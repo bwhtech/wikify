@@ -15,6 +15,8 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
 # Numbered headings ("1.", "1.1", "1.1.1") encode their own level — recover it.
 # Allow an optional trailing dot so top-level "1." is caught, not just "1.1".
 _NUM_RE = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+\S")
+_LEADING_NUM = re.compile(r"^(\d+)\b")
+_DOUBLE_NUM = re.compile(r"^\d+\.\s+\d")  # e.g. "6. 3.1 ..." — a list item, not a chapter
 
 
 def _clean_title(raw: str) -> str:
@@ -26,6 +28,17 @@ def _infer_level(title: str, fallback: int) -> int:
     if m:
         return min(6, m.group(1).count(".") + 1)
     return fallback
+
+
+def _chapter_num(title: str) -> int | None:
+    m = _LEADING_NUM.match(title)
+    return int(m.group(1)) if m else None
+
+
+def _looks_like_list_item(title: str) -> bool:
+    """A numbered 'heading' with a stray bold marker or double numbering is really
+    a list item the parser mis-read (e.g. '2. **Maternal...', '6. 3.1 Eclampsia')."""
+    return "*" in title or bool(_DOUBLE_NUM.match(title))
 
 
 @dataclass
@@ -46,6 +59,7 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
     stack: list[tuple[int, str]] = []  # (level, title) for hierarchy path
     current: Section | None = None
     buf: list[str] = []
+    max_chapter = 0  # highest accepted top-level chapter number (sequence validation)
 
     def flush():
         if current is not None:
@@ -61,6 +75,17 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
                 title = _clean_title(m.group(2))
                 # Embedded ToC wins; else numbering; else the parser's '#' depth.
                 level = correct_level(title, _infer_level(title, len(m.group(1))), level_map)
+                # Heading validation: a numbered top-level heading that is out of
+                # chapter sequence (number not greater than the last accepted chapter)
+                # or malformed is a list item mis-read as a chapter — demote it so it
+                # nests under the current chapter instead of becoming a new one.
+                if level == 1 and title not in level_map:
+                    cnum = _chapter_num(title)
+                    if cnum is not None:
+                        if _looks_like_list_item(title) or cnum <= max_chapter:
+                            level = 2
+                        else:
+                            max_chapter = cnum
                 while stack and stack[-1][0] >= level:
                     stack.pop()
                 stack.append((level, title))

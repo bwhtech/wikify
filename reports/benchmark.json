@@ -45,26 +45,26 @@
   },
   "judge_eval_cost": 0.66215,
   "structure_prep": {
-    "sections": 367,
+    "sections": 372,
     "cost": 0.03331,
     "seconds": 311.6,
     "model": "google/gemini-2.5-flash",
     "by_type": {
-      "other": 11,
-      "administrative_policies": 28,
-      "clinical_protocols": 74,
-      "staff_roles_and_responsibilities": 26,
-      "patient_management": 104,
-      "surgical_procedures": 32,
+      "clinical_protocols": 75,
+      "administrative_policies": 27,
+      "other": 10,
+      "staff_roles_and_responsibilities": 24,
+      "patient_management": 106,
+      "surgical_procedures": 36,
       "research_and_documentation": 10,
-      "equipment_and_facilities": 3,
-      "emergency_procedures": 17,
-      "medication_management": 45,
+      "equipment_and_facilities": 4,
+      "emergency_procedures": 19,
+      "medication_management": 44,
       "training_and_audits": 17
     }
   },
   "structure": {
-    "wiki_pages": 27,
+    "wiki_pages": 19,
     "tree": [
       {
         "title": "CHRISTIAN MEDICAL COLLEGE, VELLORE",
@@ -75,18 +75,12 @@
       {
         "title": "REVISION HISTORY",
         "page_start": 1,
-        "page_end": 7,
+        "page_end": 6,
         "ref_links": 0
       },
       {
         "title": "1. DEPARTMENTAL PROFILE",
         "page_start": 7,
-        "page_end": 12,
-        "ref_links": 0
-      },
-      {
-        "title": "ORGANOGRAM",
-        "page_start": 13,
         "page_end": 16,
         "ref_links": 0
       },
@@ -99,24 +93,12 @@
       {
         "title": "4. RECORDS MAINTAINED",
         "page_start": 37,
-        "page_end": 39,
+        "page_end": 38,
         "ref_links": 0
       },
       {
         "title": "5. PROCEDURE FOLLOWED FOR THE ACCESS OF THE PATIENT",
         "page_start": 39,
-        "page_end": 85,
-        "ref_links": 0
-      },
-      {
-        "title": "2. **Maternal mortality meeting",
-        "page_start": 85,
-        "page_end": 85,
-        "ref_links": 0
-      },
-      {
-        "title": "3. **Gynaecology audit",
-        "page_start": 85,
         "page_end": 87,
         "ref_links": 0
       },
@@ -133,20 +115,8 @@
         "ref_links": 1
       },
       {
-        "title": "6. 3.1 Eclampsia drill",
-        "page_start": 125,
-        "page_end": 130,
-        "ref_links": 0
-      },
-      {
         "title": "FIGO recommendations",
         "page_start": 130,
-        "page_end": 137,
-        "ref_links": 0
-      },
-      {
-        "title": "5. **Perimenopausal",
-        "page_start": 137,
         "page_end": 161,
         "ref_links": 0
       },
@@ -158,24 +128,6 @@
       },
       {
         "title": "8. PROCEDURES IN PLACE FOR MANAGING MEDICATION",
-        "page_start": 165,
-        "page_end": 165,
-        "ref_links": 0
-      },
-      {
-        "title": "1. OPD Prescription",
-        "page_start": 165,
-        "page_end": 165,
-        "ref_links": 0
-      },
-      {
-        "title": "2. Dispensing medications in OPD",
-        "page_start": 165,
-        "page_end": 165,
-        "ref_links": 0
-      },
-      {
-        "title": "3. IP Prescription and administration of medications",
         "page_start": 165,
         "page_end": 169,
         "ref_links": 0
