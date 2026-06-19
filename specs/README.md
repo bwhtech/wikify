@@ -42,6 +42,13 @@ Core principles:
 | 1 | [poc-1-parser-bakeoff.md](poc-1-parser-bakeoff.md) | Rank parsers on real samples using POC-0. Pick default + fallback. |
 | 2 | [poc-2-sectioning-retrieval.md](poc-2-sectioning-retrieval.md) | Section chunking + type tagging + the "all job descriptions" query. |
 
+## Productization
+
+The POC pipeline is validated. **[`product/`](product/README.md)** specs the actual
+Frappe app + Frappe UI (v1 beta) frontend — Imports list → guided page/tree review →
+typed Explore → wiki generation. See [`product/README.md`](product/README.md) for the
+phase roadmap, naming, and the architecture / data-model / front- & back-end plans.
+
 ## Repo layout (proposed)
 
 ```
