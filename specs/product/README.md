@@ -60,6 +60,7 @@ Each phase is a vertical slice that ends in something usable.
 | [`03-backend-plan.md`](03-backend-plan.md) | Pipeline port, background jobs, whitelisted APIs, realtime events, model config — phase by phase. |
 | [`04-frontend-plan.md`](04-frontend-plan.md) | SPA scaffold, routes, screens & components — phase by phase. |
 | [`05-wiki-generation.md`](05-wiki-generation.md) | Source Section tree → Wiki Document tree, page-ref link rewriting, regeneration. |
+| [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) | Tracer-bullet vertical slices + delivery order (the *how/when*, vs the phases' *what*). |
 
 ## Key reuse decisions (grounded in the bench)
 
