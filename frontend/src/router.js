@@ -7,6 +7,12 @@ const routes = [
 		name: "Imports",
 		component: () => import("@/pages/ImportList.vue"),
 	},
+	{
+		path: "/import/:name/:tab?",
+		name: "ImportDetail",
+		component: () => import("@/pages/ImportDetail.vue"),
+		props: true,
+	},
 ];
 
 // __FRONTEND_ROUTE__ is injected by the frappe-ui vite plugin (= '/wikify').

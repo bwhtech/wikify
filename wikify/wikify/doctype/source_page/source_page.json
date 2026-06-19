@@ -1,0 +1,83 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-06-19 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "source_document",
+  "page_no",
+  "kind",
+  "image",
+  "baseline_section",
+  "baseline_markdown"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_document",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source Document",
+   "options": "Source Document",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "page_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Page No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kind",
+   "options": "text\nvisual",
+   "read_only": 1
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image",
+   "read_only": 1
+  },
+  {
+   "fieldname": "baseline_section",
+   "fieldtype": "Section Break",
+   "label": "Baseline"
+  },
+  {
+   "fieldname": "baseline_markdown",
+   "fieldtype": "Code",
+   "label": "Baseline Markdown",
+   "options": "Markdown"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-19 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Wikify",
+ "name": "Source Page",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "page_no",
+ "sort_order": "ASC",
+ "states": []
+}

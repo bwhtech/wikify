@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "IMP-.YYYY.-.#####",
+ "creation": "2026-06-19 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "import_title",
+  "pdf",
+  "status",
+  "column_break_status",
+  "stage_progress",
+  "stage_label",
+  "page_count",
+  "artifact_section",
+  "source_document",
+  "started_at",
+  "completed_at",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "import_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pdf",
+   "fieldtype": "Attach",
+   "label": "PDF",
+   "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nQueued\nParsing\nReview\nRemediating\nTree Review\nGraphed\nGenerating Wiki\nCompleted\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stage_progress",
+   "fieldtype": "Percent",
+   "label": "Stage Progress",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stage_label",
+   "fieldtype": "Data",
+   "label": "Stage Label",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Page Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "artifact_section",
+   "fieldtype": "Section Break",
+   "label": "Artifact"
+  },
+  {
+   "fieldname": "source_document",
+   "fieldtype": "Link",
+   "label": "Source Document",
+   "options": "Source Document",
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Long Text",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-19 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Wikify",
+ "name": "Wikify Import",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "import_title"
+}

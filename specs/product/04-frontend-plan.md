@@ -67,11 +67,17 @@ import via the `exports` subpaths (`frappe-ui`, `frappe-ui/code-editor`,
 ## Phase 1 — Imports list + New Import + Progress
 
 **Imports list** (`pages/ImportList.vue`)
-- `ListView` fed by `useList("Wikify Import", fields=[name, import_title, status,
+- Fed by `useList("Wikify Import", fields=[name, import_title, status,
   stage_progress, page_count, mean_score, modified], orderBy="modified desc")`.
 - Columns: Title · Status (badge) · Progress (inline `<Progress>` when active) ·
-  Pages · Score · Updated. `options.onRowClick` → import detail.
-- `ListFilter` on status. Header button **"New Import"** opens the dialog.
+  Pages · Score · Updated. Row click → import detail.
+- Header button **"New Import"** opens the dialog. Live: subscribe
+  `wikify_import_progress` to update the matching row's status/progress in place.
+
+  > **As built (1b):** a custom aligned row list (fixed-width columns + frappe-ui
+  > `Badge`/`Progress`), not `ListView` — `ListView`'s per-cell slot exposes only a
+  > single cell value, so a status-badge-plus-inline-progress cell can't read the
+  > row's other fields. `useList` still drives the data. `ListFilter` deferred.
 
 **New Import dialog** (`components/NewImportDialog.vue`) — frappe-ui `Dialog`
 - Step 1 (single step is enough): a FileUploader for the PDF. On select, default the
