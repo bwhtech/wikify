@@ -35,6 +35,14 @@ cost/latency/tokens per call) into `engine/llm.py`. Key from `Wikify Settings`
 `Import Log Entry.meta` (cost/latency/model) so the UI can show spend per stage,
 reusing the POC's benchmark instrumentation.
 
+> **As built (Slice 2):** `engine/llm.py` calls OpenRouter's REST endpoint with
+> **`requests`** rather than the `openai` SDK (not on the bench; the only change is the
+> HTTP boundary — judge/cost logic is the POC's). `reset_metrics()`/`get_metrics()` feed
+> the parse job, which writes per-page cost into `Import Log Entry.meta`. The key
+> resolves via `engine/settings.py`: `Wikify Settings.openrouter_api_key` →
+> `site_config` → env → `apps/wikify/.env`. So the `openai` dep in Phase 0 step 4 is
+> **not** required.
+
 ---
 
 ## Phase 0 — Foundations
@@ -93,6 +101,14 @@ test site and produce Source Document + Source Page + Source Section rows.
    `publish_progress(100)`.
 
 On exception: `status=Failed`, write `error`, log an `error` line.
+
+> **As built (Slice 2):** scoring (step 3) and `mean_score` (step 6) are wired —
+> `parse_pdf` calls `verify.score_page` per page (judge on visual always; text only when
+> `Wikify Settings.judge_all_pages` is on), persists via `store.set_page_scores` /
+> `store.set_mean_score`, and the job logs per-page cost to `Import Log Entry.meta`.
+> Steps 2/4/5 (ToC, sectionize, classify) are **not** in the parse job yet — sections
+> land in Slice 4, classify in Slice 6. `None` table/judge scores are omitted on write
+> (Frappe Float is NOT NULL → row keeps `0.0`).
 
 **Realtime channels**: `wikify_import_progress` `{import, percent, stage_label,
 status}`; `wikify_import_log` `{import, level, stage, message, meta}`.

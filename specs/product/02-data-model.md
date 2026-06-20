@@ -3,12 +3,13 @@
 Maps the POC SQLite schema (`scratch/pdf_lab/loader/graph.py`) onto Frappe DocTypes.
 Field types are Frappe fieldtypes. `reqd` = required; `ro` = read-only (system-set).
 
-> **As built (through Slice 1b):** `Wikify Import`, `Source Document`, `Source Page`,
-> and `Import Log Entry` exist with only the fields their slice exercises — added
-> incrementally (scoring/remediation/canonical fields on `Source Page` in Slices 2–3).
-> `Source Section`, `Section Type`, and `Wikify Settings` are not created yet (Slices
-> 4 / 6 / 2). `Source Page` is `hash`-named (the spec's `{source_document}::p{page_no}`
-> is noted as optional); `import` / `pdf` are present per the tables below.
+> **As built (through Slice 2):** `Wikify Import`, `Source Document`, `Source Page`,
+> `Import Log Entry`, and `Wikify Settings` (Single) exist with only the fields their
+> slice exercises. Slice 2 added baseline score fields + `verdict` + `notes` on
+> `Source Page` and `mean_score` on `Source Document`; remediation/canonical fields
+> land in Slice 3. `Source Section` / `Section Type` are not created yet (Slices 4 / 6).
+> `Source Page` is `hash`-named (the spec's `{source_document}::p{page_no}` is noted as
+> optional); `import` / `pdf` are present per the tables below.
 
 ## Entity-relationship overview
 
@@ -196,6 +197,7 @@ without code (the POC already made them env-overridable).
 | `pass_threshold` | Float | 0.90 |
 | `escalate_threshold` | Float | 0.70 |
 | `cleanup_recall_tolerance` | Float | 0.12 |
+| `judge_all_pages` | Check | 0 (visual pages always judged; this also judges text pages) |
 | `render_dpi` | Int | 150 |
 | `visual_min_chars` | Int | 250 |
 | `visual_min_drawings` | Int | 40 |

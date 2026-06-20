@@ -131,6 +131,16 @@ line for visual pages (judge-dominant), as the POC surfaces.
 **Actions**: "Remediate flagged" / "Remediate all" → `trigger_remediation`; progress
 streams as in Phase 1.
 
+> **As built (Slice 2):** `components/PageReview.vue` ships the split-pane and replaces
+> the 1b stacked-card Pages tab. Left: thumbnail + page no + verdict badge + `text`/
+> `visual` chip + All/Flagged filter (default Flagged). Right: Tabs **PDF** (`<object
+> :data="{pdf}#page=N">`, not PDF.js) / **Snapshot** (PNG) / **Markdown** (`CodeEditor`
+> from `frappe-ui/code-editor`, `language="markdown"`, `:disabled`), plus the kind-aware
+> scores strip with the honest line for visual pages. **Deferred to Slice 3** (need the
+> remediation/canonical data): the Markdown tab shows `baseline_markdown` (not
+> `canonical_markdown`); no Source⇄Preview / Baseline⇄Remediated toggles, no adopted ✓
+> marker, no "Remediate flagged/all" actions.
+
 ---
 
 ## Phase 3 — Tree Review
