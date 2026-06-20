@@ -57,6 +57,14 @@ reusing the POC's benchmark instrumentation.
 Acceptance: `bench execute` can run `engine.parse_pdf(pdf_path)` end-to-end against a
 test site and produce Source Document + Source Page + Source Section rows.
 
+> **As built:** Slice 1b ships the thin spine — `engine.parse_pdf` produces
+> Source Document + Source Page (render + baseline `pymupdf4llm` parse, no scoring).
+> `store.py`'s 1b surface is `create_document` / `add_page` / `set_page_count`;
+> scoring/canonical (`add_page_score`, `canonical_mean`) land in Slice 2 and the
+> `Source Section` tree in Slice 4. `Wikify Settings` + `engine/llm.py` arrive with
+> Slice 2. Deps `pymupdf` + `pymupdf4llm` are in `pyproject.toml` (the latter now
+> also pulls a layout/OCR model — heavier than the POC, same `to_markdown` API).
+
 ---
 
 ## Phase 1 — Imports list + Parse + Progress

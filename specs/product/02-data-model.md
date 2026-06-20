@@ -3,6 +3,13 @@
 Maps the POC SQLite schema (`scratch/pdf_lab/loader/graph.py`) onto Frappe DocTypes.
 Field types are Frappe fieldtypes. `reqd` = required; `ro` = read-only (system-set).
 
+> **As built (through Slice 1b):** `Wikify Import`, `Source Document`, `Source Page`,
+> and `Import Log Entry` exist with only the fields their slice exercises — added
+> incrementally (scoring/remediation/canonical fields on `Source Page` in Slices 2–3).
+> `Source Section`, `Section Type`, and `Wikify Settings` are not created yet (Slices
+> 4 / 6 / 2). `Source Page` is `hash`-named (the spec's `{source_document}::p{page_no}`
+> is noted as optional); `import` / `pdf` are present per the tables below.
+
 ## Entity-relationship overview
 
 ```

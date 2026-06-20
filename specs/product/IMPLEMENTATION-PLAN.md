@@ -22,17 +22,20 @@ that skeleton rather than adding a new disconnected layer.
 
 ## Slice map
 
-| # | Slice | Type | Blocked by | Spec phase |
-|---|---|---|---|---|
-| 1a | Scaffold + empty SPA shell behind auth | HITL | — | 0 |
-| 1b | Walking skeleton: upload → parse → see markdown | HITL | 1a | 0 + 1 |
-| 2 | Page scoring + review split-pane | HITL | 1b | 2 |
-| 3 | Remediation (cleanup / VLM) + canonical | AFK | 2 | 2 |
-| 4 | Sectionize → Source Section tree (read-only) | AFK | 1b | 1 + 3 |
-| 5 | Tree drag-review + graph approval | HITL | 4 | 3 |
-| 6 | Classification + Explore (cross-document) | HITL | 4 | 4 |
-| 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 |
-| 8 | Inline editing (later) | AFK | 2 | 6 |
+| # | Slice | Type | Blocked by | Spec phase | Status |
+|---|---|---|---|---|---|
+| 1a | Scaffold + empty SPA shell behind auth | HITL | — | 0 | ✅ Done |
+| 1b | Walking skeleton: upload → parse → see markdown | HITL | 1a | 0 + 1 | ✅ Done |
+| 2 | Page scoring + review split-pane | HITL | 1b | 2 | Next |
+| 3 | Remediation (cleanup / VLM) + canonical | AFK | 2 | 2 | — |
+| 4 | Sectionize → Source Section tree (read-only) | AFK | 1b | 1 + 3 | — |
+| 5 | Tree drag-review + graph approval | HITL | 4 | 3 | — |
+| 6 | Classification + Explore (cross-document) | HITL | 4 | 4 | — |
+| 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 | — |
+| 8 | Inline editing (later) | AFK | 2 | 6 | — |
+
+> **Progress** (branch `slice-1-foundations`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780`.
+> Both verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 2**.
 
 Dependency spine is mostly linear (it is a pipeline). Parallelism: **6** can proceed
 off **4** alongside **5**; **8** floats off **2**.
@@ -80,6 +83,7 @@ into `scratch/` or uploaded ad hoc; reuse the POC's sample PDFs where possible.
 
 **Type:** HITL (scaffold-cloning decisions + first look at the app shell).
 **Blocked by:** none.
+**Status:** ✅ Done — `slice-1-foundations` (`c127f8b`).
 
 ### What to build
 Adapt the gameplan frontend skeleton and stand up an empty, authenticated SPA at
@@ -101,9 +105,9 @@ Adapt the gameplan frontend skeleton and stand up an empty, authenticated SPA at
   plugin handles proxy/boot/build (no manual `optimizeDeps.exclude`).
 
 ### Acceptance criteria
-- [ ] Visiting `/wikify` unauthenticated redirects to login; authenticated renders the shell.
-- [ ] App shell shows `Sidebar` + empty Imports route with correct header/tokens; dark mode via `[data-theme="dark"]` works.
-- [ ] `bench build` / vite dev both serve the SPA; socket connects without error.
+- [x] Visiting `/wikify` unauthenticated redirects to login; authenticated renders the shell.
+- [x] App shell shows a sidebar + empty Imports route with correct header/tokens; dark mode via `[data-theme="dark"]` works.
+- [x] `bench build` / vite dev both serve the SPA; socket connects without error.
 
 **Verify:** `bench build --app wikify` then `bench start`; open `/wikify` in a fresh/
 incognito session (expect login redirect), log in as Administrator (expect the shell),
@@ -119,6 +123,7 @@ toggle dark mode, and confirm no socket errors in the console.
 
 **Type:** HITL (the spine-verification checkpoint — first time real data flows end-to-end).
 **Blocked by:** 1a.
+**Status:** ✅ Done — `slice-1-foundations` (`bfec780`).
 
 ### What to build
 The tracer bullet. Thinnest possible end-to-end path: upload a PDF and watch it
@@ -143,10 +148,10 @@ no sections, no LLM** — those are later slices.
   log) + raw per-page markdown.
 
 ### Acceptance criteria
-- [ ] From the list, **New Import** → pick a PDF → progress bar animates and log streams live.
-- [ ] Import lands in `Review` with one `Source Page` per page, each showing rendered PNG + baseline markdown.
-- [ ] `bench execute wikify.engine.parse_pdf` (or equivalent) produces the rows headless (the spec's Phase-0 acceptance).
-- [ ] Refetch reflects persisted `status`/`page_count` (not only realtime).
+- [x] From the list, **New Import** → pick a PDF → progress bar animates and log streams live.
+- [x] Import lands in `Review` with one `Source Page` per page, each showing rendered PNG + baseline markdown.
+- [x] `bench execute wikify.engine.parse_pdf` (or equivalent) produces the rows headless (the spec's Phase-0 acceptance).
+- [x] Refetch reflects persisted `status`/`page_count` (not only realtime).
 
 **Verify:** headless — `bench --site pdf.localhost execute wikify.engine.parse_pdf`
 on a sample PDF, then in `console` assert one `Source Document` + N `Source Page` rows
