@@ -28,14 +28,14 @@ that skeleton rather than adding a new disconnected layer.
 | 1b | Walking skeleton: upload → parse → see markdown | HITL | 1a | 0 + 1 | ✅ Done |
 | 2 | Page scoring + review split-pane | HITL | 1b | 2 | ✅ Done |
 | 3 | Remediation (cleanup / VLM) + canonical | AFK | 2 | 2 | ✅ Done |
-| 4 | Sectionize → Source Section tree (read-only) | AFK | 1b | 1 + 3 | — |
+| 4 | Sectionize → Source Section tree (read-only) | AFK | 1b | 1 + 3 | ✅ Done |
 | 5 | Tree drag-review + graph approval | HITL | 4 | 3 | — |
 | 6 | Classification + Explore (cross-document) | HITL | 4 | 4 | — |
 | 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 | — |
 | 8 | Inline editing (later) | AFK | 2 | 6 | — |
 
-> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780` · **2** ✅ · **3** ✅.
-> All verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 4**.
+> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780` · **2** ✅ · **3** ✅ · **4** ✅.
+> All verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 5**.
 
 Dependency spine is mostly linear (it is a pipeline). Parallelism: **6** can proceed
 off **4** alongside **5**; **8** floats off **2**.
@@ -297,6 +297,7 @@ canonical; flagged count drops; `Source Document.canonical_mean` rises.
 
 **Type:** AFK.
 **Blocked by:** 1b (run after 3 so it reads canonical markdown).
+**Status:** ✅ Done — `main`.
 
 ### What to build
 - **Engine:** port `engine/loader/{sectionizer,toc}` (heading-validation + numbering +
@@ -308,13 +309,48 @@ canonical; flagged count drops; `Source Document.canonical_mean` rises.
   ranges per node.
 
 ### Acceptance criteria
-- [ ] A parsed doc shows a correct nested section tree with page ranges and hierarchy paths.
-- [ ] Tree rebuild after remediation respects adopted markdown (no revert to empty baseline).
+- [x] A parsed doc shows a correct nested section tree with page ranges and hierarchy paths.
+- [x] Tree rebuild after remediation respects adopted markdown (no revert to empty baseline).
 
 **Verify:** after parse, in `console` walk `Source Section` for the doc and assert
 correct `parent_source_section`, `level`, `hierarchy_path`, and `page_start..end` vs the
 PDF's outline. UI — Tree tab renders the nested structure with page ranges. Re-run
 remediation and confirm the rebuilt tree still reflects adopted (not empty) markdown.
+
+### As-built notes (reconciled)
+- **Engine:** `engine/loader/{toc,sectionizer}` ported verbatim from the POC (only the
+  import paths changed — `toc` reads `engine.pdf_utils.get_toc`). `engine/sectionize.py`
+  `sectionize_document(source_document, pdf_path)` is the headless entrypoint: it wires
+  in `loader/cleanup.clean_pages` (cross-page boilerplate strip), builds the embedded-ToC
+  `level_map`, sectionizes, and rebuilds the tree via the store seam.
+- **Built over canonical markdown, at both ends of the pipeline.** `store.get_canonical_pages`
+  reads `canonical_markdown or baseline_markdown` per page, so `sectionize_document` is
+  called at the end of **both** `parse_pdf` (canonical == baseline there) and
+  `remediate_pdf` (canonical == adopted output) — the remediate rebuild reflects adopted
+  text and never reverts to empty/pre-cleanup baseline.
+- **DocType:** `Source Section` is a Frappe **NestedSet** (`is_tree`,
+  `nsm_parent_field = parent_source_section`; controller subclasses `NestedSet`).
+  `store.replace_sections` rebuilds wholesale — raw-deletes the doc's rows then inserts in
+  document order, resolving each parent by hierarchy path (the parent always precedes the
+  child), persisting `level` / `hierarchy_path` / `page_start..end` / `sort_order`, and
+  setting `is_group` for any section another nests under. NestedSet manages `lft`/`rgt`;
+  other docs' subtrees are independent number-spaces so no global rebuild is needed.
+- **API:** `wikify.api.sections.get_tree(source_document)` returns the nested roots
+  (ordered by `lft`) — kept as the read seam for Slices 5/7.
+- **UI:** `ImportDetail` gains a **Tree** tab (`SectionTree.vue`, split-pane): left =
+  frappe-ui `Tree` (custom `label` slot showing title + `section_type` chip + page range,
+  fully expanded) rebuilt client-side from a reactive `useList` over `Source Section`
+  (ordered by `lft`); right = selected section's level/page badges + hierarchy path +
+  read-only `CodeEditor` markdown. Refetches after a remediation run completes (the tree
+  is rebuilt server-side). `section_type` chips are wired but stay empty until Slice 6.
+- Tests: `tests/test_sectionize.py` — pure sectionizer unit tests (numbered-heading
+  nesting, out-of-sequence chapter demotion, running-header merge, preamble fallback,
+  boilerplate strip) + integration (parse builds the tree; remediation rebuilds it over
+  adopted markdown without going empty). Verified live on `pdf.localhost` (3-chapter demo
+  manual → 7-section nested tree, page ranges, click-to-view markdown).
+- **Fixture gotcha:** the pymupdf4llm baseline marks large-font lines as headings itself,
+  so test PDFs must use **numbered titles without literal `#`** — the sectionizer recovers
+  level from the numbering (`1.` → L1, `1.1` → L2), robust to the parser's `#` depth.
 
 ### Spec refs
 [03-backend-plan Phase 1 (sectionize)](03-backend-plan.md#phase-1--imports-list--parse--progress) ·

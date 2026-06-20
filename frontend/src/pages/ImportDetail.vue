@@ -4,6 +4,7 @@ import { Badge, Button, Dropdown, Progress, Tabs, useCall, useDoc, useList } fro
 import { useSocket } from "@/socket";
 import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
+import SectionTree from "@/components/SectionTree.vue";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -15,8 +16,9 @@ const imp = useDoc({ doctype: "Wikify Import", name: props.name });
 const tabs = [
 	{ label: "Overview", key: "overview" },
 	{ label: "Pages", key: "pages" },
+	{ label: "Tree", key: "tree" },
 ];
-const activeTab = ref(props.tab === "pages" ? 1 : 0);
+const activeTab = ref({ pages: 1, tree: 2 }[props.tab] ?? 0);
 
 // Streaming log
 const logs = useList({
@@ -31,6 +33,7 @@ const status = computed(() => imp.doc?.status);
 const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
 
 const pageReview = ref(null);
+const sectionTree = ref(null);
 
 // Remediation — route flagged (or all) pages through cleanup/VLM, adopt the best.
 const remediate = useCall({
@@ -52,8 +55,11 @@ function onProgress(payload) {
 	// Terminal transitions carry fields set server-side (source_document, error).
 	if (payload.status === "Review" || payload.status === "Failed") {
 		imp.reload();
-		// A finished remediation rewrote canonical scores — refetch the page list.
-		if (wasRemediating && payload.status === "Review") pageReview.value?.reload();
+		// A finished remediation rewrote canonical scores + rebuilt the tree — refetch both.
+		if (wasRemediating && payload.status === "Review") {
+			pageReview.value?.reload();
+			sectionTree.value?.reload();
+		}
 	}
 }
 function onLog(payload) {
@@ -182,6 +188,15 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						ref="pageReview"
 						:source-document="imp.doc?.source_document"
 						:pdf-url="imp.doc?.pdf"
+					/>
+				</div>
+
+				<!-- Tree -->
+				<div v-else-if="tab.key === 'tree'" class="h-[calc(100vh-7rem)]">
+					<SectionTree
+						ref="sectionTree"
+						:source-document="imp.doc?.source_document"
+						:doc-title="imp.doc?.import_title || name"
 					/>
 				</div>
 			</template>

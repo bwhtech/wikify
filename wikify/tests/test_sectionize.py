@@ -1,0 +1,131 @@
+# Copyright (c) 2026, BWH and contributors
+# For license information, please see license.txt
+
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+import frappe
+from frappe.tests.utils import FrappeTestCase
+
+from wikify.engine import parse_pdf, remediate_pdf
+from wikify.engine.loader.cleanup import clean_pages
+from wikify.engine.loader.sectionizer import sectionize
+from wikify.tests.test_parse_pipeline import _make_sample_pdf
+from wikify.tests.test_remediate_pipeline import _MERMAID, _fake_chat
+
+
+class TestSectionizer(FrappeTestCase):
+	"""Pure sectionizer logic — no DB, deterministic (the ported POC behavior)."""
+
+	def test_numbered_headings_nest_by_their_number(self):
+		pages = [
+			(1, "## 1. Introduction\nbody\n## 1.1 Scope\nscope body"),
+			(2, "## 2. Procedures\nproc body"),
+		]
+		secs = sectionize(pages)
+		titles = [(s.title, s.level) for s in secs]
+		self.assertEqual(titles, [("1. Introduction", 1), ("1.1 Scope", 2), ("2. Procedures", 1)])
+		# Scope's hierarchy path threads through Introduction; page ranges tracked.
+		scope = secs[1]
+		self.assertEqual(scope.hierarchy_path, ["1. Introduction", "1.1 Scope"])
+		self.assertEqual(secs[2].page_start, 2)
+
+	def test_out_of_sequence_numbered_heading_is_demoted(self):
+		# "1. Eclampsia" after chapter 2 isn't a new chapter — it's a mis-read list
+		# item; it must nest under the current chapter, not restart numbering.
+		pages = [(1, "## 1. First\na\n## 2. Second\nb\n## 1. Eclampsia\nc")]
+		secs = sectionize(pages)
+		levels = {s.title: s.level for s in secs}
+		self.assertEqual(levels["1. First"], 1)
+		self.assertEqual(levels["2. Second"], 1)
+		self.assertEqual(levels["1. Eclampsia"], 2)  # demoted
+
+	def test_repeated_numbered_running_header_is_merged(self):
+		# A numbered chapter heading re-emitted as a per-page running title collapses
+		# into one section spanning the page range (not one section per page).
+		pages = [
+			(1, "## 3. Surgery\nintro"),
+			(2, "## 3. Surgery\nmore on page two"),
+			(3, "## 3. Surgery\nstill more"),
+		]
+		secs = sectionize(pages)
+		self.assertEqual(len(secs), 1)
+		self.assertEqual(secs[0].page_start, 1)
+		self.assertEqual(secs[0].page_end, 3)
+		self.assertIn("more on page two", secs[0].markdown)
+
+	def test_content_before_any_heading_becomes_preamble(self):
+		secs = sectionize([(1, "just some text\nno headings here")])
+		self.assertEqual(len(secs), 1)
+		self.assertEqual(secs[0].title, "Preamble")
+		self.assertEqual(secs[0].level, 1)
+
+	def test_clean_pages_strips_varying_boilerplate_before_sectionizing(self):
+		# Running footers ("Pg 2 of 2") must not survive as fake headings.
+		pages = [(1, "## 1. Intro\nbody\nPg 1 of 2"), (2, "## 2. Next\nbody\nPg 2 of 2")]
+		secs = sectionize(clean_pages(pages))
+		self.assertTrue(all("Pg" not in s.markdown for s in secs))
+		self.assertEqual([s.title for s in secs], ["1. Intro", "2. Next"])
+
+
+class TestSectionizeIntegration(FrappeTestCase):
+	"""parse/remediate build the Source Section NestedSet tree."""
+
+	def _sections(self, sd):
+		return frappe.get_all(
+			"Source Section",
+			filters={"source_document": sd},
+			fields=[
+				"name", "title", "level", "parent_source_section",
+				"hierarchy_path", "is_group", "lft", "rgt", "page_start", "page_end",
+			],
+			order_by="lft asc",
+		)
+
+	def test_parse_builds_section_tree(self):
+		path = Path(tempfile.mkdtemp()) / "sample.pdf"
+		_make_sample_pdf(str(path))
+		sd = parse_pdf(str(path), title="Sectionize Test")
+
+		secs = self._sections(sd)
+		self.assertTrue(secs, "parse produced no sections")
+		# A real top-level section exists and levels/paths are persisted.
+		roots = [s for s in secs if not s.parent_source_section]
+		self.assertTrue(roots)
+		for s in secs:
+			self.assertGreaterEqual(s.level, 1)
+			self.assertTrue(s.hierarchy_path)
+			# NestedSet bounds are well-formed.
+			self.assertLess(s.lft, s.rgt)
+		# The numbered chapters from the fixture surface as sections.
+		titles = " ".join(s.title for s in secs)
+		self.assertIn("Procedures", titles)
+
+	def test_remediation_rebuilds_tree_over_adopted_markdown(self):
+		path = Path(tempfile.mkdtemp()) / "sample.pdf"
+		_make_sample_pdf(str(path))
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+		):
+			sd = parse_pdf(str(path), title="Sectionize Remediate Test")
+
+		before = {s.name for s in self._sections(sd)}
+		self.assertTrue(before)
+
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+			# Cleanup keeps content (identity) so the rebuilt tree can't go empty.
+			patch("wikify.engine.remediate.clean_markdown", side_effect=lambda md, model=None: md),
+			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
+		):
+			result = remediate_pdf(sd, str(path), scope="all")
+
+		after = self._sections(sd)
+		# Tree was rebuilt (fresh rows) and did NOT revert to empty/baseline-less.
+		self.assertTrue(after, "remediation left an empty tree")
+		self.assertEqual(result["sections"], len(after))
+		self.assertFalse(before & {s.name for s in after}, "old section rows not replaced")
+		self.assertTrue(any("Procedures" in s.title for s in after))

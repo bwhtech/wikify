@@ -1,0 +1,184 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-06-20 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "source_document",
+  "parent_source_section",
+  "is_group",
+  "title",
+  "section_type",
+  "column_break_meta",
+  "level",
+  "sort_order",
+  "page_start",
+  "page_end",
+  "include_in_wiki",
+  "section_break_body",
+  "hierarchy_path",
+  "markdown",
+  "wiki_document",
+  "lft",
+  "rgt",
+  "old_parent"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_document",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source Document",
+   "options": "Source Document",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "parent_source_section",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Parent Source Section",
+   "options": "Source Section"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_group",
+   "fieldtype": "Check",
+   "label": "Is Group"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "description": "Taxonomy label (drives Explore). Set by the classifier (Slice 6).",
+   "fieldname": "section_type",
+   "fieldtype": "Link",
+   "label": "Section Type",
+   "options": "Section Type",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Depth in the tree (persisted; the POC derived it).",
+   "fieldname": "level",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Level",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "page_start",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Page Start",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page_end",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Page End",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "description": "Lets the user drop a section from wiki generation.",
+   "fieldname": "include_in_wiki",
+   "fieldtype": "Check",
+   "label": "Include in Wiki"
+  },
+  {
+   "fieldname": "section_break_body",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "\" > \"-joined ancestor titles (display + page-ref resolution).",
+   "fieldname": "hierarchy_path",
+   "fieldtype": "Small Text",
+   "label": "Hierarchy Path",
+   "read_only": 1
+  },
+  {
+   "fieldname": "markdown",
+   "fieldtype": "Code",
+   "label": "Markdown",
+   "options": "Markdown"
+  },
+  {
+   "description": "The generated wiki page (set on generation, Slice 7).",
+   "fieldname": "wiki_document",
+   "fieldtype": "Link",
+   "label": "Wiki Document",
+   "options": "Wiki Document",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lft",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Left",
+   "no_copy": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "rgt",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Right",
+   "no_copy": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "old_parent",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Old Parent",
+   "options": "Source Section",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_tree": 1,
+ "links": [],
+ "modified": "2026-06-20 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Wikify",
+ "name": "Source Section",
+ "nsm_parent_field": "parent_source_section",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "lft",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "title"
+}

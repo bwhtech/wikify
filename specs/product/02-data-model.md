@@ -3,16 +3,18 @@
 Maps the POC SQLite schema (`scratch/pdf_lab/loader/graph.py`) onto Frappe DocTypes.
 Field types are Frappe fieldtypes. `reqd` = required; `ro` = read-only (system-set).
 
-> **As built (through Slice 3):** `Wikify Import`, `Source Document`, `Source Page`,
+> **As built (through Slice 4):** `Wikify Import`, `Source Document`, `Source Page`,
 > `Import Log Entry`, and `Wikify Settings` (Single) exist with only the fields their
 > slice exercises. Slice 2 added baseline score fields + `verdict` + `notes` on
 > `Source Page` and `mean_score` on `Source Document`. Slice 3 added `remediation_*`
 > (incl. `remediation_notes`) + `canonical_*` (incl. `canonical_source`) on `Source
 > Page` and a distinct `canonical_mean` on `Source Document` (the baseline `mean_score`
-> is kept separately, so the before↔after delta survives). `Source Section` /
-> `Section Type` are not created yet (Slices 4 / 6). `Source Page` is `hash`-named (the
-> spec's `{source_document}::p{page_no}` is noted as optional); `import` / `pdf` are
-> present per the tables below.
+> is kept separately, so the before↔after delta survives). Slice 4 created
+> **`Source Section`** as a NestedSet tree (built over canonical markdown at the end of
+> both parse and remediate); its `section_type` link exists but stays empty until the
+> classifier lands. `Section Type` is not created yet (Slice 6). `Source Page` /
+> `Source Section` are `hash`-named (the spec's `{source_document}::p{page_no}` /
+> `::s{idx}` are noted as optional); `import` / `pdf` are present per the tables below.
 
 ## Entity-relationship overview
 

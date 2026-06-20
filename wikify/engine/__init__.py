@@ -18,9 +18,10 @@ import fitz  # PyMuPDF
 from wikify.engine import llm, pdf_utils, settings, store
 from wikify.engine.parsers import pymupdf as baseline
 from wikify.engine.remediate import remediate_pdf
+from wikify.engine.sectionize import sectionize_document
 from wikify.engine.verify import score_page
 
-__all__ = ["parse_pdf", "remediate_pdf"]
+__all__ = ["parse_pdf", "remediate_pdf", "sectionize_document"]
 
 
 def parse_pdf(
@@ -84,4 +85,6 @@ def parse_pdf(
 		store.set_page_count(sd, total)
 		store.set_mean_score(sd, round(sum(composites) / len(composites), 3) if composites else None)
 
+	# Build the section tree over the (baseline == canonical at parse time) markdown.
+	sectionize_document(sd, pdf_path)
 	return sd

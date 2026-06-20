@@ -25,6 +25,7 @@ import fitz  # PyMuPDF
 from wikify.engine import llm, pdf_utils, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
 from wikify.engine.loader.table_stitch import stitch_cross_page_tables
+from wikify.engine.sectionize import sectionize_document
 from wikify.engine.parsers import vlm
 from wikify.engine.verify import deterministic as det
 from wikify.engine.verify import score_page
@@ -124,5 +125,13 @@ def remediate_pdf(
 	canonical_mean = round(sum(comps) / len(comps), 3) if comps else None
 	store.set_canonical_mean(source_document, canonical_mean)
 
+	# Rebuild the section tree over the now-canonical (adopted) markdown.
+	n_sections = sectionize_document(source_document, pdf_path)
+
 	adopted_count = sum(1 for src in canon_src.values() if src != "baseline")
-	return {"targets": total, "adopted": adopted_count, "canonical_mean": canonical_mean}
+	return {
+		"targets": total,
+		"adopted": adopted_count,
+		"canonical_mean": canonical_mean,
+		"sections": n_sections,
+	}

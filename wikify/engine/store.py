@@ -134,3 +134,52 @@ def set_canonical(
 
 def set_canonical_mean(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "canonical_mean", mean)
+
+
+# --- Slice 4: sectionize → Source Section tree ---
+
+
+def get_canonical_pages(source_document: str) -> list[tuple[int, str]]:
+	"""(page_no, markdown) for sectionizing — canonical markdown where remediation
+	adopted something, else the baseline. At parse time canonical is unset, so this
+	falls back to baseline; after a remediate pass it reflects the adopted output
+	(so the rebuilt tree never reverts to empty/pre-cleanup text)."""
+	pages = frappe.get_all(
+		"Source Page",
+		filters={"source_document": source_document},
+		fields=["page_no", "canonical_markdown", "baseline_markdown"],
+		order_by="page_no asc",
+	)
+	return [(p["page_no"], p["canonical_markdown"] or p["baseline_markdown"] or "") for p in pages]
+
+
+def replace_sections(source_document: str, sections) -> int:
+	"""Rebuild a doc's Source Section tree from ordered `sectionizer.Section`s.
+
+	Replaces the existing tree wholesale (mirrors the POC's `_store_sections`):
+	clear, then insert in document order, resolving each section's parent by its
+	hierarchy path (the parent always precedes it). NestedSet manages `lft`/`rgt`;
+	`is_group` is set for any section another section nests under. Returns the count.
+	"""
+	# Full rebuild: raw-delete this doc's sections (other docs' subtrees are
+	# independent number-spaces, so NestedSet stays consistent without a global rebuild).
+	frappe.db.delete("Source Section", {"source_document": source_document})
+
+	parent_paths = {tuple(s.hierarchy_path[:-1]) for s in sections if len(s.hierarchy_path) > 1}
+	path_to_name: dict[tuple[str, ...], str] = {}
+	for idx, sec in enumerate(sections):
+		doc = frappe.new_doc("Source Section")
+		doc.source_document = source_document
+		doc.parent_source_section = path_to_name.get(tuple(sec.hierarchy_path[:-1]))
+		doc.is_group = 1 if tuple(sec.hierarchy_path) in parent_paths else 0
+		doc.title = sec.title
+		doc.section_type = sec.section_type
+		doc.level = sec.level
+		doc.hierarchy_path = " > ".join(sec.hierarchy_path)
+		doc.page_start = sec.page_start
+		doc.page_end = sec.page_end
+		doc.sort_order = idx
+		doc.markdown = sec.markdown
+		doc.insert(ignore_permissions=True)
+		path_to_name[tuple(sec.hierarchy_path)] = doc.name
+	return len(sections)

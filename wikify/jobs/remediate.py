@@ -55,7 +55,7 @@ def run(import_name: str, scope: str = "flagged") -> None:
 		log(
 			import_name, "info", "remediate",
 			f"Done — {result['adopted']}/{result['targets']} adopted, "
-			f"canonical mean {result['canonical_mean']}",
+			f"canonical mean {result['canonical_mean']}, {result['sections']} sections rebuilt",
 		)
 	except Exception:
 		error = frappe.get_traceback()

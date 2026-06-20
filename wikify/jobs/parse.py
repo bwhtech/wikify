@@ -51,11 +51,15 @@ def run(import_name: str) -> None:
 		mean_score, page_count = frappe.db.get_value(
 			"Source Document", source_document, ["mean_score", "page_count"]
 		)
+		n_sections = frappe.db.count("Source Section", {"source_document": source_document})
 		imp.db_set("source_document", source_document)
 		imp.db_set("page_count", page_count)
 		imp.db_set("completed_at", now_datetime())
 		publish_progress(import_name, 100, f"Parsed {page_count} pages", status="Review")
-		log(import_name, "info", "parse", f"Done — {page_count} pages, mean {mean_score}, status Review")
+		log(
+			import_name, "info", "parse",
+			f"Done — {page_count} pages, {n_sections} sections, mean {mean_score}, status Review",
+		)
 	except Exception:
 		error = frappe.get_traceback()
 		imp.db_set("status", "Failed")
