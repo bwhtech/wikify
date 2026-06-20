@@ -59,4 +59,5 @@ exercise them end-to-end.
 ## Git
 
 Local **`main`** tracks `origin/main` (the canonical cloud branch). `develop` is a
-preserved backup with an unrelated history — don't merge it. Branch off `main` for work.
+preserved backup with an unrelated history — don't merge it. **Commit work directly on
+`main`** (project preference — no feature branches); push only when asked.

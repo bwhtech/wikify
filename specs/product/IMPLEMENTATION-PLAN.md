@@ -34,8 +34,8 @@ that skeleton rather than adding a new disconnected layer.
 | 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 | — |
 | 8 | Inline editing (later) | AFK | 2 | 6 | — |
 
-> **Progress** (branch `slice-1-foundations`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780`.
-> Both verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 2**.
+> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780`. Both verified on
+> `pdf.localhost` per each slice's Verify steps. Up next: **Slice 2**.
 
 Dependency spine is mostly linear (it is a pipeline). Parallelism: **6** can proceed
 off **4** alongside **5**; **8** floats off **2**.
@@ -83,7 +83,7 @@ into `scratch/` or uploaded ad hoc; reuse the POC's sample PDFs where possible.
 
 **Type:** HITL (scaffold-cloning decisions + first look at the app shell).
 **Blocked by:** none.
-**Status:** ✅ Done — `slice-1-foundations` (`c127f8b`).
+**Status:** ✅ Done — `main` (`c127f8b`).
 
 ### What to build
 Adapt the gameplan frontend skeleton and stand up an empty, authenticated SPA at
@@ -123,7 +123,7 @@ toggle dark mode, and confirm no socket errors in the console.
 
 **Type:** HITL (the spine-verification checkpoint — first time real data flows end-to-end).
 **Blocked by:** 1a.
-**Status:** ✅ Done — `slice-1-foundations` (`bfec780`).
+**Status:** ✅ Done — `main` (`bfec780`).
 
 ### What to build
 The tracer bullet. Thinnest possible end-to-end path: upload a PDF and watch it
