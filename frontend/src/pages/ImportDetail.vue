@@ -1,8 +1,9 @@
 <script setup>
-import { computed, reactive, ref, watch, onMounted, onUnmounted } from "vue";
+import { computed, ref, onMounted, onUnmounted } from "vue";
 import { Badge, Button, Progress, Tabs, useDoc, useList } from "frappe-ui";
 import { useSocket } from "@/socket";
 import { statusTheme, isActive } from "@/utils/status";
+import PageReview from "@/components/PageReview.vue";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -25,23 +26,6 @@ const logs = useList({
 	orderBy: "idx_seq asc",
 	limit: 500,
 });
-
-// Per-page parse output — loads once the parse has produced a Source Document.
-const pageFilters = reactive({ source_document: "__none__" });
-const pages = useList({
-	doctype: "Source Page",
-	fields: ["name", "page_no", "kind", "image", "baseline_markdown"],
-	filters: pageFilters,
-	orderBy: "page_no asc",
-	limit: 500,
-});
-watch(
-	() => imp.doc?.source_document,
-	(sd) => {
-		if (sd) pageFilters.source_document = sd;
-	},
-	{ immediate: true },
-);
 
 const status = computed(() => imp.doc?.status);
 
@@ -160,46 +144,11 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 				</div>
 
 				<!-- Pages -->
-				<div v-else-if="tab.key === 'pages'" class="body-container pt-5 pb-40">
-					<p
-						v-if="!pages.data?.length"
-						class="py-10 text-center text-sm text-ink-gray-5"
-					>
-						No pages yet — parse still running or not started.
-					</p>
-					<div v-else class="space-y-6">
-						<div
-							v-for="page in pages.data"
-							:key="page.name"
-							class="rounded-md border border-outline-gray-1"
-						>
-							<div
-								class="flex items-center gap-2 border-b border-outline-gray-1 px-3 py-2"
-							>
-								<span class="text-base text-ink-gray-8"
-									>Page {{ page.page_no }}</span
-								>
-								<Badge
-									:label="page.kind"
-									:theme="page.kind === 'visual' ? 'orange' : 'gray'"
-									variant="subtle"
-									size="sm"
-								/>
-							</div>
-							<div class="grid gap-4 p-3 md:grid-cols-2">
-								<img
-									v-if="page.image"
-									:src="page.image"
-									:alt="`Page ${page.page_no}`"
-									class="w-full rounded border border-outline-gray-1"
-								/>
-								<pre
-									class="max-h-[480px] overflow-auto whitespace-pre-wrap rounded border border-outline-gray-1 bg-surface-gray-1 p-3 text-xs text-ink-gray-8"
-									>{{ page.baseline_markdown }}</pre
-								>
-							</div>
-						</div>
-					</div>
+				<div v-else-if="tab.key === 'pages'" class="h-[calc(100vh-7rem)]">
+					<PageReview
+						:source-document="imp.doc?.source_document"
+						:pdf-url="imp.doc?.pdf"
+					/>
 				</div>
 			</template>
 		</Tabs>

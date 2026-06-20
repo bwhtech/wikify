@@ -12,6 +12,7 @@
   "column_break_meta",
   "page_count",
   "parser_used",
+  "mean_score",
   "status"
  ],
  "fields": [
@@ -50,6 +51,14 @@
    "fieldname": "parser_used",
    "fieldtype": "Data",
    "label": "Parser Used",
+   "read_only": 1
+  },
+  {
+   "description": "Mean composite over pages (canonical mean lands in Slice 3).",
+   "fieldname": "mean_score",
+   "fieldtype": "Float",
+   "label": "Mean Score",
+   "precision": "3",
    "read_only": 1
   },
   {

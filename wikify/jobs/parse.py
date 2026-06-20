@@ -27,8 +27,17 @@ def run(import_name: str) -> None:
 		def progress_cb(done: int, total: int) -> None:
 			publish_progress(import_name, done / total * 100, f"Parsing page {done}/{total}")
 
-		def log_cb(page_no: int, total: int, kind: str) -> None:
-			log(import_name, "info", "parse", f"Parsed page {page_no}/{total} ({kind})")
+		def page_cb(page_no, total, kind, score, metrics) -> None:
+			# Per-stage cost (judge) rides along in meta so the Overview log can show it.
+			cost = sum(m["cost"] for m in metrics if m.get("cost")) or None
+			meta = {"page_no": page_no, "kind": kind, "composite": score.composite, "verdict": score.verdict}
+			if metrics:
+				meta["cost"] = cost
+				meta["models"] = [m["model"] for m in metrics]
+			suffix = f" — {score.verdict} {score.composite}"
+			if cost:
+				suffix += f" (${cost:.4f})"
+			log(import_name, "info", "parse", f"Page {page_no}/{total} ({kind}){suffix}", meta=meta)
 
 		source_document = parse_pdf(
 			pdf_path,
@@ -36,15 +45,17 @@ def run(import_name: str) -> None:
 			import_name=import_name,
 			pdf_url=imp.pdf,
 			progress_cb=progress_cb,
-			log_cb=log_cb,
+			page_cb=page_cb,
 		)
 
-		page_count = frappe.db.get_value("Source Document", source_document, "page_count")
+		mean_score, page_count = frappe.db.get_value(
+			"Source Document", source_document, ["mean_score", "page_count"]
+		)
 		imp.db_set("source_document", source_document)
 		imp.db_set("page_count", page_count)
 		imp.db_set("completed_at", now_datetime())
 		publish_progress(import_name, 100, f"Parsed {page_count} pages", status="Review")
-		log(import_name, "info", "parse", f"Done — {page_count} pages, status Review")
+		log(import_name, "info", "parse", f"Done — {page_count} pages, mean {mean_score}, status Review")
 	except Exception:
 		error = frappe.get_traceback()
 		imp.db_set("status", "Failed")

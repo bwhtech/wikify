@@ -2,8 +2,8 @@
 Frappe ORM. The pipeline calls these helpers instead of touching DocTypes
 directly, keeping the ported logic diff-minimal against the POC.
 
-Slice 1b surface: `create_document`, `add_page`, `set_page_count`. Scoring,
-sections, and canonical selection land in later slices.
+Slice 1b surface: `create_document`, `add_page`, `set_page_count`. Slice 2 adds
+`set_page_scores` + `set_mean_score`. Sections and canonical selection land later.
 """
 
 from __future__ import annotations
@@ -58,3 +58,30 @@ def add_page(
 
 def set_page_count(source_document: str, count: int) -> None:
 	frappe.db.set_value("Source Document", source_document, "page_count", count)
+
+
+def set_page_scores(page_name: str, score) -> None:
+	"""Write a `PageScore` (verify.harness) onto a Source Page row.
+
+	`table_score` / `judge_score` are `None` when there's no table / the page wasn't
+	judged. Frappe Float columns are NOT NULL (default 0), so those keys are omitted
+	rather than written — the row keeps 0.0 and the UI reads 0 as "n/a" (the harness
+	`notes` carry a genuine table-miss). Rows are recreated on every parse, so 0.0
+	never lingers as a stale value.
+	"""
+	values = {
+		"text_recall": score.text_recall,
+		"extra_ratio": score.extra_ratio,
+		"composite": score.composite,
+		"verdict": score.verdict,
+		"notes": "; ".join(score.notes) if score.notes else None,
+	}
+	if score.table_score is not None:
+		values["table_score"] = score.table_score
+	if score.judge_score is not None:
+		values["judge_score"] = score.judge_score
+	frappe.db.set_value("Source Page", page_name, values)
+
+
+def set_mean_score(source_document: str, mean: float | None) -> None:
+	frappe.db.set_value("Source Document", source_document, "mean_score", mean)

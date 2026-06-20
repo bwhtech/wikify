@@ -9,6 +9,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.engine import parse_pdf
+from wikify.engine.verify import score_page
 
 
 def _make_sample_pdf(path: str) -> None:
@@ -16,7 +17,9 @@ def _make_sample_pdf(path: str) -> None:
 	doc = fitz.open()
 	p = doc.new_page()
 	p.insert_text((72, 90), "Wikify Sample Manual", fontsize=22)
-	p.insert_text((72, 140), "1. Introduction\n\nDigital-native text page with plenty of\nselectable text.", fontsize=12)
+	p.insert_text(
+		(72, 140), "1. Introduction\n\nDigital-native text page with plenty of\nselectable text.", fontsize=12
+	)
 	p = doc.new_page()
 	p.insert_text((72, 90), "2. Procedures", fontsize=18)
 	p.insert_text((72, 140), "Step one.\nStep two.\nStep three.\n" * 3, fontsize=12)
@@ -42,10 +45,13 @@ class TestParsePipeline(FrappeTestCase):
 		self.assertEqual(sd.page_count, 3)
 		self.assertEqual(sd.parser_used, "pymupdf4llm")
 
+		# mean_score is mirrored onto the doc (scoring ran for every page).
+		self.assertIsNotNone(sd.mean_score)
+
 		pages = frappe.get_all(
 			"Source Page",
 			filters={"source_document": sd_name},
-			fields=["page_no", "kind", "image", "baseline_markdown"],
+			fields=["page_no", "kind", "image", "baseline_markdown", "composite", "verdict", "text_recall"],
 			order_by="page_no asc",
 		)
 		self.assertEqual(len(pages), 3)
@@ -56,3 +62,29 @@ class TestParsePipeline(FrappeTestCase):
 		for p in pages:
 			self.assertTrue(p.image, f"page {p.page_no} missing rendered image")
 			self.assertTrue(p.baseline_markdown is not None)
+			# Every page is scored: a verdict + composite are persisted.
+			self.assertIn(p.verdict, ("pass", "escalate", "review"))
+			self.assertIsNotNone(p.composite)
+		# A clean digital-native text page should recall ~all its tokens and pass.
+		text_page = pages[0]
+		self.assertEqual(text_page.kind, "text")
+		self.assertGreater(text_page.text_recall, 0.9)
+		# Visual page has no judge (no key in test) -> composite 0 -> flagged for review.
+		self.assertEqual(pages[2].verdict, "review")
+
+	def test_harness_scores_page_type_aware(self):
+		"""Deterministic harness behavior (no LLM): a faithful transcription passes;
+		a near-empty one is flagged."""
+		gt = "The quick brown fox jumps over the lazy dog. Section one covers setup."
+		good = score_page(1, gt, gt, page_kind="text")
+		self.assertEqual(good.verdict, "pass")
+		self.assertGreater(good.text_recall, 0.95)
+
+		dropped = score_page(2, "The fox.", gt, page_kind="text")
+		self.assertLess(dropped.text_recall, 0.85)
+		self.assertIn("low text recall — possible dropped content", dropped.notes)
+
+		# Visual page with no judge score -> composite unreliable -> review.
+		visual = score_page(3, "", gt, page_kind="visual")
+		self.assertEqual(visual.verdict, "review")
+		self.assertEqual(visual.composite, 0.0)

@@ -26,7 +26,7 @@ that skeleton rather than adding a new disconnected layer.
 |---|---|---|---|---|---|
 | 1a | Scaffold + empty SPA shell behind auth | HITL | — | 0 | ✅ Done |
 | 1b | Walking skeleton: upload → parse → see markdown | HITL | 1a | 0 + 1 | ✅ Done |
-| 2 | Page scoring + review split-pane | HITL | 1b | 2 | Next |
+| 2 | Page scoring + review split-pane | HITL | 1b | 2 | ✅ Done |
 | 3 | Remediation (cleanup / VLM) + canonical | AFK | 2 | 2 | — |
 | 4 | Sectionize → Source Section tree (read-only) | AFK | 1b | 1 + 3 | — |
 | 5 | Tree drag-review + graph approval | HITL | 4 | 3 | — |
@@ -34,8 +34,8 @@ that skeleton rather than adding a new disconnected layer.
 | 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 | — |
 | 8 | Inline editing (later) | AFK | 2 | 6 | — |
 
-> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780`. Both verified on
-> `pdf.localhost` per each slice's Verify steps. Up next: **Slice 2**.
+> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780` · **2** ✅. All
+> verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 3**.
 
 Dependency spine is mostly linear (it is a pipeline). Parallelism: **6** can proceed
 off **4** alongside **5**; **8** floats off **2**.
@@ -170,6 +170,7 @@ confirm `status`/`page_count` persist.
 
 **Type:** HITL (the product's signature review screen — design/UX review).
 **Blocked by:** 1b.
+**Status:** ✅ Done — `main`.
 
 ### What to build
 Add the scoring pipeline and the page-review experience.
@@ -186,15 +187,38 @@ Add the scoring pipeline and the page-review experience.
   strip (recall/extra/table/judge/composite + verdict, honest line for visual pages).
 
 ### Acceptance criteria
-- [ ] Each page shows scores + a `pass/escalate/review` verdict; per-stage cost visible in Overview (from log meta).
-- [ ] Split-pane: flip PDF ↔ snapshot ↔ markdown; Flagged filter narrows the list.
-- [ ] `Wikify Settings` drives model ids/thresholds without code change.
+- [x] Each page shows scores + a `pass/escalate/review` verdict; per-stage cost visible in Overview (from log meta).
+- [x] Split-pane: flip PDF ↔ snapshot ↔ markdown; Flagged filter narrows the list.
+- [x] `Wikify Settings` drives model ids/thresholds without code change.
 
 **Verify:** set the OpenRouter key in `Wikify Settings`; re-parse a sample PDF and in
 `console` assert score fields + `verdict` populated on `Source Page` and per-stage cost
 on `Import Log Entry.meta`. UI — open the Pages tab, flip PDF↔Snapshot↔Markdown, toggle
 the Flagged filter, confirm the scores strip. Change a threshold in Settings and confirm
 verdicts shift on re-parse (no code change).
+
+### As-built notes (reconciled)
+- **`engine/llm.py` uses `requests`, not the `openai` SDK** — `openai` isn't on the
+  bench; the REST boundary is the only change, judge/cost logic is the POC's. Records
+  `{label, model, seconds, prompt/completion tokens, cost}` per call via
+  `reset_metrics()` / `get_metrics()`.
+- **`Wikify Settings` (Single)** holds model ids, thresholds, key, and the render/visual
+  tunables. Key resolves Settings → `site_config` → env → `apps/wikify/.env`. Composite
+  **weights** stay code-side in `engine/config.py` (spec 02-data-model).
+- **Judge scope:** visual pages are always judged (text GT is unreliable there); text
+  pages only when `judge_all_pages` is on (default off, to bound cost). `verdict` reads
+  thresholds live from Settings, so changing a threshold shifts verdicts on re-parse.
+- **`Source Page` fields:** baseline scores + `verdict` + `notes` added now;
+  remediation/canonical fields land in Slice 3. `Source Document.mean_score` mirrors the
+  mean composite. `table_score`/`judge_score` are `None` for "no table"/"not judged" —
+  Frappe Float is NOT NULL, so those keys are omitted on write (row keeps `0.0`) and the
+  UI reads `0` as "—"; a genuine table miss still surfaces via `notes`.
+- **UI:** `PageReview.vue` (`splitpanes`) replaces the 1b stacked-card Pages tab — left
+  thumbnail list (verdict badge + kind chip + Flagged filter, default Flagged), right
+  Tabs PDF (`<object>` at `#page=N`) / Snapshot (PNG) / Markdown (`CodeEditor` from
+  `frappe-ui/code-editor`, `language="markdown"`, disabled) + a kind-aware scores strip.
+- Headless judge verified live against OpenRouter (claude-sonnet-4.6): text page →
+  pass, drawing-only page → judge 0.4 → `review`, `mean_score` mirrored on the doc.
 
 ### Spec refs
 [03-backend-plan Phase 1 (scoring) + LLM client](03-backend-plan.md#llm-client) ·

@@ -1,0 +1,162 @@
+{
+ "actions": [],
+ "creation": "2026-06-20 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "models_section",
+  "vlm_model",
+  "cleanup_model",
+  "judge_model",
+  "classifier_model",
+  "column_break_models",
+  "openrouter_api_key",
+  "thresholds_section",
+  "pass_threshold",
+  "escalate_threshold",
+  "cleanup_recall_tolerance",
+  "judge_all_pages",
+  "column_break_thresholds",
+  "render_dpi",
+  "visual_min_chars",
+  "visual_min_drawings",
+  "remediation_workers",
+  "classify_workers"
+ ],
+ "fields": [
+  {
+   "fieldname": "models_section",
+   "fieldtype": "Section Break",
+   "label": "Models"
+  },
+  {
+   "default": "mistralai/mistral-medium-3.1",
+   "description": "Vision model used to re-parse flagged / visual pages.",
+   "fieldname": "vlm_model",
+   "fieldtype": "Data",
+   "label": "VLM Model"
+  },
+  {
+   "default": "google/gemini-2.5-flash",
+   "description": "Cheap text model for the markdown cleanup pass.",
+   "fieldname": "cleanup_model",
+   "fieldtype": "Data",
+   "label": "Cleanup Model"
+  },
+  {
+   "default": "anthropic/claude-sonnet-4.6",
+   "description": "Independent grader — a different model from the parser (avoids self-confirmation).",
+   "fieldname": "judge_model",
+   "fieldtype": "Data",
+   "label": "Judge Model"
+  },
+  {
+   "default": "google/gemini-2.5-flash",
+   "fieldname": "classifier_model",
+   "fieldtype": "Data",
+   "label": "Classifier Model"
+  },
+  {
+   "fieldname": "column_break_models",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "OpenRouter API key. Falls back to site config / the app .env when blank.",
+   "fieldname": "openrouter_api_key",
+   "fieldtype": "Password",
+   "label": "OpenRouter API Key"
+  },
+  {
+   "fieldname": "thresholds_section",
+   "fieldtype": "Section Break",
+   "label": "Scoring & Thresholds"
+  },
+  {
+   "default": "0.9",
+   "description": "Composite at or above this verdicts as pass.",
+   "fieldname": "pass_threshold",
+   "fieldtype": "Float",
+   "label": "Pass Threshold",
+   "precision": "3"
+  },
+  {
+   "default": "0.7",
+   "description": "Composite at or above this (but below pass) verdicts as escalate; below is review.",
+   "fieldname": "escalate_threshold",
+   "fieldtype": "Float",
+   "label": "Escalate Threshold",
+   "precision": "3"
+  },
+  {
+   "default": "0.12",
+   "description": "Adopt cleanup unless recall drops more than this below baseline.",
+   "fieldname": "cleanup_recall_tolerance",
+   "fieldtype": "Float",
+   "label": "Cleanup Recall Tolerance",
+   "precision": "3"
+  },
+  {
+   "default": "0",
+   "description": "Run the LLM judge on text pages too (visual pages are always judged). Costs more.",
+   "fieldname": "judge_all_pages",
+   "fieldtype": "Check",
+   "label": "Judge All Pages"
+  },
+  {
+   "fieldname": "column_break_thresholds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "150",
+   "fieldname": "render_dpi",
+   "fieldtype": "Int",
+   "label": "Render DPI"
+  },
+  {
+   "default": "250",
+   "fieldname": "visual_min_chars",
+   "fieldtype": "Int",
+   "label": "Visual Min Chars"
+  },
+  {
+   "default": "40",
+   "fieldname": "visual_min_drawings",
+   "fieldtype": "Int",
+   "label": "Visual Min Drawings"
+  },
+  {
+   "default": "6",
+   "fieldname": "remediation_workers",
+   "fieldtype": "Int",
+   "label": "Remediation Workers"
+  },
+  {
+   "default": "8",
+   "fieldname": "classify_workers",
+   "fieldtype": "Int",
+   "label": "Classify Workers"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-20 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Wikify",
+ "name": "Wikify Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

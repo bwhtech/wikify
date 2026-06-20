@@ -10,6 +10,15 @@
   "page_no",
   "kind",
   "image",
+  "scores_section",
+  "verdict",
+  "composite",
+  "text_recall",
+  "extra_ratio",
+  "column_break_scores",
+  "table_score",
+  "judge_score",
+  "notes",
   "baseline_section",
   "baseline_markdown"
  ],
@@ -42,6 +51,65 @@
    "fieldname": "image",
    "fieldtype": "Attach Image",
    "label": "Image",
+   "read_only": 1
+  },
+  {
+   "fieldname": "scores_section",
+   "fieldtype": "Section Break",
+   "label": "Scores"
+  },
+  {
+   "fieldname": "verdict",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Verdict",
+   "options": "\npass\nescalate\nreview",
+   "read_only": 1
+  },
+  {
+   "fieldname": "composite",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Composite",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "text_recall",
+   "fieldtype": "Float",
+   "label": "Text Recall",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "extra_ratio",
+   "fieldtype": "Float",
+   "label": "Extra Ratio",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_scores",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "table_score",
+   "fieldtype": "Float",
+   "label": "Table Score",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "judge_score",
+   "fieldtype": "Float",
+   "label": "Judge Score",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes",
    "read_only": 1
   },
   {
