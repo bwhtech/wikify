@@ -26,6 +26,9 @@ def run(import_name: str, scope: str = "flagged") -> None:
 			percent = (done / total * 100) if total else 100
 			publish_progress(import_name, percent, f"Remediating page {done}/{total}")
 
+		def stage_cb(label: str) -> None:
+			publish_progress(import_name, 100, label)
+
 		def page_cb(page_no, total, method, adopted, base_c, new_c, metrics) -> None:
 			cost = sum(m["cost"] for m in metrics if m.get("cost")) or None
 			delta = round((new_c or 0) - (base_c or 0), 3)
@@ -46,6 +49,7 @@ def run(import_name: str, scope: str = "flagged") -> None:
 			scope=scope,
 			progress_cb=progress_cb,
 			page_cb=page_cb,
+			stage_cb=stage_cb,
 		)
 
 		imp.db_set("status", "Review")

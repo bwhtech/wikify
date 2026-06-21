@@ -1,0 +1,78 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:type_name",
+ "creation": "2026-06-20 00:00:00",
+ "description": "Taxonomy label for Source Sections. Seeded bottom-up from real manual headings; extensible per corpus.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "type_name",
+  "label",
+  "is_other",
+  "color",
+  "description"
+ ],
+ "fields": [
+  {
+   "description": "Machine key, e.g. staff_roles_and_responsibilities. Stored on Source Section.section_type.",
+   "fieldname": "type_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Type Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Display label, e.g. \"Staff Roles & Responsibilities\".",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label"
+  },
+  {
+   "default": "0",
+   "description": "Marks the catch-all \"other\" type.",
+   "fieldname": "is_other",
+   "fieldtype": "Check",
+   "label": "Is Other"
+  },
+  {
+   "description": "Chip color in Explore (hex).",
+   "fieldname": "color",
+   "fieldtype": "Data",
+   "label": "Color"
+  },
+  {
+   "description": "Fed to the classifier prompt to disambiguate this type.",
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-20 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Wikify",
+ "name": "Section Type",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "label"
+}

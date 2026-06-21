@@ -4,6 +4,7 @@ import { Badge, Button, Dialog, useCall, useList, toast } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
+import { marked } from "marked";
 import SectionDraggable from "@/components/SectionDraggable.vue";
 
 const props = defineProps({
@@ -166,6 +167,10 @@ function pageRange(node) {
 		? `p${node.page_start}`
 		: `p${node.page_start}–${node.page_end}`;
 }
+
+// Section body: rendered markdown by default, with a GitHub-style toggle to raw source.
+const mdMode = ref("rendered");
+const renderedMd = computed(() => marked.parse(selected.value?.markdown || "", { async: false }));
 </script>
 
 <template>
@@ -247,13 +252,38 @@ function pageRange(node) {
 								variant="subtle"
 								size="sm"
 							/>
+							<!-- Rendered ↔ source toggle (GitHub-style) -->
+							<div class="ml-auto flex items-center gap-0.5">
+								<Button
+									variant="ghost"
+									size="sm"
+									icon="lucide-eye"
+									:class="mdMode === 'rendered' ? 'bg-surface-gray-3' : ''"
+									tooltip="Rendered"
+									@click="mdMode = 'rendered'"
+								/>
+								<Button
+									variant="ghost"
+									size="sm"
+									icon="lucide-code"
+									:class="mdMode === 'source' ? 'bg-surface-gray-3' : ''"
+									tooltip="Markdown source"
+									@click="mdMode = 'source'"
+								/>
+							</div>
 						</div>
 						<p class="mt-1 truncate text-xs text-ink-gray-5">
 							{{ selected.hierarchy_path }}
 						</p>
 					</div>
 					<div class="min-h-0 flex-1 overflow-auto p-3">
+						<div
+							v-if="mdMode === 'rendered'"
+							class="prose prose-sm dark:prose-invert max-w-none"
+							v-html="renderedMd"
+						/>
 						<CodeEditor
+							v-else
 							:model-value="selected.markdown || ''"
 							language="markdown"
 							variant="outline"

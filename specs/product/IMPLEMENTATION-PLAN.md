@@ -30,13 +30,13 @@ that skeleton rather than adding a new disconnected layer.
 | 3 | Remediation (cleanup / VLM) + canonical | AFK | 2 | 2 | ✅ Done |
 | 4 | Sectionize → Source Section tree (read-only) | AFK | 1b | 1 + 3 | ✅ Done |
 | 5 | Tree drag-review + graph approval | HITL | 4 | 3 | ✅ Done |
-| 6 | Classification + Explore (cross-document) | HITL | 4 | 4 | — |
+| 6 | Classification + Explore (cross-document) | HITL | 4 | 4 | ✅ Done |
 | 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 | — |
 | 8 | Inline editing (later) | AFK | 2 | 6 | — |
 
-> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780` · **2** ✅ · **3** ✅ · **4** ✅ · **5** ✅.
-> All verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 6** (Classification +
-> Explore — can also proceed off 4 in parallel) or **7** once 6 lands.
+> **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780` · **2** ✅ · **3** ✅ · **4** ✅ · **5** ✅ · **6** ✅.
+> All verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 7** (Wiki
+> generation — needs 5 + 6, both landed).
 
 Dependency spine is mostly linear (it is a pipeline). Parallelism: **6** can proceed
 off **4** alongside **5**; **8** floats off **2**.
@@ -429,6 +429,7 @@ Click **Approve & Build Graph** → `status=Graphed`.
 
 **Type:** HITL (the headline screen — design review).
 **Blocked by:** 4 (+ 5 for the approval gate before Explore unlocks).
+**Status:** ✅ Done — `main`.
 
 ### What to build
 - **Seed:** `Section Type` master with the 11 POC types (fixtures / `after_install`).
@@ -440,14 +441,89 @@ Click **Approve & Build Graph** → `status=Graphed`.
   across all Source Documents, grouped by document with provenance.
 
 ### Acceptance criteria
-- [ ] Sections carry a `section_type`; reclassify re-labels after tree edits.
-- [ ] "All job descriptions across all PDFs" answered by a metadata filter (not fuzzy search).
-- [ ] Type chips show correct counts including the `other` catch-all.
+- [x] Sections carry a `section_type`; reclassify re-labels after tree edits.
+- [x] "All job descriptions across all PDFs" answered by a metadata filter (not fuzzy search).
+- [x] Type chips show correct counts including the `other` catch-all.
 
 **Verify:** confirm the 11 `Section Type` rows seed after `migrate`/install. After
 classify, in `console` assert `section_type` set on sections. UI — import **two** PDFs,
 graph both, then on `/wikify/explore` pick a type and confirm matching sections appear
 **across both documents** with provenance; chip counts (incl. `other`) match the query.
+
+### As-built notes (reconciled)
+- **`Section Type` master** (`type_name` autoname, `label` / `color` hex / `description` /
+  `is_other`) seeded with the 11 POC types via `wikify/seed.py:seed_section_types` —
+  idempotent, called from both `after_install` (fresh sites) and a `post_model_sync`
+  patch (`patches/v1_0/seed_section_types`, existing sites on `migrate`). Editable
+  afterward; the classifier reads whatever rows exist (taxonomy is data, not code).
+- **Classifier** ported to `engine/loader/classifier.py` (`classify_section(title,
+  content, taxonomy)`): taxonomy comes from the master (passed in), model id from
+  `Wikify Settings.classifier_model`, call via `engine.llm`. Any failure / no key falls
+  back to `"other"` — never raises, so a parse without a key still completes typed.
+- **`engine/classify.py:classify_document(source_document, progress_cb)`** reads each
+  Source Section's (title, markdown), classifies, and writes `section_type`. **Runs
+  sequentially, not threaded** (the POC used a `ThreadPoolExecutor`): each call resolves
+  key/model through `frappe.local`, which isn't thread-safe — the same precedent as
+  remediation (Slice 3). Cheap classifier model, so serial is fine and streams cleanly.
+- **Transient-failure resilience (added after the OBG live run):** bulk eager classify
+  fires one call per section back-to-back, so a big manual trips the provider rate limit.
+  The POC's bare `except: return "other"` conflated a dropped call with a real verdict —
+  on the 374-section OBG re-run that inflated `other` from ~9 to 135. `classify_section`
+  now **retries with linear backoff** (3 retries) and only falls back to `other` on a
+  genuine `other`/off-taxonomy label or after exhausting retries. (Tests stub
+  `classifier.time.sleep`.)
+- **Eager classify** at the end of **both** `parse_pdf` and `remediate_pdf` (after the
+  tree rebuild — the rebuild assigns fresh section names, so types must be re-derived).
+  Manual re-run via `api.imports.reclassify(import_name)` → `jobs/classify.run`, which
+  streams per-section log lines + emits `wikify_classify_done` and **does not** change
+  the import's persisted status (re-tag in Review *or* Graphed). HITL decisions: classify
+  is eager-on-every-parse (+ manual Reclassify), not gated.
+- **Explore APIs** (`api/explore.py`): `type_summary(source_document?)` — per-type counts
+  (all seeded types for stable chips, plus an `__untagged__` bucket when present);
+  `sections_by_type(section_type, source_document?)` — the cross-document headline query,
+  grouped by Source Document with `doc_title` / `import_name` / page-range provenance.
+  Mirrors POC `graph.section_type_counts` / `sections_by_type`. `count(name)` uses the
+  query builder (`Count`) — modern Frappe rejects SQL-function strings in `get_all`.
+- **UI:** sidebar **Explore** nav + global `/wikify/explore` (`pages/ExploreGlobal.vue`)
+  built as the chosen **type-rail + grouped-results** layout (rail of types w/ colored
+  dots + counts → right pane lists matching sections grouped by document, group header
+  links to that import's Tree tab). Per-doc **Explore** tab (`components/Explore.vue`):
+  horizontal `TypeChip` bar + flat section list + a **Reclassify** button (realtime
+  `wikify_classify_done` → refresh). `TypeChip.vue` is the one place an inline hex color
+  is allowed (11 distinct types exceed the semantic Badge palette).
+- **Gotcha:** reused the Slice-4 lesson — `useCall` reactive `auto`/`params` don't refire
+  when a dep flips, so all Explore fetches are `immediate:false` + explicit `.submit()`
+  from watchers.
+- **HITL design decisions (2026-06-20):** (1) classify eager on every parse/remediate +
+  manual Reclassify; (2) global Explore = type-rail + grouped-by-document results.
+- Tests: `tests/test_classify.py` (7) — taxonomy seed, classify writes types + counts,
+  progress callback, no-key→`other`, off-taxonomy→`other`, `type_summary` counts +
+  untagged bucket, `sections_by_type` cross-document grouping + per-doc scoping. The
+  parse integration test stubs `classify_section` to stay hermetic. Verified live on a
+  **180-page real manual** (Obstetrics & Gynaecology) end-to-end through the parse job.
+
+### UI/pipeline polish (done with Slice 6, HITL design feedback 2026-06-20)
+- **PageReview tabs:** the per-page whole-PDF view ignored the page, so it moved up to a
+  **top-level PDF tab** (ImportDetail, beside Overview/Pages/Tree/Explore). Per-page tabs
+  are now three: **Page** (rendered page image, default) · **Preview** (formatted markdown
+  via `marked` + `prose`; mermaid shows as a code block until wiki generation) ·
+  **Markdown** (raw source). The Baseline/Remediation/Canonical source toggle drives both
+  Preview and Markdown.
+- **Pages filter:** default is now **All** (was Flagged), with **Flagged** (verdict ≠ pass)
+  and its negation **Passed**; each shows a count.
+- **Tree section body:** renders markdown (`marked` + `prose`) **by default** with a
+  GitHub-style icon toggle (eye / `lucide-code`) to the raw source `CodeEditor`.
+- **Parse/remediate progress:** the bar used to sit pinned at the last page during the
+  post-loop sectionize + classify phases (classify is one LLM call per section — minutes
+  on a big manual). Added a `stage_cb` through `parse_pdf` / `remediate_pdf` so those
+  phases stream labels ("Building section tree", "Classifying sections (i/N)").
+- **Bold headings:** pymupdf4llm emits emphasized headings (`_**Verbal Orders**_`).
+  `sectionizer._clean_title` now strips wrapping `*`/`_` (deterministic, every flow) —
+  which also fixes level inference (`_**2.1 Foo**_` → `2.1 Foo` matches the numbering) and
+  stops fully-bold numbered chapters being mis-demoted; the LLM cleanup prompt
+  (`cleanup_llm`) gained a matching "headings must be plain text" rule for the remediate
+  path. Verified live: re-sectionizing the OBG reference produced clean titles (374
+  sections).
 
 ### Spec refs
 [03-backend-plan Phase 4](03-backend-plan.md#phase-4--explore-typed-cross-document) ·

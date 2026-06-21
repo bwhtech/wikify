@@ -5,6 +5,7 @@ import { useSocket } from "@/socket";
 import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
+import Explore from "@/components/Explore.vue";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -17,8 +18,10 @@ const tabs = [
 	{ label: "Overview", key: "overview" },
 	{ label: "Pages", key: "pages" },
 	{ label: "Tree", key: "tree" },
+	{ label: "Explore", key: "explore" },
+	{ label: "PDF", key: "pdf" },
 ];
-const activeTab = ref({ pages: 1, tree: 2 }[props.tab] ?? 0);
+const activeTab = ref({ pages: 1, tree: 2, explore: 3, pdf: 4 }[props.tab] ?? 0);
 
 // Streaming log
 const logs = useList({
@@ -184,11 +187,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 
 				<!-- Pages -->
 				<div v-else-if="tab.key === 'pages'" class="h-[calc(100vh-7rem)]">
-					<PageReview
-						ref="pageReview"
-						:source-document="imp.doc?.source_document"
-						:pdf-url="imp.doc?.pdf"
-					/>
+					<PageReview ref="pageReview" :source-document="imp.doc?.source_document" />
 				</div>
 
 				<!-- Tree -->
@@ -201,6 +200,30 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:status="status"
 						@graphed="imp.reload()"
 					/>
+				</div>
+
+				<!-- Explore -->
+				<div v-else-if="tab.key === 'explore'" class="h-[calc(100vh-7rem)]">
+					<Explore
+						:source-document="imp.doc?.source_document"
+						:import-name="name"
+					/>
+				</div>
+
+				<!-- PDF (whole document) -->
+				<div v-else-if="tab.key === 'pdf'" class="h-[calc(100vh-7rem)]">
+					<object
+						v-if="imp.doc?.pdf"
+						:data="`${imp.doc.pdf}#view=FitH`"
+						type="application/pdf"
+						class="h-full w-full"
+					>
+						<p class="p-4 text-sm text-ink-gray-5">
+							Can't embed the PDF here —
+							<a :href="imp.doc.pdf" target="_blank" class="underline">open it in a new tab</a>.
+						</p>
+					</object>
+					<p v-else class="p-4 text-sm text-ink-gray-5">No PDF attached.</p>
 				</div>
 			</template>
 		</Tabs>

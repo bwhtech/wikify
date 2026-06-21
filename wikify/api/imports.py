@@ -51,3 +51,24 @@ def trigger_remediation(import_name: str, scope: str = "flagged") -> str:
 		scope=scope,
 	)
 	return import_name
+
+
+@frappe.whitelist()
+def reclassify(import_name: str) -> str:
+	"""Re-tag the doc's Source Sections after manual tree edits.
+
+	Parse/remediate classify eagerly; this is the on-demand re-run. It doesn't change
+	the import status (a doc stays in Review or Graphed while re-tagging), so it's
+	available at any post-parse stage.
+	"""
+	imp = frappe.get_doc("Wikify Import", import_name)
+	if not imp.source_document:
+		frappe.throw("Nothing to classify — parse hasn't produced a document yet.")
+
+	frappe.enqueue(
+		"wikify.jobs.classify.run",
+		queue="long",
+		timeout=1800,
+		import_name=import_name,
+	)
+	return import_name

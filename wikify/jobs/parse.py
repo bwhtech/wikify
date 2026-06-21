@@ -27,6 +27,11 @@ def run(import_name: str) -> None:
 		def progress_cb(done: int, total: int) -> None:
 			publish_progress(import_name, done / total * 100, f"Parsing page {done}/{total}")
 
+		# Post-page-loop phases (sectionize + classify) keep the bar at 100 but update the
+		# label, so a long classify pass reads as progressing, not stuck on the last page.
+		def stage_cb(label: str) -> None:
+			publish_progress(import_name, 100, label)
+
 		def page_cb(page_no, total, kind, score, metrics) -> None:
 			# Per-stage cost (judge) rides along in meta so the Overview log can show it.
 			cost = sum(m["cost"] for m in metrics if m.get("cost")) or None
@@ -46,6 +51,7 @@ def run(import_name: str) -> None:
 			pdf_url=imp.pdf,
 			progress_cb=progress_cb,
 			page_cb=page_cb,
+			stage_cb=stage_cb,
 		)
 
 		mean_score, page_count = frappe.db.get_value(

@@ -24,7 +24,11 @@ _DOUBLE_NUM = re.compile(r"^\d+\.\s+\d")  # e.g. "6. 3.1 ..." — a list item, n
 
 
 def _clean_title(raw: str) -> str:
-	return raw.strip().strip("*").strip()
+	# pymupdf4llm emits emphasized headings (e.g. `_**Verbal Orders**_`); strip the
+	# wrapping bold/italic markers (`*` and `_`) so the tree title is plain text. This
+	# also helps level inference — `_**2.1 Foo**_` → `2.1 Foo` now matches the numbering
+	# regex — and stops a fully-bold numbered chapter being mis-demoted as a list item.
+	return raw.strip().strip("*_").strip()
 
 
 def _infer_level(title: str, fallback: int) -> int:

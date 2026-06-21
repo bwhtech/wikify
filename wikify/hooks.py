@@ -94,7 +94,7 @@ app_icon_route = "/wikify"
 # ------------
 
 # before_install = "wikify.install.before_install"
-# after_install = "wikify.install.after_install"
+after_install = "wikify.install.after_install"
 
 # Uninstallation
 # ------------

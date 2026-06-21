@@ -7,7 +7,10 @@ import { session } from "@/data/session";
 
 const { resolvedTheme, toggleTheme, initializeTheme } = useTheme();
 
-const nav = [{ label: "Imports", to: { name: "Imports" }, icon: "lucide-inbox" }];
+const nav = [
+	{ label: "Imports", to: { name: "Imports" }, icon: "lucide-inbox" },
+	{ label: "Explore", to: { name: "Explore" }, icon: "lucide-shapes" },
+];
 
 onMounted(initializeTheme);
 </script>

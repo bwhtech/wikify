@@ -23,6 +23,8 @@ _PROMPT = (
 	"prepared-by / issued-by / approved-by footer block. Keep only the page's substantive content.\n"
 	"- Restore real Markdown structure: headings (#/##/###), numbered and bulleted lists, "
 	"and proper Markdown tables (only when the content is genuinely tabular).\n"
+	"- Headings must be plain text: strip bold/italic emphasis from heading lines "
+	"(e.g. `## _**Verbal Orders**_` → `## Verbal Orders`); never wrap a heading in * or _.\n"
 	"- Keep ALL substantive text. Do NOT summarize, add, translate, or drop real content.\n"
 	"- Output ONLY the cleaned Markdown — no commentary, no code fences.\n\nMARKDOWN:\n"
 )

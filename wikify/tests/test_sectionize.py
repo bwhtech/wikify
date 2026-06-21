@@ -61,6 +61,21 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual(secs[0].title, "Preamble")
 		self.assertEqual(secs[0].level, 1)
 
+	def test_emphasis_is_stripped_from_heading_titles(self):
+		# pymupdf4llm emits bold/italic headings (`_**Verbal Orders**_`, `## **2.1 Foo**`);
+		# the wrapping markers are stripped, and numbering still drives the level.
+		pages = [
+			(1, "## _**Verbal Orders**_\nbody"),
+			(2, "## **2. Procedures**\np\n## **2.1 Scope**\nq"),
+		]
+		secs = sectionize(pages)
+		by_title = {s.title: s.level for s in secs}
+		self.assertIn("Verbal Orders", by_title)
+		self.assertEqual(by_title["2. Procedures"], 1)
+		self.assertEqual(by_title["2.1 Scope"], 2)  # numbering recovered after strip
+		# No emphasis markers leak into any title.
+		self.assertFalse(any("*" in s.title or s.title.startswith("_") for s in secs))
+
 	def test_clean_pages_strips_varying_boilerplate_before_sectionizing(self):
 		# Running footers ("Pg 2 of 2") must not survive as fake headings.
 		pages = [(1, "## 1. Intro\nbody\nPg 1 of 2"), (2, "## 2. Next\nbody\nPg 2 of 2")]

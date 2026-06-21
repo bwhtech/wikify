@@ -153,6 +153,28 @@ def get_canonical_pages(source_document: str) -> list[tuple[int, str]]:
 	return [(p["page_no"], p["canonical_markdown"] or p["baseline_markdown"] or "") for p in pages]
 
 
+# --- Slice 6: classification ---
+
+
+def get_section_taxonomy() -> list[str]:
+	"""Ordered `type_name`s from the Section Type master (the classifier's label set)."""
+	return frappe.get_all("Section Type", pluck="type_name", order_by="is_other asc, creation asc")
+
+
+def get_sections_to_classify(source_document: str) -> list[dict]:
+	"""Each section's (name, title, markdown) — the input the classifier needs."""
+	return frappe.get_all(
+		"Source Section",
+		filters={"source_document": source_document},
+		fields=["name", "title", "markdown"],
+		order_by="lft asc",
+	)
+
+
+def set_section_type(name: str, section_type: str | None) -> None:
+	frappe.db.set_value("Source Section", name, "section_type", section_type, update_modified=False)
+
+
 def replace_sections(source_document: str, sections) -> int:
 	"""Rebuild a doc's Source Section tree from ordered `sectionizer.Section`s.
 

@@ -3,12 +3,13 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import fitz  # PyMuPDF
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from wikify.engine import parse_pdf
+from wikify.engine import classify, parse_pdf
 from wikify.engine.verify import score_page
 
 
@@ -38,7 +39,10 @@ class TestParsePipeline(FrappeTestCase):
 		path = Path(tempfile.mkdtemp()) / "sample.pdf"
 		_make_sample_pdf(str(path))
 
-		sd_name = parse_pdf(str(path), title="Test Sample")
+		# Classification (eager in parse, Slice 6) is a network call — stub it so the
+		# parse integration test stays hermetic; classification has its own test module.
+		with patch.object(classify, "classify_section", return_value="other"):
+			sd_name = parse_pdf(str(path), title="Test Sample")
 
 		sd = frappe.get_doc("Source Document", sd_name)
 		self.assertEqual(sd.title, "Test Sample")

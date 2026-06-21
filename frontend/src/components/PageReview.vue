@@ -4,10 +4,10 @@ import { Badge, Button, useList } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
+import { marked } from "marked";
 
 const props = defineProps({
 	sourceDocument: { type: String, default: null },
-	pdfUrl: { type: String, default: null },
 });
 
 const pages = useList({
@@ -43,16 +43,13 @@ const pages = useList({
 // Let the parent (ImportDetail) refetch after a remediation run completes.
 defineExpose({ reload: () => pages.reload() });
 
-// Default to the Flagged view — the operator's job is triaging non-pass pages.
-const filter = ref("flagged");
-const filters = [
-	{ label: "Flagged", key: "flagged" },
-	{ label: "All", key: "all" },
-];
+// All by default; Flagged = pages needing review (verdict ≠ pass), Passed = its negation.
+const filter = ref("all");
 
 const visiblePages = computed(() => {
 	const all = pages.data || [];
 	if (filter.value === "flagged") return all.filter((p) => p.verdict !== "pass");
+	if (filter.value === "passed") return all.filter((p) => p.verdict === "pass");
 	return all;
 });
 
@@ -74,14 +71,24 @@ watch(
 	{ immediate: true },
 );
 
+const totalCount = computed(() => (pages.data || []).length);
 const flaggedCount = computed(() => (pages.data || []).filter((p) => p.verdict !== "pass").length);
+const passedCount = computed(() => (pages.data || []).filter((p) => p.verdict === "pass").length);
+const filterOptions = computed(() => [
+	{ label: "All", key: "all", count: totalCount.value },
+	{ label: "Flagged", key: "flagged", count: flaggedCount.value },
+	{ label: "Passed", key: "passed", count: passedCount.value },
+]);
 
+// Per-page views: the rendered page image (default — "what it looked like"), the
+// formatted markdown, and the raw markdown source. Viewing the whole PDF lives at the
+// document level (ImportDetail's top-level PDF tab), since it isn't page-specific.
 const tabs = [
-	{ label: "PDF", key: "pdf" },
-	{ label: "Snapshot", key: "snapshot" },
+	{ label: "Page", key: "page" },
+	{ label: "Preview", key: "preview" },
 	{ label: "Markdown", key: "markdown" },
 ];
-const activeTab = ref("markdown");
+const activeTab = ref("page");
 
 const verdictTheme = { pass: "green", escalate: "orange", review: "red" };
 
@@ -123,11 +130,10 @@ function fmtOptional(v) {
 	return v ? Number(v).toFixed(2) : "—";
 }
 
-const pdfSrc = computed(() =>
-	selected.value && props.pdfUrl
-		? `${props.pdfUrl}#page=${selected.value.page_no}&view=FitH`
-		: null,
-);
+// Formatted markdown for the Preview tab. Same Baseline/Remediation/Canonical source
+// as the raw Markdown tab; mermaid fences render as code blocks here (they become
+// diagrams in the generated wiki, Slice 7).
+const renderedMd = computed(() => marked.parse(mdContent.value || "", { async: false }));
 
 // Scores strip: text pages show the full deterministic set; visual pages drop
 // recall/extra (meaningless on diagrams) and lean on the judge.
@@ -183,9 +189,9 @@ function fmtDelta(v) {
 			<Pane :size="30" :min-size="20" class="flex flex-col border-r border-outline-gray-1">
 				<div class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-2">
 					<Button
-						v-for="f in filters"
+						v-for="f in filterOptions"
 						:key="f.key"
-						:label="f.key === 'flagged' ? `Flagged (${flaggedCount})` : 'All'"
+						:label="`${f.label} (${f.count})`"
 						size="sm"
 						:variant="filter === f.key ? 'subtle' : 'ghost'"
 						@click="filter = f.key"
@@ -196,7 +202,13 @@ function fmtDelta(v) {
 						v-if="!visiblePages.length"
 						class="px-2 py-6 text-center text-sm text-ink-gray-5"
 					>
-						No flagged pages — everything passed.
+						{{
+							filter === "flagged"
+								? "No flagged pages — everything passed."
+								: filter === "passed"
+									? "No passed pages yet."
+									: "No pages."
+						}}
 					</p>
 					<button
 						v-for="page in visiblePages"
@@ -349,48 +361,43 @@ function fmtDelta(v) {
 						/>
 					</div>
 
-					<div class="min-h-0 flex-1 overflow-auto">
-						<!-- PDF -->
-						<template v-if="activeTab === 'pdf'">
-							<object
-								v-if="pdfSrc"
-								:data="pdfSrc"
-								type="application/pdf"
-								class="h-full w-full"
-							>
-								<p class="p-4 text-sm text-ink-gray-5">
-									Can't embed the PDF here —
-									<a :href="pdfUrl" target="_blank" class="underline"
-										>open it in a new tab</a
-									>.
-								</p>
-							</object>
-							<p v-else class="p-4 text-sm text-ink-gray-5">No PDF attached.</p>
-						</template>
+					<!-- Markdown source toggle (Baseline / Remediation / Canonical) — applies
+					     to both the formatted Preview and the raw Markdown tabs. -->
+					<div
+						v-if="(activeTab === 'preview' || activeTab === 'markdown') && mdViews.length > 1"
+						class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
+					>
+						<Button
+							v-for="v in mdViews"
+							:key="v.key"
+							:label="v.label"
+							size="sm"
+							:variant="mdView === v.key ? 'subtle' : 'ghost'"
+							@click="mdView = v.key"
+						/>
+					</div>
 
-						<!-- Snapshot -->
-						<div v-else-if="activeTab === 'snapshot'" class="p-4">
+					<div class="min-h-0 flex-1 overflow-auto">
+						<!-- Page (rendered image of the original page) -->
+						<div v-if="activeTab === 'page'" class="p-4">
 							<img
 								v-if="selected.image"
 								:src="selected.image"
-								:alt="`Page ${selected.page_no} snapshot`"
+								:alt="`Page ${selected.page_no}`"
 								class="mx-auto max-w-full rounded border border-outline-gray-1"
 							/>
-							<p v-else class="text-sm text-ink-gray-5">No snapshot rendered.</p>
+							<p v-else class="text-sm text-ink-gray-5">No page image rendered.</p>
 						</div>
 
-						<!-- Markdown (Baseline / Remediation / Canonical) -->
+						<!-- Preview (formatted markdown) -->
+						<div
+							v-else-if="activeTab === 'preview'"
+							class="prose prose-sm dark:prose-invert max-w-none p-4"
+							v-html="renderedMd"
+						/>
+
+						<!-- Markdown (raw source) -->
 						<div v-else-if="activeTab === 'markdown'" class="flex h-full flex-col p-3">
-							<div v-if="mdViews.length > 1" class="mb-2 flex items-center gap-1">
-								<Button
-									v-for="v in mdViews"
-									:key="v.key"
-									:label="v.label"
-									size="sm"
-									:variant="mdView === v.key ? 'subtle' : 'ghost'"
-									@click="mdView = v.key"
-								/>
-							</div>
 							<CodeEditor
 								:model-value="mdContent"
 								language="markdown"
