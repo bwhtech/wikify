@@ -505,14 +505,20 @@ graph both, then on `/wikify/explore` pick a type and confirm matching sections 
 ### UI/pipeline polish (done with Slice 6, HITL design feedback 2026-06-20)
 - **PageReview tabs:** the per-page whole-PDF view ignored the page, so it moved up to a
   **top-level PDF tab** (ImportDetail, beside Overview/Pages/Tree/Explore). Per-page tabs
-  are now three: **Page** (rendered page image, default) · **Preview** (formatted markdown
-  via `marked` + `prose`; mermaid shows as a code block until wiki generation) ·
-  **Markdown** (raw source). The Baseline/Remediation/Canonical source toggle drives both
-  Preview and Markdown.
+  are now three: **Page** (rendered page image, default) · **Preview** (formatted markdown,
+  shared `MarkdownPreview.vue`) · **Markdown** (raw source). The Baseline/Remediation/
+  Canonical source toggle drives both Preview and Markdown.
+- **Markdown previews render mermaid.** `MarkdownPreview.vue` (used by the page Preview tab
+  *and* the Tree section body) renders markdown with `marked` + `prose`, then post-processes
+  ```` ```mermaid ```` fences into SVG via `utils/mermaid` — which **reuses the Frappe Wiki
+  app's vendored mermaid loader** (`/assets/wiki/js/mermaid-loader.js` + the 3 MB
+  `mermaid.min.js`; wiki is an installed app). Keeps mermaid out of our bundle and makes the
+  preview theme identical to the published wiki (loader builds its theme from live Frappe UI
+  tokens). Degrades gracefully to a code block if the asset is absent.
 - **Pages filter:** default is now **All** (was Flagged), with **Flagged** (verdict ≠ pass)
   and its negation **Passed**; each shows a count.
-- **Tree section body:** renders markdown (`marked` + `prose`) **by default** with a
-  GitHub-style icon toggle (eye / `lucide-code`) to the raw source `CodeEditor`.
+- **Tree section body:** renders markdown (`MarkdownPreview`) **by default** with a
+  frappe-ui `TabButtons` toggle (icon+text: Preview / Markdown) to the raw `CodeEditor`.
 - **Parse/remediate progress:** the bar used to sit pinned at the last page during the
   post-loop sectionize + classify phases (classify is one LLM call per section — minutes
   on a big manual). Added a `stage_cb` through `parse_pdf` / `remediate_pdf` so those

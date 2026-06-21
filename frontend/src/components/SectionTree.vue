@@ -4,8 +4,8 @@ import { Badge, Button, Dialog, TabButtons, useCall, useList, toast } from "frap
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
-import { marked } from "marked";
 import SectionDraggable from "@/components/SectionDraggable.vue";
+import MarkdownPreview from "@/components/MarkdownPreview.vue";
 
 const props = defineProps({
 	sourceDocument: { type: String, default: null },
@@ -170,7 +170,6 @@ function pageRange(node) {
 
 // Section body: rendered markdown by default, with a GitHub-style toggle to raw source.
 const mdMode = ref("rendered");
-const renderedMd = computed(() => marked.parse(selected.value?.markdown || "", { async: false }));
 </script>
 
 <template>
@@ -267,10 +266,9 @@ const renderedMd = computed(() => marked.parse(selected.value?.markdown || "", {
 						</p>
 					</div>
 					<div class="min-h-0 flex-1 overflow-auto p-3">
-						<div
+						<MarkdownPreview
 							v-if="mdMode === 'rendered'"
-							class="prose prose-sm dark:prose-invert max-w-none"
-							v-html="renderedMd"
+							:content="selected.markdown || ''"
 						/>
 						<CodeEditor
 							v-else

@@ -5,7 +5,7 @@ import { Badge, Button, useList } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
-import { marked } from "marked";
+import MarkdownPreview from "@/components/MarkdownPreview.vue";
 
 const props = defineProps({
 	sourceDocument: { type: String, default: null },
@@ -159,11 +159,6 @@ function fmt(v) {
 function fmtOptional(v) {
 	return v ? Number(v).toFixed(2) : "—";
 }
-
-// Formatted markdown for the Preview tab. Same Baseline/Remediation/Canonical source
-// as the raw Markdown tab; mermaid fences render as code blocks here (they become
-// diagrams in the generated wiki, Slice 7).
-const renderedMd = computed(() => marked.parse(mdContent.value || "", { async: false }));
 
 // Scores strip: text pages show the full deterministic set; visual pages drop
 // recall/extra (meaningless on diagrams) and lean on the judge.
@@ -419,11 +414,11 @@ function fmtDelta(v) {
 							<p v-else class="text-sm text-ink-gray-5">No page image rendered.</p>
 						</div>
 
-						<!-- Preview (formatted markdown) -->
-						<div
+						<!-- Preview (formatted markdown + mermaid diagrams) -->
+						<MarkdownPreview
 							v-else-if="activeTab === 'preview'"
-							class="prose prose-sm dark:prose-invert max-w-none p-4"
-							v-html="renderedMd"
+							:content="mdContent"
+							class="p-4"
 						/>
 
 						<!-- Markdown (raw source) -->
