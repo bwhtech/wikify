@@ -14,6 +14,7 @@ import json
 import time
 
 from wikify.engine import llm, settings
+from wikify.engine.loader.context import context_block
 
 # Bulk eager classification fires one call per section back-to-back, so a big manual can
 # trip the provider's rate limit. A transient failure must NOT be silently recorded as
@@ -24,7 +25,7 @@ _RETRIES = 3
 _BACKOFF_SECONDS = 2.0
 
 
-def classify_section(title: str, content: str, taxonomy: list[str]) -> str:
+def classify_section(title: str, content: str, taxonomy: list[str], project_context: str = "") -> str:
 	"""Return one taxonomy label for a section, or `"other"` on a genuine miss.
 
 	Retries transient API failures (rate limits) with backoff before giving up — a
@@ -36,6 +37,7 @@ def classify_section(title: str, content: str, taxonomy: list[str]) -> str:
 	prompt = (
 		f"Classify this document section into exactly one of: {labels}.\n"
 		f'Respond ONLY as JSON: {{"type":"<one of the labels>"}}.\n\n'
+		f"{context_block(project_context)}"
 		f"TITLE: {title}\nCONTENT (truncated):\n{content[:1500]}"
 	)
 	for attempt in range(_RETRIES + 1):

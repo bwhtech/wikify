@@ -10,7 +10,7 @@ from __future__ import annotations
 import frappe
 
 from wikify.engine import remediate_pdf
-from wikify.jobs._util import log, publish_progress
+from wikify.jobs._util import log, project_context, publish_progress
 
 
 def run(import_name: str, scope: str = "flagged") -> None:
@@ -19,6 +19,10 @@ def run(import_name: str, scope: str = "flagged") -> None:
 		imp.db_set("status", "Remediating")
 		publish_progress(import_name, 0, f"Starting remediation ({scope})", status="Remediating")
 		log(import_name, "info", "remediate", f"Remediating {scope} pages of {imp.import_title}")
+
+		context = project_context(imp)
+		if context:
+			log(import_name, "info", "remediate", f"Using project context ({len(context)} chars)")
 
 		pdf_path = frappe.get_doc("File", {"file_url": imp.pdf}).get_full_path()
 
@@ -34,8 +38,12 @@ def run(import_name: str, scope: str = "flagged") -> None:
 			delta = round((new_c or 0) - (base_c or 0), 3)
 			verb = "adopted" if adopted else "kept baseline"
 			meta = {
-				"page_no": page_no, "method": method, "adopted": adopted,
-				"base": base_c, "new": new_c, "delta": delta,
+				"page_no": page_no,
+				"method": method,
+				"adopted": adopted,
+				"base": base_c,
+				"new": new_c,
+				"delta": delta,
 			}
 			suffix = f" — {method} {verb} ({base_c}→{new_c}, Δ{delta:+.3f})"
 			if cost:
@@ -47,17 +55,18 @@ def run(import_name: str, scope: str = "flagged") -> None:
 			imp.source_document,
 			pdf_path,
 			scope=scope,
+			project_context=context,
 			progress_cb=progress_cb,
 			page_cb=page_cb,
 			stage_cb=stage_cb,
 		)
 
 		imp.db_set("status", "Review")
-		publish_progress(
-			import_name, 100, f"Remediated {result['targets']} pages", status="Review"
-		)
+		publish_progress(import_name, 100, f"Remediated {result['targets']} pages", status="Review")
 		log(
-			import_name, "info", "remediate",
+			import_name,
+			"info",
+			"remediate",
 			f"Done — {result['adopted']}/{result['targets']} adopted, "
 			f"canonical mean {result['canonical_mean']}, {result['sections']} sections rebuilt",
 		)

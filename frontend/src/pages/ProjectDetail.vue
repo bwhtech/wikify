@@ -40,13 +40,20 @@ const showNewImport = ref(false);
 				/>
 			</div>
 
-			<Button
-				variant="solid"
-				theme="gray"
-				icon-left="lucide-plus"
-				label="New Import"
-				@click="showNewImport = true"
-			/>
+			<div class="flex items-center gap-2">
+				<Button
+					variant="ghost"
+					icon="lucide-settings"
+					:route="{ name: 'ProjectSettings', params: { name } }"
+				/>
+				<Button
+					variant="solid"
+					theme="gray"
+					icon-left="lucide-plus"
+					label="New Import"
+					@click="showNewImport = true"
+				/>
+			</div>
 		</header>
 
 		<ImportList :project="name" @new-import="showNewImport = true" />

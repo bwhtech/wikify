@@ -33,12 +33,14 @@ def rebuild_and_classify(
 	source_document: str,
 	pdf_path: str,
 	stage_cb: Callable[[str], None] | None = None,
+	project_context: str = "",
 ) -> int:
 	"""Rebuild the section tree, then classify each fresh section. Returns the count.
 
 	Shared tail of the parse and remediate passes (the rebuild assigns new section
 	names, so types are always re-derived). `stage_cb` streams the two post-page-loop
 	phase labels so the progress bar doesn't look pinned at the last page.
+	`project_context` steers the eager classify (blank = v0.1 behavior).
 	"""
 	if stage_cb:
 		stage_cb("Building section tree")
@@ -50,5 +52,6 @@ def rebuild_and_classify(
 		progress_cb=(lambda done, total, title, type_: stage_cb(f"Classifying sections ({done}/{total})"))
 		if stage_cb
 		else None,
+		project_context=project_context,
 	)
 	return count

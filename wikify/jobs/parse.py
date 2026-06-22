@@ -11,7 +11,7 @@ import frappe
 from frappe.utils import now_datetime
 
 from wikify.engine import parse_pdf
-from wikify.jobs._util import log, publish_progress
+from wikify.jobs._util import log, project_context, publish_progress
 
 
 def run(import_name: str) -> None:
@@ -21,6 +21,10 @@ def run(import_name: str) -> None:
 		imp.db_set("started_at", now_datetime())
 		publish_progress(import_name, 0, "Starting parse", status="Parsing")
 		log(import_name, "info", "parse", f"Starting parse of {imp.import_title}")
+
+		context = project_context(imp)
+		if context:
+			log(import_name, "info", "parse", f"Using project context ({len(context)} chars)")
 
 		pdf_path = frappe.get_doc("File", {"file_url": imp.pdf}).get_full_path()
 
@@ -50,6 +54,7 @@ def run(import_name: str) -> None:
 			import_name=import_name,
 			pdf_url=imp.pdf,
 			project=imp.project,
+			project_context=context,
 			progress_cb=progress_cb,
 			page_cb=page_cb,
 			stage_cb=stage_cb,

@@ -8,6 +8,12 @@ const routes = [
 		component: () => import("@/pages/ProjectList.vue"),
 	},
 	{
+		path: "/project/:name/settings",
+		name: "ProjectSettings",
+		component: () => import("@/components/ProjectSettings.vue"),
+		props: true,
+	},
+	{
 		path: "/project/:name",
 		name: "ProjectDetail",
 		component: () => import("@/pages/ProjectDetail.vue"),

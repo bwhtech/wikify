@@ -32,7 +32,7 @@ def _sec(title, level, path, p_start, p_end):
 
 
 # Deterministic stand-in for the LLM classifier: route by a keyword in the title.
-def _fake_classify(title, content, taxonomy):
+def _fake_classify(title, content, taxonomy, project_context=""):
 	lowered = title.lower()
 	if "nurse" in lowered or "role" in lowered:
 		return "staff_roles_and_responsibilities"
@@ -43,9 +43,9 @@ def _fake_classify(title, content, taxonomy):
 
 class TestClassify(FrappeTestCase):
 	def setUp(self):
-		self.sd = frappe.get_doc(
-			{"doctype": "Source Document", "title": "Classify Test"}
-		).insert(ignore_permissions=True)
+		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Classify Test"}).insert(
+			ignore_permissions=True
+		)
 		store.replace_sections(
 			self.sd.name,
 			[
@@ -99,7 +99,9 @@ class TestClassify(FrappeTestCase):
 	def test_no_key_falls_back_to_other(self):
 		# With no OpenRouter key, classify_section never calls out — returns "other".
 		with patch.object(classifier.llm, "has_openrouter", return_value=False):
-			label = classifier.classify_section("1. Staff Roles", "body", ["staff_roles_and_responsibilities"])
+			label = classifier.classify_section(
+				"1. Staff Roles", "body", ["staff_roles_and_responsibilities"]
+			)
 		self.assertEqual(label, "other")
 
 	def test_transient_failure_retries_then_succeeds(self):
@@ -167,9 +169,9 @@ class TestClassify(FrappeTestCase):
 
 	def test_sections_by_type_groups_across_documents(self):
 		# A second document with a section of the same type → cross-doc grouping.
-		sd2 = frappe.get_doc(
-			{"doctype": "Source Document", "title": "Another Manual"}
-		).insert(ignore_permissions=True)
+		sd2 = frappe.get_doc({"doctype": "Source Document", "title": "Another Manual"}).insert(
+			ignore_permissions=True
+		)
 		store.replace_sections(sd2.name, [_sec("1. Roles", 1, ["1. Roles"], 1, 1)])
 
 		with patch.object(classify, "classify_section", side_effect=_fake_classify):

@@ -39,6 +39,7 @@ def remediate_pdf(
 	source_document: str,
 	pdf_path: str,
 	scope: str = "all",
+	project_context: str = "",
 	progress_cb: Callable[[int, int], None] | None = None,
 	page_cb: Callable[..., None] | None = None,
 	stage_cb: Callable[[str], None] | None = None,
@@ -87,7 +88,11 @@ def remediate_pdf(
 			# A single page's model call failing (rate limit, billing, transient) must not
 			# abort the whole pass — log it, keep the baseline for that page, move on.
 			try:
-				new_md = vlm.parse_page_image(data_url) if method == "vlm" else clean_markdown(base_md)
+				new_md = (
+					vlm.parse_page_image(data_url, project_context=project_context)
+					if method == "vlm"
+					else clean_markdown(base_md, project_context=project_context)
+				)
 				new_ps = score_page(
 					p["page_no"], new_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind
 				)
@@ -132,7 +137,7 @@ def remediate_pdf(
 	store.set_canonical_mean(source_document, canonical_mean)
 
 	# Rebuild the section tree over the now-canonical (adopted) markdown, then re-tag.
-	n_sections = rebuild_and_classify(source_document, pdf_path, stage_cb)
+	n_sections = rebuild_and_classify(source_document, pdf_path, stage_cb, project_context=project_context)
 
 	adopted_count = sum(1 for src in canon_src.values() if src != "baseline")
 	return {

@@ -12,6 +12,18 @@ import json
 import frappe
 
 
+def project_context(import_doc) -> str:
+	"""The owning project's steering `context_prompt` (blank when unset).
+
+	Resolved once per job from `import.project` and threaded into the engine's LLM
+	prompts — keeps the engine pure (string in, no DocType reads for context).
+	See 0.2/01-project-hierarchy → *Where the context prompt threads*.
+	"""
+	if not import_doc.project:
+		return ""
+	return frappe.db.get_value("Wikify Project", import_doc.project, "context_prompt") or ""
+
+
 def publish_progress(
 	import_name: str,
 	percent: float,

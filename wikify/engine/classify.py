@@ -27,19 +27,23 @@ from wikify.engine.loader.classifier import classify_section
 def classify_document(
 	source_document: str,
 	progress_cb: Callable[[int, int, str, str], None] | None = None,
+	project_context: str = "",
 ) -> dict:
 	"""Classify every section of a doc against the Section Type taxonomy.
 
 	Writes `section_type` on each Source Section and returns
 	`{"sections": n, "by_type": {type: count}}`. `progress_cb(done, total, title, type)`
-	streams per-section progress for the reclassify job's live log.
+	streams per-section progress for the reclassify job's live log. `project_context`
+	steers the classifier with the owning project's domain hints (blank = v0.1 behavior).
 	"""
 	taxonomy = store.get_section_taxonomy()
 	sections = store.get_sections_to_classify(source_document)
 	total = len(sections)
 	counts: Counter[str] = Counter()
 	for i, sec in enumerate(sections):
-		section_type = classify_section(sec["title"] or "", sec["markdown"] or "", taxonomy)
+		section_type = classify_section(
+			sec["title"] or "", sec["markdown"] or "", taxonomy, project_context=project_context
+		)
 		store.set_section_type(sec["name"], section_type)
 		counts[section_type] += 1
 		if progress_cb:

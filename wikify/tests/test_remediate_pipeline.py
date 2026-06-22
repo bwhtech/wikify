@@ -14,7 +14,7 @@ from wikify.tests.test_parse_pipeline import _make_sample_pdf
 
 # Sentinel: a remediation output the fake judge rates 5/5 (vs 2/5 for anything else),
 # so we can deterministically drive the "vlm improves → adopt" branch.
-_MERMAID = "```mermaid\nflowchart TD\n  A[\"Start\"] --> B[\"End\"]\n```\nMERMAID_OK"
+_MERMAID = '```mermaid\nflowchart TD\n  A["Start"] --> B["End"]\n```\nMERMAID_OK'
 
 
 def _fake_chat(model, messages, label="", **kw):
@@ -26,7 +26,13 @@ def _fake_chat(model, messages, label="", **kw):
 		md = messages[0]["content"][-1].get("text", "")
 		overall = 5 if "MERMAID_OK" in md else 2
 	content = json.dumps(
-		{"overall": overall, "completeness": overall, "structure": overall, "no_hallucination": 5, "note": "t"}
+		{
+			"overall": overall,
+			"completeness": overall,
+			"structure": overall,
+			"no_hallucination": 5,
+			"note": "t",
+		}
 	)
 	return {"choices": [{"message": {"content": content}}], "usage": {}}
 
@@ -48,13 +54,18 @@ class TestRemediatePipeline(FrappeTestCase):
 		sd, path = self._parse()
 		mean_before = frappe.db.get_value("Source Document", sd, "mean_score")
 		# Visual page (3) is judged 2/5 at parse → flagged for review.
-		self.assertEqual(frappe.db.get_value("Source Page", {"source_document": sd, "page_no": 3}, "verdict"), "review")
+		self.assertEqual(
+			frappe.db.get_value("Source Page", {"source_document": sd, "page_no": 3}, "verdict"), "review"
+		)
 
 		with (
 			patch("wikify.engine.llm.has_openrouter", return_value=True),
 			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
 			# Text cleanup is content-preserving (identity) → recall held → adopted.
-			patch("wikify.engine.remediate.clean_markdown", side_effect=lambda md, model=None: md),
+			patch(
+				"wikify.engine.remediate.clean_markdown",
+				side_effect=lambda md, model=None, project_context="": md,
+			),
 			# VLM re-parse yields a mermaid-bearing transcription the judge rates 5/5.
 			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
 		):
@@ -66,8 +77,13 @@ class TestRemediatePipeline(FrappeTestCase):
 				"Source Page",
 				filters={"source_document": sd},
 				fields=[
-					"page_no", "kind", "remediation_method", "remediation_adopted",
-					"canonical_source", "canonical_markdown", "canonical_composite",
+					"page_no",
+					"kind",
+					"remediation_method",
+					"remediation_adopted",
+					"canonical_source",
+					"canonical_markdown",
+					"canonical_composite",
 				],
 				order_by="page_no asc",
 			)
@@ -105,7 +121,10 @@ class TestRemediatePipeline(FrappeTestCase):
 		with (
 			patch("wikify.engine.llm.has_openrouter", return_value=True),
 			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
-			patch("wikify.engine.remediate.clean_markdown", side_effect=lambda md, model=None: md),
+			patch(
+				"wikify.engine.remediate.clean_markdown",
+				side_effect=lambda md, model=None, project_context="": md,
+			),
 			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
 		):
 			remediate_pdf(sd, path, scope="flagged")

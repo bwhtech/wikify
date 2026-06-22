@@ -26,6 +26,39 @@ def create_project(project_name: str, description: str = "") -> str:
 
 
 @frappe.whitelist()
+def update_project(
+	name: str,
+	project_name: str | None = None,
+	description: str | None = None,
+	context_prompt: str | None = None,
+	agent_model: str | None = None,
+	status: str | None = None,
+) -> str:
+	"""Update a project's editable settings (name, description, context, model, status).
+
+	Only the passed fields are touched; the controller `validate` still enforces a unique
+	`project_name` and the single-default invariant. `context_prompt` is the steering lever
+	threaded into every AI step and the agent.
+	"""
+	proj = frappe.get_doc("Wikify Project", name)
+	if project_name is not None:
+		stripped = project_name.strip()
+		if not stripped:
+			frappe.throw("Project name is required.")
+		proj.project_name = stripped
+	if description is not None:
+		proj.description = description
+	if context_prompt is not None:
+		proj.context_prompt = context_prompt
+	if agent_model is not None:
+		proj.agent_model = agent_model
+	if status is not None:
+		proj.status = status
+	proj.save()
+	return proj.name
+
+
+@frappe.whitelist()
 def list_projects() -> list[dict]:
 	"""Projects for the list screen, default ("Uncategorized") pinned first."""
 	return frappe.get_all(
