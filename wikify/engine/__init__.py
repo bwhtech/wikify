@@ -21,16 +21,19 @@ from wikify.engine.finalize import finalize_document
 from wikify.engine.generate import generate_wiki, preview_wiki
 from wikify.engine.parsers import pymupdf as baseline
 from wikify.engine.remediate import remediate_pdf
+from wikify.engine.reparse import embed_page_image, reparse_page
 from wikify.engine.sectionize import rebuild_and_classify, sectionize_document
 from wikify.engine.verify import score_page
 
 __all__ = [
 	"classify_document",
+	"embed_page_image",
 	"finalize_document",
 	"generate_wiki",
 	"parse_pdf",
 	"preview_wiki",
 	"remediate_pdf",
+	"reparse_page",
 	"sectionize_document",
 ]
 

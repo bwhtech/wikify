@@ -6,6 +6,7 @@ import { useSocket } from "@/socket";
 const CHANNELS = {
 	stream: "onStream",
 	tool: "onTool",
+	confirm: "onConfirm",
 	clarify: "onClarify",
 	complete: "onComplete",
 	error: "onError",

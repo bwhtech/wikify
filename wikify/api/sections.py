@@ -113,9 +113,7 @@ def _rebuild_tree(source_document: str) -> None:
 
 def _subtree_names(name: str) -> tuple[str, list[str]]:
 	"""(source_document, [names in the subtree rooted at `name`]) via lft/rgt range."""
-	sec = frappe.db.get_value(
-		"Source Section", name, ["source_document", "lft", "rgt"], as_dict=True
-	)
+	sec = frappe.db.get_value("Source Section", name, ["source_document", "lft", "rgt"], as_dict=True)
 	if not sec:
 		frappe.throw(_("Section {0} not found.").format(name))
 	names = frappe.get_all(
@@ -131,6 +129,29 @@ def _subtree_names(name: str) -> tuple[str, list[str]]:
 
 
 @frappe.whitelist()
+def create_section_type(
+	type_name: str, label: str | None = None, description: str | None = None, color: str | None = None
+) -> dict:
+	"""Add a Section Type to the taxonomy (the agent's "new tag" capability).
+
+	`type_name` is slugified to a snake_case machine key (matching the classifier's seeded
+	keys); a pre-existing key is returned as-is (idempotent) rather than erroring.
+	"""
+	key = frappe.scrub((type_name or "").strip()).strip("_")
+	if not key:
+		frappe.throw(_("Provide a type name."))
+	if frappe.db.exists("Section Type", key):
+		return {"ok": True, "type_name": key, "existed": True}
+	doc = frappe.new_doc("Section Type")
+	doc.type_name = key
+	doc.label = (label or type_name).strip()
+	doc.description = (description or "").strip() or None
+	doc.color = (color or "").strip() or None
+	doc.insert(ignore_permissions=True)
+	return {"ok": True, "type_name": key, "existed": False}
+
+
+@frappe.whitelist()
 def reorder_section(
 	name: str, new_parent: str | None = None, new_index: int = 0, siblings: str | list | None = None
 ) -> dict:
@@ -143,17 +164,13 @@ def reorder_section(
 	`siblings`.
 	"""
 	new_parent = new_parent or None
-	sec = frappe.db.get_value(
-		"Source Section", name, ["source_document", "lft", "rgt"], as_dict=True
-	)
+	sec = frappe.db.get_value("Source Section", name, ["source_document", "lft", "rgt"], as_dict=True)
 	if not sec:
 		frappe.throw(_("Section {0} not found.").format(name))
 
 	# Guard against cycles: the new parent must not be the node itself or a descendant.
 	if new_parent:
-		parent = frappe.db.get_value(
-			"Source Section", new_parent, ["source_document", "lft"], as_dict=True
-		)
+		parent = frappe.db.get_value("Source Section", new_parent, ["source_document", "lft"], as_dict=True)
 		if not parent or parent.source_document != sec.source_document:
 			frappe.throw(_("New parent must belong to the same document."))
 		if sec.lft <= parent.lft <= sec.rgt:
@@ -168,6 +185,68 @@ def reorder_section(
 
 	_rebuild_tree(sec.source_document)
 	return {"ok": True}
+
+
+@frappe.whitelist()
+def move_section(name: str, new_parent: str | None = None, new_index: int | None = None) -> dict:
+	"""Reparent + reorder a section without the client computing the sibling order.
+
+	The drag-review UI sends the full post-drop sibling list to `reorder_section`; the
+	agent (Slice 14) only knows the target parent + position, so this derives the
+	destination sibling order itself (existing children at `new_parent`, minus this node,
+	with `name` spliced in at `new_index`), then delegates to the same NestedSet rebuild so
+	`lft`/`rgt`/`level`/`hierarchy_path`/`is_group` stay consistent.
+	"""
+	new_parent = new_parent or None
+	sec = frappe.db.get_value("Source Section", name, ["source_document", "lft", "rgt"], as_dict=True)
+	if not sec:
+		frappe.throw(_("Section {0} not found.").format(name))
+
+	if new_parent:
+		parent = frappe.db.get_value(
+			"Source Section", new_parent, ["source_document", "lft", "rgt"], as_dict=True
+		)
+		if not parent or parent.source_document != sec.source_document:
+			frappe.throw(_("New parent must belong to the same document."))
+		if sec.lft <= parent.lft <= sec.rgt:
+			frappe.throw(_("Can't move a section into its own subtree."))
+
+	# Current children at the destination (excluding the moving node), in display order.
+	table = frappe.qb.DocType("Source Section")
+	q = table.source_document == sec.source_document
+	q = q & (
+		(table.parent_source_section == new_parent)
+		if new_parent
+		else ((table.parent_source_section == "") | table.parent_source_section.isnull())
+	)
+	siblings = (
+		frappe.qb.from_(table)
+		.where(q & (table.name != name))
+		.orderby(Coalesce(table.sort_order, 0), order=Order.asc)
+		.orderby(table.name, order=Order.asc)
+		.select(table.name)
+	).run(pluck="name")
+
+	idx = len(siblings) if new_index is None else max(0, min(int(new_index), len(siblings)))
+	siblings.insert(idx, name)
+
+	frappe.db.set_value("Source Section", name, "parent_source_section", new_parent)
+	for order, sib in enumerate(siblings):
+		frappe.db.set_value("Source Section", sib, "sort_order", order, update_modified=False)
+	_rebuild_tree(sec.source_document)
+	return {"ok": True, "index": idx}
+
+
+@frappe.whitelist()
+def set_section_type(name: str, section_type: str | None = None) -> dict:
+	"""Retag a section with a `section_type` (must be an existing Section Type, or blank)."""
+	if not frappe.db.exists("Source Section", name):
+		frappe.throw(_("Section {0} not found.").format(name))
+	section_type = (section_type or "").strip() or None
+	if section_type and not frappe.db.exists("Section Type", section_type):
+		frappe.throw(_("Unknown Section Type {0}.").format(section_type))
+	frappe.db.set_value("Source Section", name, "section_type", section_type, update_modified=False)
+	return {"ok": True, "section_type": section_type}
 
 
 @frappe.whitelist()

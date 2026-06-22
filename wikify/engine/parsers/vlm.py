@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from wikify.engine import llm, settings
 from wikify.engine.loader.cleanup import strip_outer_markdown_fence
-from wikify.engine.loader.context import context_block
+from wikify.engine.loader.context import context_block, instruction_block
 
 _PROMPT = (
 	"Convert this PDF page into clean, faithful GitHub-flavored Markdown. "
@@ -30,15 +30,18 @@ _PROMPT = (
 )
 
 
-def parse_page_image(image_data_url: str, model: str | None = None, project_context: str = "") -> str:
+def parse_page_image(
+	image_data_url: str, model: str | None = None, project_context: str = "", instruction: str = ""
+) -> str:
 	"""Markdown for a single page, read from its rendered image (data URL)."""
+	preamble = context_block(project_context) + instruction_block(instruction)
 	resp = llm.chat_completion(
 		model or settings.get("vlm_model"),
 		[
 			{
 				"role": "user",
 				"content": [
-					{"type": "text", "text": context_block(project_context) + _PROMPT},
+					{"type": "text", "text": preamble + _PROMPT},
 					{"type": "image_url", "image_url": {"url": image_data_url}},
 				],
 			}

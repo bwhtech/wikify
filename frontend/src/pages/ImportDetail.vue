@@ -123,13 +123,22 @@ function onLog(payload) {
 		});
 	}
 }
+// The AI agent's write tools (Slice 14) change this document's tree/pages from the chat
+// panel — refetch the affected views when a mutation lands on this document.
+function onAgentMutation(payload) {
+	if (!imp.doc || payload.source_document !== imp.doc.source_document) return;
+	pageReview.value?.reload();
+	sectionTree.value?.reload();
+}
 onMounted(() => {
 	socket?.on("wikify_import_progress", onProgress);
 	socket?.on("wikify_import_log", onLog);
+	socket?.on("wikify_agent_mutation", onAgentMutation);
 });
 onUnmounted(() => {
 	socket?.off("wikify_import_progress", onProgress);
 	socket?.off("wikify_import_log", onLog);
+	socket?.off("wikify_agent_mutation", onAgentMutation);
 });
 
 const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "text-ink-red-6" };

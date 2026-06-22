@@ -136,6 +136,24 @@ def set_canonical_mean(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "canonical_mean", mean)
 
 
+def get_page_image(page_name: str) -> str | None:
+	"""The file URL of a page's rendered PNG (attached at parse time), or None."""
+	return frappe.db.get_value("Source Page", page_name, "image")
+
+
+def get_canonical_composites(source_document: str) -> list[float | None]:
+	"""Each page's canonical composite (falling back to baseline composite) for the doc."""
+	rows = frappe.get_all(
+		"Source Page",
+		filters={"source_document": source_document},
+		fields=["canonical_composite", "composite"],
+		order_by="page_no asc",
+	)
+	return [
+		r["canonical_composite"] if r["canonical_composite"] is not None else r["composite"] for r in rows
+	]
+
+
 def set_canonical_markdown(page_name: str, markdown: str) -> None:
 	"""Overwrite a page's canonical markdown in place (furniture-strip finalize), leaving
 	its composite + provenance untouched."""

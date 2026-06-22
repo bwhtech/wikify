@@ -13,7 +13,7 @@ from wikify.engine import remediate_pdf
 from wikify.jobs._util import log, project_context, publish_progress
 
 
-def run(import_name: str, scope: str = "flagged") -> None:
+def run(import_name: str, scope: str = "flagged", instruction: str = "") -> None:
 	imp = frappe.get_doc("Wikify Import", import_name)
 	try:
 		imp.db_set("status", "Remediating")
@@ -23,6 +23,8 @@ def run(import_name: str, scope: str = "flagged") -> None:
 		context = project_context(imp)
 		if context:
 			log(import_name, "info", "remediate", f"Using project context ({len(context)} chars)")
+		if instruction:
+			log(import_name, "info", "remediate", f"Steering re-parse: {instruction}")
 
 		pdf_path = frappe.get_doc("File", {"file_url": imp.pdf}).get_full_path()
 
@@ -56,6 +58,7 @@ def run(import_name: str, scope: str = "flagged") -> None:
 			pdf_path,
 			scope=scope,
 			project_context=context,
+			instruction=instruction,
 			progress_cb=progress_cb,
 			page_cb=page_cb,
 			stage_cb=stage_cb,

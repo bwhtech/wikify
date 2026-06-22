@@ -25,7 +25,7 @@ Numbering continues at **10** so the delivery sequence stays monotonic across ve
 | 11 | Project context → pipeline + project settings | AFK | 10 | 01 | ✅ |
 | 12 | Agent walking skeleton (chat + 1 read tool + streaming) | HITL | 10 | 02 | ✅ |
 | 13 | Agent context attachment + full read tools | HITL | 12 | 02 | ✅ |
-| 14 | Agent write / action tools (tree · retag · re-parse · pipeline) | HITL | 13, 11 | 02 | — |
+| 14 | Agent write / action tools (tree · retag · re-parse · pipeline) | HITL | 13, 11 | 02 | ✅ |
 | 15 | Wiki rendered preview | HITL | 9 | 03 | — |
 | 16 | Polish (session history · per-project agent model · settings · empty states) | AFK | 14 | 01, 02 | — |
 
@@ -388,17 +388,79 @@ context-dependent question with and without the chip; confirm project context in
 - **UI:** tool-call cards show running → done with a short summary; affected-item links.
 
 ### Acceptance criteria
-- [ ] "Move 'Anaesthesia' under 'Clinical Protocols'" reorders the tree; Tree tab updates
+- [x] "Move 'Anaesthesia' under 'Clinical Protocols'" reorders the tree; Tree tab updates
   on refetch.
-- [ ] "Tag pages 40–45 as surgical_procedures" retags those sections.
-- [ ] "Don't make page 7 a mermaid diagram — just embed the page image" runs
+- [x] "Tag pages 40–45 as surgical_procedures" retags those sections.
+- [x] "Don't make page 7 a mermaid diagram — just embed the page image" runs
   `use_page_image`; the page's canonical markdown becomes the image embed.
-- [ ] "Re-parse page 12 keeping the table as real markdown" enqueues an instruction-steered
+- [x] "Re-parse page 12 keeping the table as real markdown" enqueues an instruction-steered
   `reparse_page`; canonical updates and the page review shows it.
-- [ ] Reparse-whole-document / regenerate-wiki ask for confirmation before running.
+- [x] Reparse-whole-document / regenerate-wiki ask for confirmation before running.
 
 **Verify:** drive each tool from the panel; confirm DB mutations in `console`; confirm the
 review/tree UI reflects them; confirm the confirm-gate on expensive ops.
+
+### As built
+- **Tool dataclass** gained two flags (`registry.py`): `confirm` (expensive/destructive —
+  held for a UI confirm card) and `mutates` (changed a DocType — fires a refetch signal).
+  `build_default_registry()` now collects six tool modules (read + tree + taxonomy +
+  reparse + pipeline + converse); **adding a capability is still one `Tool` — the loop
+  never changed**. 16 tools total registered.
+- **Tree / taxonomy tools** (`tools/tree.py`, `tools/taxonomy.py`) — `move_section`,
+  `rename_section`, `set_section_type`, `toggle_include_in_wiki`, `create_section_type`.
+  They reuse the `api.sections` NestedSet mutations; two new whitelisted API seams were
+  added there: `move_section(name, new_parent, new_index)` (derives the destination sibling
+  order itself, then delegates to the same `_rebuild_tree`, so the agent needn't compute
+  the post-drop order the drag-review UI sends) and `set_section_type` (validates the type
+  exists) + `create_section_type` (slugifies to a snake_case key, idempotent). All five are
+  `mutates=True`, apply directly (cheap, reversible), and return a confirming summary.
+- **Re-parse tools** (`tools/reparse.py`) — `use_page_image` (deterministic, no LLM:
+  `engine.embed_page_image` writes `![Page N](<url>)` + `canonical_source="image"` — the
+  `Source Page.canonical_source` Select gained the `image` option), `reparse_page`
+  (single-page, instruction-steered cleanup/VLM via the new `engine/reparse.py:reparse_page`
+  — adopts the result as canonical since the user explicitly asked), and `reparse_document`
+  (confirm-gated; enqueues the existing remediate job over all pages with the instruction).
+  Page-scoped edits update the page's canonical only (shown in Page Review immediately)
+  **without a full-tree rebuild**, so manual tree structure is preserved.
+- **Pipeline tools** (`tools/pipeline.py`) — `reclassify` + `regenerate_wiki`, both
+  confirm-gated, both enqueue the existing `jobs/classify` / `jobs/generate` keyed by the
+  Import resolved from the document (`Ctx.default_import`). `regenerate_wiki` reuses the
+  document's existing Wiki Space (errors cleanly if none yet).
+- **Instruction threading** — `engine/loader/context.py:instruction_block()` mirrors
+  `context_block()` (blank → `""`, so no-instruction prompts are byte-identical to v0.1);
+  threaded as an optional `instruction: str = ""` through `clean_markdown`,
+  `vlm.parse_page_image`, `remediate_pdf`, and the remediate job. The engine stays pure.
+- **The loop** (`loop.py`) — takes `approved_tools` (threaded `api.run → job → AgentRunner
+  → Ctx.approved`). Per tool call: a **terminal** tool (`ask_clarification`) persists a
+  `clarification` message (history skips those, so the assistant turn's tool_calls never
+  dangle) + emits `wikify_agent_clarify` and ends the turn; a **confirm** tool not yet in
+  `ctx.approved` is **not executed** — it emits `wikify_agent_confirm` and feeds back a
+  `[NOT EXECUTED — awaiting confirmation]` sentinel (valid tool/response pairing) so the
+  model asks the user; a **mutating** tool, after running, commits then emits
+  `wikify_agent_mutation` (commit-before-publish — the job's transaction is otherwise
+  invisible to a frontend refetch, which read stale rows in the first UI test).
+- **Realtime + frontend** — `agent/realtime.js` binds the new `confirm` channel;
+  `useAgentChat` handles `onConfirm` (amber confirm card) + `onClarify` (question + option
+  chips) and adds `approveTool` (re-runs the held tool with `approved_tools`),
+  `dismissConfirm`, `selectClarifyOption`. `AgentChatPanel` renders the confirm + clarify
+  cards and a tool-status label map. `ImportDetail` subscribes to `wikify_agent_mutation`
+  and reloads the Pages + Tree views when the change targets its document.
+- **Deviation:** the spec's confirm mechanism ("tool returns a sentinel … a follow-up
+  `run()` re-invokes it") is implemented as a **loop-level gate** (the confirm check lives
+  in `_run_tool`, not in each handler) so handlers stay pure and the gate is uniform.
+  Page-scoped re-parse updates canonical only (no tree rebuild) to protect manual edits —
+  propagation into the tree/wiki is via `reclassify` / `regenerate_wiki` / a document
+  re-parse, all of which are tools the agent can chain.
+- **Verified:** headless tool runs against the live Nephrology/Obstetrics docs (tree
+  mutations incl. cycle guard, `use_page_image` embed, import/pdf resolution, regenerate
+  guard); 8 new `FrappeTestCase`s in `test_agent_write.py` (tree/taxonomy mutations,
+  deterministic embed, confirm-gate **held-then-runs-on-approval**, terminal clarify,
+  mutation event) — updated the `clean_markdown` mock signature in
+  `test_remediate_pipeline`; full suite **88 green**. UI on `pdf.localhost`: opened the
+  panel on the Tree tab (project + document + section chips), "Retag the Milestones section
+  as administrative_policies" streamed a `set_section_type` tool card + answer and the tree
+  reflected it; "Re-parse the entire document…" surfaced the **confirm card** (Run it /
+  Cancel) before executing. pre-commit clean.
 
 ### Spec refs
 [02-ai-agent](02-ai-agent.md) → *Write / tree tools*, *Re-parse tools*, *Pipeline tools*.

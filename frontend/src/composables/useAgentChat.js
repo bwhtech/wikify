@@ -71,6 +71,29 @@ export function useAgentChat() {
 					if (summary) card.content = summary;
 				}
 			},
+			onConfirm: ({ name, args, call_id, summary }) => {
+				// Expensive/destructive tool held for approval — render a confirm card.
+				dropThinking();
+				messages.value.push({
+					id: `confirm-${call_id}`,
+					role: "confirm",
+					toolName: name,
+					args,
+					summary,
+					status: "pending",
+				});
+			},
+			onClarify: ({ message_id, question, options }) => {
+				isRunning.value = false;
+				dropThinking();
+				messages.value.push({
+					id: message_id,
+					role: "clarify",
+					status: "clarification",
+					content: question,
+					options: options || [],
+				});
+			},
 			onComplete: ({ message_id }) => {
 				isRunning.value = false;
 				dropThinking();
@@ -147,6 +170,25 @@ export function useAgentChat() {
 		}
 	}
 
+	// Confirm card → re-run the held tool, this time pre-approved.
+	async function approveTool(card) {
+		if (isRunning.value) return;
+		card.status = "approved";
+		prompt.value = `Yes — go ahead and run ${card.toolName}.`;
+		await submitPrompt({ approved_tools: [card.toolName] });
+	}
+
+	function dismissConfirm(card) {
+		card.status = "dismissed";
+	}
+
+	// Clarification chip → answer with the chosen option.
+	async function selectClarifyOption(option) {
+		if (isRunning.value) return;
+		prompt.value = option;
+		await submitPrompt();
+	}
+
 	async function cancel() {
 		if (!sessionId.value) return;
 		await call("wikify.api.agent.cancel", { session_id: sessionId.value });
@@ -189,6 +231,9 @@ export function useAgentChat() {
 		attachments,
 		removeAttachment,
 		submitPrompt,
+		approveTool,
+		dismissConfirm,
+		selectClarifyOption,
 		cancel,
 		loadSession,
 		listSessions,

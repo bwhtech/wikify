@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from wikify.engine import llm, settings
 from wikify.engine.loader.cleanup import strip_outer_markdown_fence
-from wikify.engine.loader.context import context_block
+from wikify.engine.loader.context import context_block, instruction_block
 
 _PROMPT = (
 	"You are cleaning Markdown that a PDF-extraction tool produced. The tool sometimes "
@@ -32,12 +32,15 @@ _PROMPT = (
 )
 
 
-def clean_markdown(raw_markdown: str, model: str | None = None, project_context: str = "") -> str:
+def clean_markdown(
+	raw_markdown: str, model: str | None = None, project_context: str = "", instruction: str = ""
+) -> str:
 	if not raw_markdown.strip():
 		return raw_markdown
+	preamble = context_block(project_context) + instruction_block(instruction)
 	resp = llm.chat_completion(
 		model or settings.get("cleanup_model"),
-		[{"role": "user", "content": context_block(project_context) + _PROMPT + raw_markdown}],
+		[{"role": "user", "content": preamble + _PROMPT + raw_markdown}],
 		label="cleanup",
 		max_tokens=4096,
 	)

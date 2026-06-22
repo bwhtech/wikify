@@ -40,6 +40,7 @@ def remediate_pdf(
 	pdf_path: str,
 	scope: str = "all",
 	project_context: str = "",
+	instruction: str = "",
 	progress_cb: Callable[[int, int], None] | None = None,
 	page_cb: Callable[..., None] | None = None,
 	stage_cb: Callable[[str], None] | None = None,
@@ -50,6 +51,8 @@ def remediate_pdf(
 	only touches non-`pass` pages. Returns a summary dict. `progress_cb(done, total)` and
 	`page_cb(page_no, total, method, adopted, base_composite, new_composite, metrics)` are
 	optional streaming hooks the remediate job uses for live progress + log lines.
+	`instruction` (0.2 Slice 14) steers the cleanup/VLM re-parse with a one-off
+	plain-English rule on top of the project context (blank = v0.1 behavior).
 	"""
 	if not llm.has_openrouter():
 		raise RuntimeError("OpenRouter key not set — remediation needs cloud models.")
@@ -89,9 +92,9 @@ def remediate_pdf(
 			# abort the whole pass — log it, keep the baseline for that page, move on.
 			try:
 				new_md = (
-					vlm.parse_page_image(data_url, project_context=project_context)
+					vlm.parse_page_image(data_url, project_context=project_context, instruction=instruction)
 					if method == "vlm"
-					else clean_markdown(base_md, project_context=project_context)
+					else clean_markdown(base_md, project_context=project_context, instruction=instruction)
 				)
 				new_ps = score_page(
 					p["page_no"], new_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind

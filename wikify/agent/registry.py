@@ -22,14 +22,20 @@ class Tool:
 	description: str
 	parameters: dict  # raw JSON-schema for the function args
 	handler: Callable[[Ctx, dict], str]  # runs it; returns a result/summary string
+	# Slice 14: a `confirm` tool is expensive/destructive — the loop holds it for a UI
+	# confirm card and only runs it once the user approves (its name in `Ctx.approved`).
+	# A `mutates` tool changed a DocType — the loop emits `wikify_agent_mutation` so open
+	# Tree/Pages views refetch.
+	confirm: bool = False
+	mutates: bool = False
 
 
 def build_default_registry() -> dict[str, Tool]:
-	"""All available tools, keyed by name. Slice 12: read tools only."""
-	from wikify.agent.tools import read
+	"""All available tools, keyed by name (read + write/reparse/pipeline/converse)."""
+	from wikify.agent.tools import converse, pipeline, read, reparse, taxonomy, tree
 
 	registry: dict[str, Tool] = {}
-	for module in (read,):
+	for module in (read, tree, taxonomy, reparse, pipeline, converse):
 		for tool in module.TOOLS:
 			registry[tool.name] = tool
 	return registry

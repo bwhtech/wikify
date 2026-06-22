@@ -184,11 +184,11 @@
    "label": "Canonical"
   },
   {
-   "description": "Provenance of the canonical markdown: baseline, cleanup, or vlm.",
+   "description": "Provenance of the canonical markdown: baseline, cleanup, vlm, or image.",
    "fieldname": "canonical_source",
    "fieldtype": "Select",
    "label": "Canonical Source",
-   "options": "\nbaseline\ncleanup\nvlm",
+   "options": "\nbaseline\ncleanup\nvlm\nimage",
    "read_only": 1
   },
   {

@@ -23,10 +23,13 @@ def run(
 	source_document: str | None = None,
 	attachments: list | str | None = None,
 	model: str | None = None,
+	approved_tools: list | str | None = None,
 ) -> dict:
 	"""Start an agent turn: append the user message, enqueue the loop, return 202.
 
 	The answer arrives over `wikify_agent_*:<session_id>` realtime, not this response.
+	`approved_tools` carries the confirm-gated tool names the user just approved (sent by
+	the panel's confirm card), so the loop runs them this turn instead of re-gating.
 	"""
 	prompt = (prompt or "").strip()
 	if not prompt:
@@ -34,6 +37,9 @@ def run(
 	if isinstance(attachments, str):
 		attachments = frappe.parse_json(attachments) or []
 	attachments = attachments or []
+	if isinstance(approved_tools, str):
+		approved_tools = frappe.parse_json(approved_tools) or []
+	approved_tools = approved_tools or []
 
 	user = frappe.session.user
 	resolved_model = llm.resolve_model(model, project)
@@ -61,6 +67,7 @@ def run(
 		session_id=sess.name,
 		user=user,
 		attachments=attachments,
+		approved_tools=approved_tools,
 	)
 
 	frappe.local.response["http_status_code"] = 202

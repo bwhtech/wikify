@@ -32,7 +32,14 @@ def request_cancel(session_id: str) -> None:
 class AgentRunner:
 	"""Runs one user turn end-to-end: stream → tool loop → persist → realtime."""
 
-	def __init__(self, session_id: str, user: str, *, attachments: list | None = None):
+	def __init__(
+		self,
+		session_id: str,
+		user: str,
+		*,
+		attachments: list | None = None,
+		approved_tools: list | None = None,
+	):
 		self.session_id = session_id
 		self.user = user
 		self.doc = frappe.get_doc("Wikify Agent Session", session_id)
@@ -50,6 +57,7 @@ class AgentRunner:
 			project=project,
 			source_document=source_document,
 			attachments=self.attachments,
+			approved=set(approved_tools or []),
 		)
 
 	# --- realtime ---------------------------------------------------------------------
@@ -122,6 +130,26 @@ class AgentRunner:
 			self._emit("wikify_agent_complete", {"message_id": message_id})
 			return True
 
+		# A terminal tool (ask_clarification) ends the turn with a question — no result is
+		# fed back. Persist it as a `clarification` message (history skips those, so the
+		# assistant turn's tool_calls never dangle) and emit the clarify event.
+		terminal = next(
+			(c for c in ordered if (t := self.registry.get(c["name"])) and t.side == "terminal"), None
+		)
+		if terminal:
+			targs = _safe_json(terminal["arguments"])
+			question = targs.get("question") or text_acc or _("Could you clarify?")
+			options = targs.get("options") or []
+			session.update_message(
+				message_id, content=question, status="clarification", metadata={"options": options}
+			)
+			session.touch(self.session_id)
+			self._emit(
+				"wikify_agent_clarify",
+				{"message_id": message_id, "question": question, "options": options},
+			)
+			return True
+
 		# Persist the assistant turn (text + requested tool calls), then run them.
 		persisted_calls = [
 			{"id": c["id"], "name": c["name"], "args": _safe_json(c["arguments"])} for c in ordered
@@ -168,28 +196,66 @@ class AgentRunner:
 			"wikify_agent_tool",
 			{"name": name, "args": args, "status": "running", "call_id": call["id"]},
 		)
+
+		# Expensive/destructive tools hold for a UI confirm card. Until the user approves
+		# (the tool name arrives in `ctx.approved` on the follow-up run) the tool does NOT
+		# run — we feed back a sentinel so the model asks the user to confirm.
+		if tool and tool.confirm and name not in self.ctx.approved:
+			self._emit(
+				"wikify_agent_confirm",
+				{"name": name, "args": args, "call_id": call["id"], "summary": tool.description},
+			)
+			result = _(
+				"[NOT EXECUTED — awaiting user confirmation] This is an expensive/destructive "
+				"operation. Briefly tell the user exactly what it will do and that they need to "
+				"confirm it; it will run only when they approve."
+			)
+			self._finish_tool(call, args, result, status="needs_confirmation")
+			return result
+
 		if not tool:
 			result = _("Unknown tool: {0}").format(name)
 		else:
 			try:
 				result = tool.handler(self.ctx, args)
+				if tool.mutates and self.ctx.source_document:
+					# A DocType changed — tell open Tree/Pages views to refetch.
+					self._emit_mutation(name)
 			except Exception:
 				frappe.log_error(title=f"Wikify agent tool failed: {name}")
 				result = _("Tool {0} failed: {1}").format(name, frappe.get_traceback(with_context=False))
+		self._finish_tool(call, args, result)
+		return result
+
+	def _finish_tool(self, call: dict, args: dict, result: str, status: str = "done") -> None:
+		"""Persist the tool result row + emit the tool-card 'done' event."""
 		summary = result if len(result) <= 200 else result[:200] + "…"
 		session.append_message(
 			self.session_id,
 			"tool",
 			result,
-			tool_name=name,
+			tool_name=call["name"],
 			tool_call_id=call["id"],
 			metadata={"args": args},
 		)
 		self._emit(
 			"wikify_agent_tool",
-			{"name": name, "args": args, "status": "done", "summary": summary, "call_id": call["id"]},
+			{"name": call["name"], "args": args, "status": status, "summary": summary, "call_id": call["id"]},
 		)
-		return result
+
+	def _emit_mutation(self, tool_name: str) -> None:
+		"""Broadcast that the agent changed a document's data (open views refetch).
+
+		Commit first: the loop runs in a background job whose transaction would otherwise
+		not be visible until the turn ends, so a frontend refetch fired by this event would
+		read stale rows. Committing here makes the change durable + immediately readable.
+		"""
+		frappe.db.commit()
+		frappe.publish_realtime(
+			"wikify_agent_mutation",
+			{"source_document": self.ctx.source_document, "tool": tool_name},
+			user=self.user,
+		)
 
 	# --- message assembly -------------------------------------------------------------
 

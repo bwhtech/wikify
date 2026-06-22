@@ -64,7 +64,7 @@ class TestRemediatePipeline(FrappeTestCase):
 			# Text cleanup is content-preserving (identity) → recall held → adopted.
 			patch(
 				"wikify.engine.remediate.clean_markdown",
-				side_effect=lambda md, model=None, project_context="": md,
+				side_effect=lambda md, model=None, project_context="", instruction="": md,
 			),
 			# VLM re-parse yields a mermaid-bearing transcription the judge rates 5/5.
 			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
@@ -123,7 +123,7 @@ class TestRemediatePipeline(FrappeTestCase):
 			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
 			patch(
 				"wikify.engine.remediate.clean_markdown",
-				side_effect=lambda md, model=None, project_context="": md,
+				side_effect=lambda md, model=None, project_context="", instruction="": md,
 			),
 			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
 		):

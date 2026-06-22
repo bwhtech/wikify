@@ -13,6 +13,12 @@ const emit = defineEmits(["update:open"]);
 const chat = useAgentChat();
 const { messages, prompt, isRunning, errorText, attachments } = chat;
 
+const TOOL_STATUS_LABEL = {
+	running: "running…",
+	needs_confirmation: "needs confirmation",
+	done: "done",
+};
+
 const CHIP_ICON = {
 	project: "lucide-folder",
 	document: "lucide-file-text",
@@ -129,8 +135,62 @@ function onKeydown(e) {
 							/>
 							<span class="font-medium text-ink-gray-8">{{ m.toolName }}</span>
 							<span class="text-ink-gray-5">{{
-								m.status === "running" ? "running…" : "done"
+								TOOL_STATUS_LABEL[m.status] || m.status
 							}}</span>
+						</div>
+					</div>
+
+					<!-- Confirmation card — expensive/destructive tool held for approval -->
+					<div
+						v-else-if="m.role === 'confirm'"
+						class="rounded-lg border border-outline-amber-1 bg-surface-amber-1 px-3 py-2.5"
+					>
+						<div class="flex items-center gap-2 text-sm font-medium text-ink-gray-8">
+							<span
+								class="lucide-shield-alert size-4 text-ink-amber-6"
+								aria-hidden="true"
+							/>
+							Confirm {{ m.toolName }}
+						</div>
+						<p class="mt-1 text-sm text-ink-gray-7">{{ m.summary }}</p>
+						<div v-if="m.status === 'pending'" class="mt-2.5 flex gap-2">
+							<Button
+								variant="solid"
+								theme="red"
+								label="Run it"
+								@click="chat.approveTool(m)"
+							/>
+							<Button
+								variant="outline"
+								label="Cancel"
+								@click="chat.dismissConfirm(m)"
+							/>
+						</div>
+						<p v-else class="mt-2 text-xs text-ink-gray-5">
+							{{ m.status === "approved" ? "Approved — running." : "Cancelled." }}
+						</p>
+					</div>
+
+					<!-- Clarification card — the agent asked a question -->
+					<div
+						v-else-if="m.role === 'clarify'"
+						class="rounded-lg border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5"
+					>
+						<div class="flex items-start gap-2 text-base text-ink-gray-9">
+							<span
+								class="lucide-help-circle mt-0.5 size-4 shrink-0 text-ink-gray-6"
+								aria-hidden="true"
+							/>
+							<span>{{ m.content }}</span>
+						</div>
+						<div v-if="m.options?.length" class="mt-2.5 flex flex-wrap gap-1.5">
+							<Button
+								v-for="opt in m.options"
+								:key="opt"
+								variant="outline"
+								:label="opt"
+								@click="chat.selectClarifyOption(opt)"
+							/>
 						</div>
 					</div>
 

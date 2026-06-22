@@ -11,6 +11,11 @@ import frappe
 from wikify.agent.loop import AgentRunner
 
 
-def run_agent_job(session_id: str, user: str, attachments: list | None = None) -> None:
+def run_agent_job(
+	session_id: str,
+	user: str,
+	attachments: list | None = None,
+	approved_tools: list | None = None,
+) -> None:
 	frappe.set_user(user)
-	AgentRunner(session_id, user, attachments=attachments).run()
+	AgentRunner(session_id, user, attachments=attachments, approved_tools=approved_tools).run()

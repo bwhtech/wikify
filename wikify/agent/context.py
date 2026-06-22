@@ -32,6 +32,8 @@ class Ctx:
 	project: str | None = None
 	source_document: str | None = None
 	attachments: list[dict] = field(default_factory=list)
+	# Names of confirm-gated tools the user approved for this turn (Slice 14).
+	approved: set[str] = field(default_factory=set)
 
 	def default_document(self, explicit: str | None = None) -> str | None:
 		"""A tool's `source_document` arg, falling back to the attached document.
@@ -43,6 +45,17 @@ class Ctx:
 		if explicit and frappe.db.exists("Source Document", explicit):
 			return explicit
 		return self.source_document
+
+	def default_import(self, explicit: str | None = None) -> str | None:
+		"""The Wikify Import owning the (resolved) document — needed by pipeline jobs.
+
+		The reclassify / regenerate / reparse-document tools enqueue existing jobs keyed
+		by `import_name`; the agent works in `source_document` terms, so resolve the link.
+		"""
+		source_document = self.default_document(explicit)
+		if not source_document:
+			return None
+		return frappe.db.get_value("Wikify Import", {"source_document": source_document}, "name")
 
 
 @dataclass
