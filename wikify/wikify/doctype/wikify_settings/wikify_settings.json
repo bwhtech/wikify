@@ -9,6 +9,7 @@
   "cleanup_model",
   "judge_model",
   "classifier_model",
+  "agent_model",
   "column_break_models",
   "openrouter_api_key",
   "thresholds_section",
@@ -55,6 +56,12 @@
    "fieldname": "classifier_model",
    "fieldtype": "Data",
    "label": "Classifier Model"
+  },
+  {
+   "description": "Site-wide default model for the AI assistant. A project can override it on its settings page; blank falls back to a built-in default.",
+   "fieldname": "agent_model",
+   "fieldtype": "Data",
+   "label": "Agent Model"
   },
   {
    "fieldname": "column_break_models",

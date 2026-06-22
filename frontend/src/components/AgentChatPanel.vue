@@ -1,9 +1,10 @@
 <script setup>
 // Slide-over chat panel for the Wikify AI agent. Slice 12 shipped the message list +
-// tool-call cards + streaming bubble + input. Slice 13 adds the context chips row (the
-// removable attachments the agent knows about) and a session-history dropdown.
+// tool-call cards + streaming bubble + input. Slice 13 added the context chips row + a
+// session-history dropdown. Slice 16 adds a model picker, session rename/archive, error
+// retry, and empty states.
 import { computed, nextTick, ref, watch } from "vue";
-import { Button, Dropdown, Spinner } from "frappe-ui";
+import { Button, Dialog, Dropdown, FormControl, Spinner } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useAgentChat } from "@/composables/useAgentChat";
 
@@ -11,7 +12,7 @@ const props = defineProps({ open: { type: Boolean, default: false } });
 const emit = defineEmits(["update:open"]);
 
 const chat = useAgentChat();
-const { messages, prompt, isRunning, errorText, attachments } = chat;
+const { messages, prompt, isRunning, errorText, attachments, sessionId, model, models } = chat;
 
 const TOOL_STATUS_LABEL = {
 	running: "running…",
@@ -26,16 +27,49 @@ const CHIP_ICON = {
 	section: "lucide-list-tree",
 };
 
+const shortModel = (m) => (m || "").split("/").pop() || "Default";
+
 // Session-history dropdown — fetched lazily when opened.
-const sessionOptions = computed(() =>
-	(chat.sessions.value || []).map((s) => ({
+const sessionOptions = computed(() => {
+	const list = (chat.sessions.value || []).map((s) => ({
 		label: s.title || "Untitled chat",
 		onClick: () => chat.loadSession(s.name),
-	}))
-);
+	}));
+	return list.length
+		? list
+		: [{ label: "No saved chats yet", onClick: () => {}, disabled: true }];
+});
 async function refreshSessions() {
 	await chat.listSessions();
 }
+
+// Model picker — populated from get_agent_models when the panel first opens.
+const modelOptions = computed(() =>
+	(models.value || []).map((m) => ({ label: shortModel(m), onClick: () => (model.value = m) }))
+);
+watch(
+	() => props.open,
+	(open) => {
+		if (open) chat.loadModels();
+	},
+	{ immediate: true }
+);
+
+// Rename dialog.
+const showRename = ref(false);
+const renameText = ref("");
+function openRename() {
+	const s = (chat.sessions.value || []).find((x) => x.name === sessionId.value);
+	renameText.value = s?.title || "";
+	showRename.value = true;
+}
+async function saveRename() {
+	await chat.renameSession(renameText.value);
+	showRename.value = false;
+}
+
+// Show a Retry affordance when the last message is an agent error.
+const showRetry = computed(() => messages.value.at(-1)?.status === "error");
 
 const listEl = ref(null);
 async function scrollToBottom() {
@@ -84,6 +118,20 @@ function onKeydown(e) {
 							@click="refreshSessions"
 						/>
 					</Dropdown>
+					<Button
+						v-if="sessionId"
+						variant="ghost"
+						icon="lucide-pencil"
+						tooltip="Rename chat"
+						@click="openRename"
+					/>
+					<Button
+						v-if="sessionId"
+						variant="ghost"
+						icon="lucide-archive"
+						tooltip="Archive chat"
+						@click="chat.archiveSession()"
+					/>
 					<Button
 						variant="ghost"
 						icon="lucide-plus"
@@ -235,7 +283,18 @@ function onKeydown(e) {
 						</button>
 					</span>
 				</div>
-				<p v-if="errorText" class="mb-2 text-sm text-ink-red-6">{{ errorText }}</p>
+				<div v-if="errorText" class="mb-2 flex items-center justify-between gap-2">
+					<p class="text-sm text-ink-red-6">{{ errorText }}</p>
+					<Button
+						v-if="showRetry"
+						variant="subtle"
+						theme="gray"
+						size="sm"
+						icon-left="lucide-rotate-ccw"
+						label="Retry"
+						@click="chat.retry()"
+					/>
+				</div>
 				<div
 					class="flex items-end gap-2 rounded-lg border border-outline-gray-2 bg-surface-base px-2 py-1.5 focus-within:border-outline-gray-3"
 				>
@@ -261,7 +320,41 @@ function onKeydown(e) {
 						@click="onSubmit"
 					/>
 				</div>
+
+				<!-- Model picker — the agent model for this session. -->
+				<div class="mt-1.5 flex items-center justify-end">
+					<Dropdown :options="modelOptions" placement="left">
+						<button
+							class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-7"
+						>
+							<span class="lucide-cpu size-3" aria-hidden="true" />
+							<span class="max-w-[12rem] truncate">{{ shortModel(model) }}</span>
+							<span class="lucide-chevron-down size-3" aria-hidden="true" />
+						</button>
+					</Dropdown>
+				</div>
 			</div>
+
+			<Dialog v-model:open="showRename" title="Rename chat">
+				<template #default>
+					<FormControl
+						v-model="renameText"
+						label="Chat title"
+						type="text"
+						placeholder="e.g. Nephrology tree cleanup"
+						@keyup.enter="saveRename"
+					/>
+				</template>
+				<template #actions>
+					<Button
+						variant="solid"
+						theme="gray"
+						label="Save"
+						:disabled="!renameText.trim()"
+						@click="saveRename"
+					/>
+				</template>
+			</Dialog>
 		</aside>
 	</Transition>
 </template>

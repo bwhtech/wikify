@@ -27,7 +27,7 @@ Numbering continues at **10** so the delivery sequence stays monotonic across ve
 | 13 | Agent context attachment + full read tools | HITL | 12 | 02 | ✅ |
 | 14 | Agent write / action tools (tree · retag · re-parse · pipeline) | HITL | 13, 11 | 02 | ✅ |
 | 15 | Wiki rendered preview | HITL | 9 | 03 | ✅ |
-| 16 | Polish (session history · per-project agent model · settings · empty states) | AFK | 14 | 01, 02 | — |
+| 16 | Polish (session history · per-project agent model · settings · empty states) | AFK | 14 | 01, 02 | ✅ |
 
 **Spine:** 10 → 11 → 12 → 13 → 14 → 16 is the main chain. **Parallelism:** 15 (wiki
 preview) floats off v0.1 slice 9 and can be built any time after 10; 11 can proceed
@@ -558,12 +558,62 @@ generate the wiki and compare one page to its preview.
 - Project list polish (pinned "Uncategorized", archived filter), breadcrumbs.
 
 ### Acceptance criteria
-- [ ] Sessions can be listed, reopened, renamed, archived.
-- [ ] Agent model resolves project-override → settings → default; the picker works.
-- [ ] Empty/error states render cleanly; cancel/retry behave.
+- [x] Sessions can be listed, reopened, renamed, archived.
+- [x] Agent model resolves project-override → settings → default; the picker works.
+- [x] Empty/error states render cleanly; cancel/retry behave.
 
 **Verify:** exercise session history + model resolution; force an agent error and confirm
 the retry path.
+
+### As built
+- **Model resolution chain.** `Wikify Settings` gained an `agent_model` Data field (site
+  default). `llm.resolve_model` now resolves **explicit → project `agent_model` → Settings
+  `agent_model` → built-in `DEFAULT_AGENT_MODEL`**; `llm.agent_models()` returns the picker
+  list — the resolved default first, then the (real, in-use) pipeline model ids from
+  Settings, so every option is a model OpenRouter already serves here. Exposed as
+  `api.agent.get_agent_models`. The panel's picker and the project-settings override both
+  read it; an explicitly picked model sticks to the session (`run` persists it onto
+  `Wikify Agent Session.model`).
+- **Session management.** `api.agent` gained `rename_session` + `archive_session` (both
+  guarded by a `_owned_session` ownership check); `archive_session` flips `status` to
+  Archived so the session drops out of the Active-only `list_sessions`. The panel header
+  grew **rename** (pencil → dialog) and **archive** buttons (shown only when a session is
+  open); the history dropdown lists/reopens (hydrating messages + tool cards) and shows a
+  "No saved chats yet" empty option.
+- **No-op guard** (Builder's `claims_unbacked_action`, `loop.py`): a final answer that
+  narrates a mutating action in the past tense (moved/renamed/retagged/re-parsed/…) while
+  **no mutating tool ran this turn** spends **one** corrective round (a nudge user message)
+  so the model actually invokes the tool or retracts the claim. Bounded to once per turn;
+  a real tool call this turn skips it. The verb list is deliberately narrow (only verbs
+  that map to a write tool) to avoid false positives on benign phrasing.
+- **Prompt-cache markers.** The (large, stable) system prompt + attachment context block
+  are emitted as Anthropic `cache_control: ephemeral` content parts **only for Claude
+  models** (other models get the plain string; `litellm.drop_params` would strip it
+  anyway) — a cache breakpoint across the turn's tool-loop rounds. Verified live against
+  `anthropic/claude-sonnet-4.6` (streaming + non-streaming both return cleanly).
+- **Frontend.** `useAgentChat` gained `model`/`models`/`loadModels` (picker, pinned to the
+  resolved default on open), `retry` (re-runs the last turn after an error; a Retry button
+  shows when the last message is an error), and `renameSession`/`archiveSession`.
+  `AgentChatPanel` adds the model picker (footer dropdown), the rename dialog, the
+  rename/archive header actions, and the empty-history option. `ProjectList` adds a **Show
+  archived (N) / Hide archived** toggle (archived projects hidden by default; the seeded
+  default never archives so the list is never empty). `ProjectSettings`' `agent_model`
+  became a **select** populated from `get_agent_models` with a "Site default" (blank)
+  option.
+- **Deviation:** a dedicated `get_session`-reload on `complete` already existed (slice 12);
+  the spec's "settings" item (a global Wikify Settings page in the SPA surfacing the
+  OpenRouter key) was **not** added — the key + tunables remain in Desk `Wikify Settings`
+  (the agent only needed the `agent_model` field there, which this slice added), and no
+  acceptance criterion calls for an in-SPA settings screen. `delete_session` was skipped in
+  favour of archive (non-destructive, matches the Active/Archived model).
+- **Tests:** `wikify/tests/test_agent_polish.py` (13 — model-resolution chain, picker list,
+  rename/archive + ownership guard, `claims_unbacked_action` detection, the corrective
+  round fires-once / skips-on-real-tool, cache-marker for-Anthropic-only); updated
+  `test_agent.py`'s attachment-block assertion to flatten cache-marked content. Full suite
+  **106 green**. UI on `pdf.localhost`: model picker lists the three real models + sticks;
+  rename persisted + surfaced in history; archive dropped the session from history; reopen
+  hydrated a past chat with its tool card; the project archived-filter toggle hid/revealed
+  an archived project. pre-commit clean.
 
 ### Spec refs
 [02-ai-agent](02-ai-agent.md) (API, loop guards) · [01-project-hierarchy](01-project-hierarchy.md) (settings).

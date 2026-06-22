@@ -14,16 +14,16 @@ from wikify.engine import settings
 # Send only params the target model supports (drop the rest) instead of erroring.
 litellm.drop_params = True
 
-# Default when neither the session, its project, nor Settings names a model. A capable
-# tool-caller; per-project / Settings overrides land in slice 16.
+# Built-in fallback when neither the session, its project, nor Wikify Settings names a
+# model. A capable tool-caller.
 DEFAULT_AGENT_MODEL = "anthropic/claude-sonnet-4.6"
 
 
 def resolve_model(explicit: str | None = None, project: str | None = None) -> str:
-	"""Resolve the agent model: explicit → project override → default.
+	"""Resolve the agent model: explicit → project override → Settings default → built-in.
 
-	(Wikify Settings + the populated picker arrive in slice 16; this already honours the
-	per-project `agent_model` set in slice 11.)
+	The per-project `agent_model` (slice 11) wins over the site-wide
+	`Wikify Settings.agent_model` (slice 16), which wins over `DEFAULT_AGENT_MODEL`.
 	"""
 	if explicit:
 		return explicit
@@ -33,7 +33,22 @@ def resolve_model(explicit: str | None = None, project: str | None = None) -> st
 		model = frappe.db.get_value("Wikify Project", project, "agent_model")
 		if model:
 			return model
-	return DEFAULT_AGENT_MODEL
+	return settings.get("agent_model") or DEFAULT_AGENT_MODEL
+
+
+def agent_models() -> list[str]:
+	"""Model ids for the panel's picker.
+
+	The resolved site default first, then the (real, in-use) pipeline model ids configured
+	in Wikify Settings — so every option is a model OpenRouter already serves here. The
+	user can still set a per-project override to anything via project settings.
+	"""
+	models = [settings.get("agent_model") or DEFAULT_AGENT_MODEL]
+	for field in ("judge_model", "cleanup_model", "classifier_model", "vlm_model"):
+		model = settings.get(field)
+		if model and model not in models:
+			models.append(model)
+	return models
 
 
 def _openrouter_model(model: str) -> str:

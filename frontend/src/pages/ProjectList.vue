@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Badge, Button, Dialog, ErrorMessage, FormControl, useCall, useList } from "frappe-ui";
 import { clear as clearAgentContext } from "@/data/agentContext";
@@ -17,6 +17,16 @@ const projects = useList({
 	orderBy: "is_default desc, project_name asc",
 	limit: 100,
 });
+
+// Archived projects are hidden by default; toggle reveals them (the seeded "Uncategorized"
+// default is never archivable, so it always shows).
+const showArchived = ref(false);
+const visibleProjects = computed(() =>
+	(projects.data || []).filter((p) => showArchived.value || p.status !== "Archived")
+);
+const archivedCount = computed(
+	() => (projects.data || []).filter((p) => p.status === "Archived").length
+);
 
 const showNew = ref(false);
 const newName = ref("");
@@ -55,19 +65,28 @@ function openProject(name) {
 			class="sticky top-0 z-10 flex min-h-12 items-center justify-between border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
 		>
 			<h1 class="text-lg text-ink-gray-9">Projects</h1>
-			<Button
-				variant="solid"
-				theme="gray"
-				icon-left="lucide-plus"
-				label="New Project"
-				@click="showNew = true"
-			/>
+			<div class="flex items-center gap-2">
+				<Button
+					v-if="archivedCount"
+					variant="ghost"
+					theme="gray"
+					:label="showArchived ? 'Hide archived' : `Show archived (${archivedCount})`"
+					@click="showArchived = !showArchived"
+				/>
+				<Button
+					variant="solid"
+					theme="gray"
+					icon-left="lucide-plus"
+					label="New Project"
+					@click="showNew = true"
+				/>
+			</div>
 		</header>
 
 		<div class="body-container pt-5 pb-40">
 			<!-- Empty state -->
 			<div
-				v-if="!projects.loading && (projects.data?.length ?? 0) === 0"
+				v-if="!projects.loading && visibleProjects.length === 0"
 				class="flex flex-col items-center justify-center gap-3 py-16 text-center"
 			>
 				<div class="rounded-full bg-surface-gray-2 p-3 text-ink-gray-5">
@@ -88,7 +107,7 @@ function openProject(name) {
 			<!-- Cards -->
 			<div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				<button
-					v-for="p in projects.data"
+					v-for="p in visibleProjects"
 					:key="p.name"
 					class="flex flex-col gap-2 rounded-md border border-outline-gray-1 p-4 text-left hover:bg-surface-gray-2"
 					@click="openProject(p.name)"

@@ -37,6 +37,13 @@ def _sec(title, level, path, p_start, p_end):
 	)
 
 
+def _system_text(content):
+	"""Flatten a system message's content (string, or cache-marked content-part list)."""
+	if isinstance(content, list):
+		return "".join(part.get("text", "") for part in content)
+	return content or ""
+
+
 def _text_chunk(text):
 	return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text, tool_calls=None))])
 
@@ -279,7 +286,9 @@ class TestAgent(FrappeTestCase):
 			AgentRunner(
 				sess.name, "Administrator", attachments=[{"type": "document", "name": self.sd.name}]
 			).run()
-		systems = [m["content"] for m in fake.calls[0]["messages"] if m["role"] == "system"]
+		# System content may be a plain string or a cache-marked [{text, cache_control}] list
+		# (Anthropic models) — flatten before asserting.
+		systems = [_system_text(m["content"]) for m in fake.calls[0]["messages"] if m["role"] == "system"]
 		self.assertTrue(any("1. Alpha" in s for s in systems))
 
 	# --- slice 13: session listing ---------------------------------------------------

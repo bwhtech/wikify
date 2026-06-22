@@ -2,7 +2,8 @@
 
 Slice 12 (walking skeleton): `run` (enqueue + 202), `cancel`, `get_session`. Slice 13
 adds `list_sessions` (history dropdown) + `new_session` (explicit fresh session) and
-attachment-aware scoping on `run`. Clearing/deleting + the model picker arrive in 16.
+attachment-aware scoping on `run`. Slice 16 adds session management
+(`rename_session`/`archive_session`) and `get_agent_models` for the panel's model picker.
 """
 
 from __future__ import annotations
@@ -55,6 +56,11 @@ def run(
 	if sess.is_running:
 		frappe.local.response["http_status_code"] = 429
 		frappe.throw(_("This session is already running. Wait for it to finish or cancel it."))
+
+	# An explicitly picked model (the panel's picker) sticks to the session so subsequent
+	# turns + the loop use it; otherwise keep whatever the session resolved to on creation.
+	if model and sess.model != resolved_model:
+		frappe.db.set_value("Wikify Agent Session", sess.name, "model", resolved_model)
 
 	user_msg = session.append_message(sess.name, "user", prompt, status="done", attachments=attachments)
 	session.touch(sess.name, first_user_message=prompt)
@@ -143,3 +149,36 @@ def get_session(session_id: str) -> dict:
 		order_by="creation asc",
 	)
 	return {"session": sess.as_dict(), "messages": messages}
+
+
+def _owned_session(session_id: str):
+	"""Fetch a session, asserting the current user owns it (session management guard)."""
+	sess = frappe.get_doc("Wikify Agent Session", session_id)
+	if sess.user != frappe.session.user:
+		frappe.throw(_("You can only manage your own chats."), frappe.PermissionError)
+	return sess
+
+
+@frappe.whitelist()
+def rename_session(session_id: str, title: str) -> dict:
+	"""Rename a session (the history list / panel header)."""
+	title = (title or "").strip()
+	if not title:
+		frappe.throw(_("Title can't be empty."))
+	_owned_session(session_id)
+	frappe.db.set_value("Wikify Agent Session", session_id, "title", title[:140])
+	return {"ok": True, "title": title[:140]}
+
+
+@frappe.whitelist()
+def archive_session(session_id: str) -> dict:
+	"""Archive a session — it drops out of the (Active-only) history list."""
+	_owned_session(session_id)
+	frappe.db.set_value("Wikify Agent Session", session_id, "status", "Archived")
+	return {"ok": True}
+
+
+@frappe.whitelist()
+def get_agent_models() -> list[str]:
+	"""Model ids for the panel's picker (resolved default + configured pipeline models)."""
+	return llm.agent_models()

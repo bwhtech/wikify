@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { Button, ErrorMessage, FormControl, toast, useCall, useDoc } from "frappe-ui";
 
 const props = defineProps({
@@ -7,6 +7,17 @@ const props = defineProps({
 });
 
 const project = useDoc({ doctype: "Wikify Project", name: props.name });
+
+// Model override picker — blank means "use the site default" (Wikify Settings → built-in).
+const agentModels = useCall({
+	url: "/api/v2/method/wikify.api.agent.get_agent_models",
+	method: "GET",
+	immediate: true,
+});
+const modelOptions = computed(() => [
+	{ label: "Site default", value: "" },
+	...(agentModels.data || []).map((m) => ({ label: m, value: m })),
+]);
 
 // Local editable copy, seeded once the doc arrives (and re-seeded after a save reload).
 const form = ref({
@@ -118,11 +129,12 @@ function submit() {
 					<FormControl
 						v-model="form.agent_model"
 						label="Agent model"
-						type="text"
-						placeholder="Leave blank to use the site default"
+						type="select"
+						:options="modelOptions"
 					/>
 					<p class="mt-1.5 text-p-sm text-ink-gray-5">
-						Optional per-project override for the assistant model.
+						Optional per-project override for the assistant model. "Site default" uses
+						the model set in Wikify Settings.
 					</p>
 				</div>
 

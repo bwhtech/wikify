@@ -24,9 +24,13 @@ export function useAgentChat() {
 	const isRunning = ref(false);
 	const errorText = ref("");
 	const sessions = ref([]);
+	const model = ref("");
+	const models = ref([]);
 	// Editable copy of the default context chips — re-seeded from the store when the
 	// surface (project/document/page/section) changes; the user can remove a chip with ✕.
 	const attachments = ref([]);
+	// The last turn we submitted, so an errored turn can be retried verbatim.
+	let lastSubmit = null;
 	let unbind = null;
 
 	watch(
@@ -148,6 +152,7 @@ export function useAgentChat() {
 		prompt.value = "";
 		isRunning.value = true;
 		errorText.value = "";
+		lastSubmit = { text, extra };
 		const atts = attachments.value;
 		const projectChip = atts.find((a) => a.type === "project");
 		const docChip = atts.find((a) => a.type === "document");
@@ -158,6 +163,7 @@ export function useAgentChat() {
 				scope: scopeOf(atts),
 				project: projectChip?.name || null,
 				source_document: docChip?.name || null,
+				model: model.value || null,
 				attachments: atts.map(({ type, name, label }) => ({ type, name, label })),
 				...extra,
 			});
@@ -189,6 +195,15 @@ export function useAgentChat() {
 		await submitPrompt();
 	}
 
+	// Error → retry the same prompt + extras (re-run a held confirm, an option, a turn).
+	async function retry() {
+		if (!lastSubmit || isRunning.value) return;
+		messages.value = messages.value.filter((m) => m.status !== "error");
+		errorText.value = "";
+		prompt.value = lastSubmit.text;
+		await submitPrompt(lastSubmit.extra);
+	}
+
 	async function cancel() {
 		if (!sessionId.value) return;
 		await call("wikify.api.agent.cancel", { session_id: sessionId.value });
@@ -201,6 +216,7 @@ export function useAgentChat() {
 		sessionId.value = id;
 		messages.value = hydrate(res.messages || []);
 		isRunning.value = !!res.session?.is_running;
+		if (res.session?.model) model.value = res.session.model;
 		errorText.value = "";
 		rebind();
 	}
@@ -208,6 +224,28 @@ export function useAgentChat() {
 	async function listSessions() {
 		sessions.value = await call("wikify.api.agent.list_sessions", {});
 		return sessions.value;
+	}
+
+	async function loadModels() {
+		if (models.value.length) return models.value;
+		models.value = await call("wikify.api.agent.get_agent_models", {});
+		// Pin the picker to the resolved default so a turn always sends a concrete model.
+		if (!model.value && models.value.length) model.value = models.value[0];
+		return models.value;
+	}
+
+	async function renameSession(title) {
+		if (!sessionId.value || !title.trim()) return;
+		await call("wikify.api.agent.rename_session", { session_id: sessionId.value, title });
+		const s = sessions.value.find((x) => x.name === sessionId.value);
+		if (s) s.title = title.trim();
+	}
+
+	async function archiveSession() {
+		if (!sessionId.value) return;
+		await call("wikify.api.agent.archive_session", { session_id: sessionId.value });
+		newSession();
+		await listSessions();
 	}
 
 	function newSession() {
@@ -228,15 +266,21 @@ export function useAgentChat() {
 		isRunning,
 		errorText,
 		sessions,
+		model,
+		models,
 		attachments,
 		removeAttachment,
 		submitPrompt,
 		approveTool,
 		dismissConfirm,
 		selectClarifyOption,
+		retry,
 		cancel,
 		loadSession,
 		listSessions,
+		loadModels,
+		renameSession,
+		archiveSession,
 		newSession,
 	};
 }

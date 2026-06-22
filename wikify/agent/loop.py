@@ -9,6 +9,7 @@ back, and finish when the model answers with no tool call. Everything is `server
 from __future__ import annotations
 
 import json
+import re
 
 import frappe
 from frappe import _
@@ -19,6 +20,26 @@ from wikify.agent.prompts import system_prompt
 from wikify.agent.registry import build_default_registry
 
 MAX_ROUNDS = 25
+
+# No-op guard (Builder's `claims_unbacked_action`): the model narrates a mutating action
+# in the past tense but called no tool, so nothing actually changed. We only trip on the
+# verbs that map to a real write tool to avoid false positives on benign phrasing.
+_UNBACKED_CLAIM_RE = re.compile(
+	r"\bI(?:'ve| have)\s+(?:now\s+|just\s+|already\s+)?"
+	r"(?:moved|renamed|re-?tagged|re-?parsed|re-?classified|regenerated|embedded|"
+	r"toggled|set the (?:section )?type|created the (?:section )?type)\b",
+	re.IGNORECASE,
+)
+_NO_OP_NUDGE = (
+	"You described performing an action (moving, renaming, retagging, re-parsing, etc.) "
+	"but did not call any tool, so nothing actually changed. If the user asked for that "
+	"change, call the appropriate tool now to make it real. If no change was requested, "
+	"correct yourself and do not claim one."
+)
+
+
+def claims_unbacked_action(text: str) -> bool:
+	return bool(text and _UNBACKED_CLAIM_RE.search(text))
 
 
 def cancel_key(session_id: str) -> str:
@@ -51,6 +72,10 @@ class AgentRunner:
 		source_document = self.resolved.source_document or self.doc.source_document
 		self.model = self.doc.model or llm.resolve_model(project=project)
 		self.registry = build_default_registry()
+		# No-op guard bookkeeping: did any mutating tool actually run this turn, and have
+		# we already spent the single corrective round?
+		self._turn_mutated = False
+		self._correction_used = False
 		self.ctx = Ctx(
 			session=session_id,
 			user=user,
@@ -124,6 +149,14 @@ class AgentRunner:
 		ordered = [tool_calls[i] for i in sorted(tool_calls)]
 
 		if not ordered:
+			if not self._turn_mutated and not self._correction_used and claims_unbacked_action(text_acc):
+				# The model claimed a mutating action but called no tool. Spend one
+				# corrective round so it actually invokes the tool (or retracts the claim).
+				self._correction_used = True
+				session.update_message(message_id, content=text_acc, status="done")
+				messages.append({"role": "assistant", "content": text_acc})
+				messages.append({"role": "user", "content": _NO_OP_NUDGE})
+				return False
 			# Model answered — turn ends.
 			session.update_message(message_id, content=text_acc, status="done")
 			session.touch(self.session_id)
@@ -218,9 +251,11 @@ class AgentRunner:
 		else:
 			try:
 				result = tool.handler(self.ctx, args)
-				if tool.mutates and self.ctx.source_document:
-					# A DocType changed — tell open Tree/Pages views to refetch.
-					self._emit_mutation(name)
+				if tool.mutates:
+					self._turn_mutated = True
+					if self.ctx.source_document:
+						# A DocType changed — tell open Tree/Pages views to refetch.
+						self._emit_mutation(name)
 			except Exception:
 				frappe.log_error(title=f"Wikify agent tool failed: {name}")
 				result = _("Tool {0} failed: {1}").format(name, frappe.get_traceback(with_context=False))
@@ -265,12 +300,27 @@ class AgentRunner:
 		project_context = self.resolved.project_context
 		if not project_context and self.doc.project:
 			project_context = frappe.db.get_value("Wikify Project", self.doc.project, "context_prompt") or ""
-		messages: list[dict] = [{"role": "system", "content": system_prompt(project_context)}]
+		messages: list[dict] = [
+			{"role": "system", "content": self._cacheable(system_prompt(project_context))}
+		]
 		if self.resolved.block:
 			# A second system message carries the bounded attachment context for this turn.
-			messages.append({"role": "system", "content": self.resolved.block})
+			messages.append({"role": "system", "content": self._cacheable(self.resolved.block)})
 		messages.extend(session.history_messages(self.session_id))
 		return messages
+
+	def _cacheable(self, content: str):
+		"""Mark a large, stable block for Anthropic prompt caching.
+
+		The system prompt + attachment context block are big and identical across the
+		turn's rounds, so a cache breakpoint cuts cost/latency on the tool loop. Only
+		Anthropic models read `cache_control`; other models get the plain string (and
+		`litellm.drop_params` would strip it anyway).
+		"""
+		model = (self.model or "").lower()
+		if "claude" in model or "anthropic" in model:
+			return [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+		return content
 
 	# --- terminal states --------------------------------------------------------------
 
