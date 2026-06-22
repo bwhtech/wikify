@@ -136,6 +136,27 @@ def set_canonical_mean(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "canonical_mean", mean)
 
 
+def set_canonical_markdown(page_name: str, markdown: str) -> None:
+	"""Overwrite a page's canonical markdown in place (furniture-strip finalize), leaving
+	its composite + provenance untouched."""
+	frappe.db.set_value("Source Page", page_name, "canonical_markdown", markdown)
+
+
+def get_finalize_pages(source_document: str) -> list[dict]:
+	"""Pages for the document-level finalize pass: name + page_no + the current best
+	markdown (canonical where remediation adopted something, else baseline). The finalize
+	pass needs `name` to write the reconciled markdown back via `set_canonical`."""
+	pages = frappe.get_all(
+		"Source Page",
+		filters={"source_document": source_document},
+		fields=["name", "page_no", "canonical_markdown", "baseline_markdown"],
+		order_by="page_no asc",
+	)
+	for p in pages:
+		p["markdown"] = p["canonical_markdown"] or p["baseline_markdown"] or ""
+	return pages
+
+
 # --- Slice 4: sectionize → Source Section tree ---
 
 

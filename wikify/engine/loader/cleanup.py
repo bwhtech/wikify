@@ -24,9 +24,40 @@ _VARYING = [
 	re.compile(r"(?i)^\s*date\s*:"),
 ]
 
+# Approval / sign-off footer block — QMS-manual page furniture rendered as a one- or
+# two-row Markdown table, e.g. `|Prepared by - Dr X|Issued by: QMC|Approved by - Dr Y|`.
+# It recurs per page but as a long, pipe-laden, per-page-varying row, so the recurrence
+# + 90-char boilerplate rule misses it. Matched structurally instead: a table row
+# carrying >=2 distinct sign-off phrases (a lone "approved by" in a data row is kept).
+_SEP_ONLY = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
+_SIGNOFF = ("prepared by", "issued by", "approved by", "reviewed by", "authorized by")
+
 
 def _norm(line: str) -> str:
 	return _NORM.sub(" ", line).strip().lower()
+
+
+def _is_signoff_footer_row(line: str) -> bool:
+	s = line.strip()
+	if not (s.startswith("|") and s.endswith("|")):
+		return False
+	low = s.lower()
+	return sum(kw in low for kw in _SIGNOFF) >= 2
+
+
+def _strip_footer_blocks(md: str) -> str:
+	"""Drop sign-off footer rows and any separator row orphaned next to them."""
+	lines = md.splitlines()
+	drop: set[int] = set()
+	for i, line in enumerate(lines):
+		if _is_signoff_footer_row(line):
+			drop.add(i)
+			for j in (i - 1, i + 1):  # absorb the |---|---| separator above/below it
+				if 0 <= j < len(lines) and _SEP_ONLY.match(lines[j]):
+					drop.add(j)
+	if not drop:
+		return md
+	return "\n".join(line for k, line in enumerate(lines) if k not in drop)
 
 
 def find_boilerplate(pages: list[tuple[int, str]]) -> set[str]:
@@ -51,7 +82,7 @@ def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> li
 			for line in md.splitlines()
 			if not (_norm(line) and _norm(line) in boilerplate) and not _is_varying(line)
 		]
-		out.append((pno, "\n".join(kept)))
+		out.append((pno, _strip_footer_blocks("\n".join(kept))))
 	return out
 
 

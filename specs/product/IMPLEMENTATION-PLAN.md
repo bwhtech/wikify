@@ -33,10 +33,22 @@ that skeleton rather than adding a new disconnected layer.
 | 6 | Classification + Explore (cross-document) | HITL | 4 | 4 | ✅ Done |
 | 7 | Wiki generation (tree → Wiki Documents) | AFK | 5, 6 | 5 | ✅ Done |
 | 8 | Inline editing (later) | AFK | 2 | 6 | — |
+| 9 | Document-level finalize (furniture-persist) | AFK | 3, 4 | 2 | 🚧 Engine only |
 
 > **Progress** (on `main`): **1a** ✅ `c127f8b` · **1b** ✅ `bfec780` · **2** ✅ · **3** ✅ · **4** ✅ · **5** ✅ · **6** ✅ · **7** ✅.
 > All verified on `pdf.localhost` per each slice's Verify steps. Up next: **Slice 8** (inline
 > editing — optional, floats off Slice 2).
+
+> **⚠️ Slice 9 is engine-only — wiring still TODO.** `engine/finalize.py` (`finalize_document`)
+> is built, tested, and verified headless on the real 180-page manual (strips running
+> furniture — banner / doc-code / sign-off footer — that the per-page `cleanup` leaves in
+> `canonical_markdown`, and persists it; `loader/cleanup.py` now also drops the sign-off
+> footer block). **Still to do:** a `jobs/finalize.py` (long-queue job + realtime progress),
+> a whitelisted API in `api/`, and a "Finalize" action in the review UI — plus deciding
+> whether it auto-runs in the remediate tail or stays a manual stage. It is currently only
+> reachable via `bench execute wikify.engine.finalize_document`. **Deferred:** the cross-page
+> LLM table-merge half — genuine split tables are rare on real manuals (the deterministic
+> `stitch_cross_page_tables` already covers them), so revisit only when a corpus needs it.
 
 Dependency spine is mostly linear (it is a pipeline). Parallelism: **6** can proceed
 off **4** alongside **5**; **8** floats off **2**.

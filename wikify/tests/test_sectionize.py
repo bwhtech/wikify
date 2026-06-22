@@ -114,6 +114,30 @@ class TestSectionizer(FrappeTestCase):
 		self.assertTrue(all("Pg" not in s.markdown for s in secs))
 		self.assertEqual([s.title for s in secs], ["1. Intro", "2. Next"])
 
+	def test_clean_pages_strips_signoff_footer_block(self):
+		# The QMS sign-off footer (a table row with >=2 sign-off phrases) plus its
+		# orphaned |---| separator are page furniture and must be removed.
+		footer = (
+			"|**Prepared by - Dr. A**|**Issued by: QMC**|**Approved by - Dr. B**|\n"
+			"|---|---|---|"
+		)
+		pages = [(1, f"## 1. Intro\nreal body\n{footer}"), (2, f"## 2. Next\nmore body\n{footer}")]
+		cleaned = dict(clean_pages(pages))
+		for md in cleaned.values():
+			self.assertNotIn("Prepared by", md)
+			self.assertNotIn("Issued by", md)
+			self.assertNotIn("|---|---|---|", md)
+		self.assertIn("real body", cleaned[1])
+		self.assertIn("more body", cleaned[2])
+
+	def test_clean_pages_keeps_data_row_mentioning_approved_by_once(self):
+		# A genuine data row that merely mentions one sign-off phrase is NOT furniture.
+		table = "| Step | Status |\n|---|---|\n| Reviewed and approved by committee | done |"
+		pages = [(1, f"## 1. Audit\n{table}")]
+		cleaned = dict(clean_pages(pages))
+		self.assertIn("approved by committee", cleaned[1])
+		self.assertIn("|---|---|", cleaned[1])  # the real table separator survives
+
 
 class TestSectionizeIntegration(FrappeTestCase):
 	"""parse/remediate build the Source Section NestedSet tree."""
