@@ -21,7 +21,7 @@ Numbering continues at **10** so the delivery sequence stays monotonic across ve
 
 | # | Slice | Type | Blocked by | Spec | Status |
 |---|---|---|---|---|---|
-| 10 | Project hierarchy (DocType + backfill + project/imports UI) | HITL | 9 | 01 | — |
+| 10 | Project hierarchy (DocType + backfill + project/imports UI) | HITL | 9 | 01 | ✅ |
 | 11 | Project context → pipeline + project settings | AFK | 10 | 01 | — |
 | 12 | Agent walking skeleton (chat + 1 read tool + streaming) | HITL | 10 | 02 | — |
 | 13 | Agent context attachment + full read tools | HITL | 12 | 02 | — |
@@ -91,16 +91,47 @@ Reuse the POC sample PDFs / a small fixture (one text-heavy + one visual page).
   Explore, import detail shows a project breadcrumb. Explore gains a project filter.
 
 ### Acceptance criteria
-- [ ] New Project → New Import inside it files the Import + (after parse) its Source
+- [x] New Project → New Import inside it files the Import + (after parse) its Source
   Document under that project; the project card shows the count.
-- [ ] After `migrate`, every pre-0.2 Import + Source Document is under "Uncategorized";
+- [x] After `migrate`, every pre-0.2 Import + Source Document is under "Uncategorized";
   none orphaned.
-- [ ] Deleting "Uncategorized" or a non-empty project is blocked with a clear message.
-- [ ] Explore can be scoped to one project and still spans its documents.
+- [x] Deleting "Uncategorized" or a non-empty project is blocked with a clear message.
+- [x] Explore can be scoped to one project and still spans its documents.
 
 **Verify:** migrate on a copy with existing imports → confirm backfill in `console`; create
 a project + import via UI; attempt the blocked deletes; run the v0.1 parse end-to-end to
 confirm regression-free.
+
+### As built
+- **DocType** `Wikify Project` (`PRJ-.YYYY.-.#####` autoname, `project_name` title) with
+  the controller guards (`validate` → single `is_default`; `on_trash` → block deleting the
+  default or a non-empty project). `import_count` is denormalized via
+  `Wikify Import.after_insert/on_trash` hooks.
+- **Links:** `project` (reqd, indexed) on `Wikify Import`; `project` (ro, indexed,
+  denormalized) on `Source Document`, stamped at parse time through
+  `engine.parse_pdf` → `store.create_document`. Added a `project_name` **fetch_from** field
+  on the Import (drives the import-detail breadcrumb without an extra fetch); the backfill
+  patch stamps it on existing rows since `fetch_from` only fires on save.
+- **Seed + backfill:** `seed.seed_uncategorized_project` (get-or-create by `is_default`)
+  is called from `after_install` and the `wikify.patches.v0_2.seed_uncategorized_and_backfill`
+  patch, which backfills Imports + Source Documents and recomputes every `import_count`.
+- **API:** `api/projects.py` (`create_project`, `list_projects` default-pinned,
+  `default_project`); `start_import` gained an optional `project` param (defaults to
+  Uncategorized); `explore.type_summary` / `sections_by_type` gained an optional `project`
+  filter (resolved to the project's Source Documents, empty project → empty result).
+- **UI:** `pages/ProjectList.vue` (new `/wikify` home — cards via `useList`, New Project
+  dialog, Uncategorized pinned + Default badge); `pages/ProjectDetail.vue` (breadcrumb +
+  New Import, embeds the now project-scoped `ImportList`); `NewImportDialog` gained a
+  Project picker (preset to the current project, else Uncategorized); `ImportDetail` shows a
+  project breadcrumb + back-to-project; Explore gained a project filter dropdown; sidebar
+  nav is now **Projects + Explore**.
+- **Deviation:** project **settings** (the `context_prompt` editor at
+  `/project/:name/settings`) is intentionally deferred to Slice 11 per the plan; Slice 10
+  ships the hierarchy + scoping only. Permissions use the existing **System Manager** role
+  (matching the 0.1 DocTypes), not a separate "Wikify User" role.
+- **Tests:** `wikify/tests/test_projects.py` (8 tests — seed idempotency, single-default +
+  delete guards, `import_count`/`project_name` denorm, project-scoped Explore);
+  `test_section_edits` updated to set the now-reqd `project`. Full suite 55 green.
 
 ### Spec refs
 [01-project-hierarchy](01-project-hierarchy.md) (data model, seed/backfill, UI).

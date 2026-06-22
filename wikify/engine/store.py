@@ -17,11 +17,13 @@ def create_document(
 	import_name: str | None = None,
 	pdf_url: str | None = None,
 	parser: str | None = None,
+	project: str | None = None,
 ) -> str:
 	"""Create a Source Document and return its name."""
 	doc = frappe.new_doc("Source Document")
 	doc.title = title
 	doc.set("import", import_name)  # 'import' is a Python keyword — set by string
+	doc.project = project  # denormalized from the Import for project-scoped Explore
 	doc.pdf = pdf_url
 	doc.parser_used = parser
 	doc.status = "Parsed"
@@ -122,9 +124,7 @@ def set_remediation(
 	)
 
 
-def set_canonical(
-	page_name: str, markdown: str, composite: float | None, source: str
-) -> None:
+def set_canonical(page_name: str, markdown: str, composite: float | None, source: str) -> None:
 	"""Write a page's canonical (best-per-page) markdown + its composite + provenance."""
 	values = {"canonical_markdown": markdown, "canonical_source": source}
 	if composite is not None:
@@ -255,9 +255,7 @@ def get_sections_for_wiki(source_document: str) -> list[dict]:
 
 
 def set_section_wiki_document(name: str, wiki_document: str | None) -> None:
-	frappe.db.set_value(
-		"Source Section", name, "wiki_document", wiki_document, update_modified=False
-	)
+	frappe.db.set_value("Source Section", name, "wiki_document", wiki_document, update_modified=False)
 
 
 def set_document_wiki(

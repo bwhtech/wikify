@@ -1,0 +1,155 @@
+<script setup>
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { Badge, Button, Dialog, ErrorMessage, FormControl, useCall, useList } from "frappe-ui";
+
+const router = useRouter();
+
+// The Projects landing screen — cards via useList (default "Uncategorized" pinned first
+// through the is_default ordering). import_count is denormalized on the doctype.
+const projects = useList({
+	doctype: "Wikify Project",
+	fields: ["name", "project_name", "description", "status", "is_default", "import_count"],
+	orderBy: "is_default desc, project_name asc",
+	limit: 100,
+});
+
+const showNew = ref(false);
+const newName = ref("");
+const newDescription = ref("");
+
+const createProject = useCall({
+	url: "/api/v2/method/wikify.api.projects.create_project",
+	method: "POST",
+	immediate: false,
+	onSuccess(name) {
+		resetNew();
+		showNew.value = false;
+		router.push({ name: "ProjectDetail", params: { name } });
+	},
+});
+
+function create() {
+	if (!newName.value.trim()) return;
+	createProject.submit({ project_name: newName.value, description: newDescription.value });
+}
+
+function resetNew() {
+	newName.value = "";
+	newDescription.value = "";
+	createProject.reset();
+}
+
+function openProject(name) {
+	router.push({ name: "ProjectDetail", params: { name } });
+}
+</script>
+
+<template>
+	<div class="flex h-full flex-col">
+		<header
+			class="sticky top-0 z-10 flex min-h-12 items-center justify-between border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
+		>
+			<h1 class="text-lg text-ink-gray-9">Projects</h1>
+			<Button
+				variant="solid"
+				theme="gray"
+				icon-left="lucide-plus"
+				label="New Project"
+				@click="showNew = true"
+			/>
+		</header>
+
+		<div class="body-container pt-5 pb-40">
+			<!-- Empty state -->
+			<div
+				v-if="!projects.loading && (projects.data?.length ?? 0) === 0"
+				class="flex flex-col items-center justify-center gap-3 py-16 text-center"
+			>
+				<div class="rounded-full bg-surface-gray-2 p-3 text-ink-gray-5">
+					<span class="lucide-folder size-6" aria-hidden="true" />
+				</div>
+				<p class="text-base text-ink-gray-7">No projects yet</p>
+				<p class="text-sm text-ink-gray-5">Create a project, then upload PDFs into it.</p>
+				<Button
+					variant="solid"
+					theme="gray"
+					icon-left="lucide-plus"
+					label="New Project"
+					class="mt-2"
+					@click="showNew = true"
+				/>
+			</div>
+
+			<!-- Cards -->
+			<div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				<button
+					v-for="p in projects.data"
+					:key="p.name"
+					class="flex flex-col gap-2 rounded-md border border-outline-gray-1 p-4 text-left hover:bg-surface-gray-2"
+					@click="openProject(p.name)"
+				>
+					<div class="flex items-center gap-2">
+						<span
+							class="lucide-folder size-4 shrink-0 text-ink-gray-5"
+							aria-hidden="true"
+						/>
+						<span class="min-w-0 flex-1 truncate text-base text-ink-gray-8">{{
+							p.project_name
+						}}</span>
+						<Badge
+							v-if="p.is_default"
+							label="Default"
+							theme="gray"
+							variant="subtle"
+							size="sm"
+						/>
+						<Badge
+							v-else-if="p.status === 'Archived'"
+							label="Archived"
+							theme="orange"
+							variant="subtle"
+							size="sm"
+						/>
+					</div>
+					<p class="line-clamp-2 min-h-[2.5rem] text-sm text-ink-gray-5">
+						{{ p.description || "No description" }}
+					</p>
+					<p class="text-sm text-ink-gray-6">
+						{{ p.import_count || 0 }} import{{ p.import_count === 1 ? "" : "s" }}
+					</p>
+				</button>
+			</div>
+		</div>
+
+		<Dialog v-model:open="showNew" title="New Project" @close="resetNew">
+			<template #default>
+				<div class="space-y-4">
+					<FormControl
+						v-model="newName"
+						label="Project name"
+						type="text"
+						placeholder="e.g. Nephrology Manuals"
+					/>
+					<FormControl
+						v-model="newDescription"
+						label="Description"
+						type="textarea"
+						placeholder="Short blurb shown on the project card (optional)"
+					/>
+					<ErrorMessage :message="createProject.error?.message" />
+				</div>
+			</template>
+			<template #actions>
+				<Button
+					variant="solid"
+					theme="gray"
+					label="Create"
+					:loading="createProject.loading"
+					:disabled="!newName.trim()"
+					@click="create"
+				/>
+			</template>
+		</Dialog>
+	</div>
+</template>

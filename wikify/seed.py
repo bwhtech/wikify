@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import frappe
 
+UNCATEGORIZED = "Uncategorized"
+
 # (type_name, label, color, description) — order is the display order in Explore.
 # The 11 POC types; `other` is the catch-all (is_other), always last.
 SECTION_TYPES: list[tuple[str, str, str, str]] = [
@@ -97,3 +99,23 @@ def seed_section_types() -> None:
 				"is_other": 1 if type_name == "other" else 0,
 			}
 		).insert(ignore_permissions=True)
+
+
+def seed_uncategorized_project() -> str:
+	"""Get-or-create the single default "Uncategorized" project. Idempotent.
+
+	Keyed on `is_default` (not the name) so a renamed catch-all is still found.
+	Returns the project name.
+	"""
+	existing = frappe.db.get_value("Wikify Project", {"is_default": 1}, "name")
+	if existing:
+		return existing
+	doc = frappe.get_doc(
+		{
+			"doctype": "Wikify Project",
+			"project_name": UNCATEGORIZED,
+			"description": "Catch-all for unfiled imports.",
+			"is_default": 1,
+		}
+	).insert(ignore_permissions=True)
+	return doc.name

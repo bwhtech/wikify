@@ -1,14 +1,28 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, useCall } from "frappe-ui";
+import { Badge, FormControl, useCall, useList } from "frappe-ui";
 
 const router = useRouter();
+
+// Project filter — default "All projects" (empty value spans every document).
+const projects = useList({
+	doctype: "Wikify Project",
+	fields: ["name", "project_name", "is_default"],
+	orderBy: "is_default desc, project_name asc",
+	limit: 100,
+});
+const projectOptions = computed(() => [
+	{ label: "All projects", value: "" },
+	...(projects.data || []).map((p) => ({ label: p.project_name, value: p.name })),
+]);
+const selectedProject = ref("");
 
 // Fetches driven explicitly (reactive `auto` on useCall is unreliable — Slice 4 gotcha).
 const summary = useCall({
 	url: "/api/v2/method/wikify.api.explore.type_summary",
 	method: "GET",
+	immediate: false,
 });
 const groups = useCall({
 	url: "/api/v2/method/wikify.api.explore.sections_by_type",
@@ -17,19 +31,25 @@ const groups = useCall({
 });
 
 const types = computed(() => (summary.data || []).filter((t) => t.count > 0));
-const matchCount = computed(() =>
-	(groups.data || []).reduce((n, g) => n + g.sections.length, 0),
-);
+const matchCount = computed(() => (groups.data || []).reduce((n, g) => n + g.sections.length, 0));
 
 const selectedType = ref(null);
-const selected = computed(() => types.value.find((t) => t.type_name === selectedType.value) || null);
+const selected = computed(
+	() => types.value.find((t) => t.type_name === selectedType.value) || null
+);
+
+// Re-pull the type summary whenever the project scope changes; the selected-type watcher
+// then re-pulls the grouped results for the (possibly new) scope.
+watch(selectedProject, (project) => summary.submit(project ? { project } : {}), {
+	immediate: true,
+});
 watch(types, (list) => {
 	if (list.length && !list.some((t) => t.type_name === selectedType.value)) {
 		selectedType.value = list[0].type_name;
 	}
 });
-watch(selectedType, (t) => {
-	if (t) groups.submit({ section_type: t });
+watch([selectedType, selectedProject], ([t, project]) => {
+	if (t) groups.submit(project ? { section_type: t, project } : { section_type: t });
 });
 
 function openImport(name) {
@@ -47,7 +67,13 @@ function pageRange(s) {
 			class="sticky top-0 z-10 flex min-h-12 items-center gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
 		>
 			<h1 class="text-lg text-ink-gray-9">Explore</h1>
-			<span class="text-sm text-ink-gray-5">Sections by type across all documents</span>
+			<span class="text-sm text-ink-gray-5">Sections by type across documents</span>
+			<FormControl
+				v-model="selectedProject"
+				type="select"
+				:options="projectOptions"
+				class="ml-auto w-48"
+			/>
 		</header>
 
 		<!-- Empty state: nothing classified anywhere yet -->
@@ -112,7 +138,10 @@ function pageRange(s) {
 							class="mb-1.5 flex items-center gap-2 text-sm font-medium text-ink-gray-8 hover:text-ink-gray-9"
 							@click="openImport(g.import_name)"
 						>
-							<span class="lucide-file-text size-4 text-ink-gray-5" aria-hidden="true" />
+							<span
+								class="lucide-file-text size-4 text-ink-gray-5"
+								aria-hidden="true"
+							/>
 							<span class="truncate">{{ g.doc_title }}</span>
 							<Badge
 								:label="`${g.sections.length}`"

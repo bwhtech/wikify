@@ -25,6 +25,7 @@
 	},
 	"root": true,
 	"globals": {
+		"__FRONTEND_ROUTE__": true,
 		"frappe": true,
 		"Vue": true,
 		"SetVueGlobals": true,

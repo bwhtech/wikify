@@ -51,7 +51,7 @@ watch(
 	(key) => {
 		const i = tabKeys.indexOf(key);
 		if (i >= 0 && i !== activeTab.value) activeTab.value = i;
-	},
+	}
 );
 
 // Streaming log
@@ -126,7 +126,22 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 			class="sticky top-0 z-10 flex min-h-12 items-center justify-between gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
 		>
 			<div class="flex min-w-0 items-center gap-3">
-				<Button variant="ghost" icon="lucide-arrow-left" :route="{ name: 'Imports' }" />
+				<Button
+					variant="ghost"
+					icon="lucide-arrow-left"
+					:route="
+						imp.doc?.project
+							? { name: 'ProjectDetail', params: { name: imp.doc.project } }
+							: { name: 'Projects' }
+					"
+				/>
+				<RouterLink
+					v-if="imp.doc?.project"
+					:to="{ name: 'ProjectDetail', params: { name: imp.doc.project } }"
+					class="shrink-0 text-base text-ink-gray-5 hover:text-ink-gray-7"
+					>{{ imp.doc.project_name || "Project" }}
+					<span class="text-ink-gray-4" aria-hidden="true">/</span></RouterLink
+				>
 				<h1 class="truncate text-lg text-ink-gray-9">
 					{{ imp.doc?.import_title || name }}
 				</h1>

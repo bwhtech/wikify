@@ -5,3 +5,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 wikify.patches.v1_0.seed_section_types
+wikify.patches.v0_2.seed_uncategorized_and_backfill

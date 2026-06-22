@@ -14,6 +14,7 @@ from frappe.tests.utils import FrappeTestCase
 from wikify.api import sections as api
 from wikify.engine import store
 from wikify.engine.loader.sectionizer import Section
+from wikify.seed import seed_uncategorized_project
 
 
 def _sec(title, level, path, p_start, p_end):
@@ -29,9 +30,9 @@ def _sec(title, level, path, p_start, p_end):
 
 class TestSectionEdits(FrappeTestCase):
 	def setUp(self):
-		self.sd = frappe.get_doc(
-			{"doctype": "Source Document", "title": "Edit Test"}
-		).insert(ignore_permissions=True)
+		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Edit Test"}).insert(
+			ignore_permissions=True
+		)
 		store.replace_sections(
 			self.sd.name,
 			[
@@ -48,8 +49,15 @@ class TestSectionEdits(FrappeTestCase):
 				"Source Section",
 				filters={"source_document": self.sd.name},
 				fields=[
-					"name", "title", "level", "parent_source_section",
-					"hierarchy_path", "is_group", "include_in_wiki", "lft", "rgt",
+					"name",
+					"title",
+					"level",
+					"parent_source_section",
+					"hierarchy_path",
+					"is_group",
+					"include_in_wiki",
+					"lft",
+					"rgt",
 				],
 			)
 		}
@@ -88,9 +96,16 @@ class TestSectionEdits(FrappeTestCase):
 	def test_reorder_to_root_clears_parent(self):
 		alpha_one = self._name("1.1 Alpha-One")
 		beta = self._name("2. Beta")
-		api.reorder_section(alpha_one, new_parent=None, new_index=2, siblings=[
-			self._name("1. Alpha"), beta, alpha_one,
-		])
+		api.reorder_section(
+			alpha_one,
+			new_parent=None,
+			new_index=2,
+			siblings=[
+				self._name("1. Alpha"),
+				beta,
+				alpha_one,
+			],
+		)
 		row = self._rows()["1.1 Alpha-One"]
 		self.assertIn(row.parent_source_section, (None, ""))
 		self.assertEqual(row.level, 1)
@@ -131,6 +146,7 @@ class TestSectionEdits(FrappeTestCase):
 				"import_title": "Edit Test",
 				"pdf": "/files/none.pdf",
 				"status": "Review",
+				"project": seed_uncategorized_project(),
 				"source_document": self.sd.name,
 			}
 		).insert(ignore_permissions=True)

@@ -8,6 +8,7 @@
  "field_order": [
   "title",
   "import",
+  "project",
   "pdf",
   "column_break_meta",
   "page_count",
@@ -33,6 +34,15 @@
    "label": "Import",
    "options": "Wikify Import",
    "read_only": 1
+  },
+  {
+   "description": "Denormalized from Wikify Import.project at parse time. Drives project-scoped Explore.",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Wikify Project",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "pdf",

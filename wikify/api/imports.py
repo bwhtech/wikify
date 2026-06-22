@@ -5,17 +5,20 @@ from __future__ import annotations
 import frappe
 
 from wikify.engine import preview_wiki as _preview_wiki
+from wikify.seed import seed_uncategorized_project
 
 
 @frappe.whitelist()
-def start_import(pdf_file_url: str, title: str) -> str:
+def start_import(pdf_file_url: str, title: str, project: str | None = None) -> str:
 	"""Create a Wikify Import for an uploaded PDF and enqueue the parse job.
 
+	`project` is the owning Wikify Project; it defaults to "Uncategorized" when omitted.
 	Returns the new Import's name so the SPA can route to its detail page.
 	"""
 	imp = frappe.new_doc("Wikify Import")
 	imp.import_title = title
 	imp.pdf = pdf_file_url
+	imp.project = project or seed_uncategorized_project()
 	imp.status = "Queued"
 	imp.insert()
 
@@ -91,9 +94,7 @@ def preview_wiki(import_name: str) -> dict:
 	if not imp.source_document:
 		frappe.throw("Nothing to preview — parse hasn't produced a document yet.")
 	preview = _preview_wiki(imp.source_document)
-	preview["wiki_space"] = frappe.db.get_value(
-		"Source Document", imp.source_document, "wiki_space"
-	)
+	preview["wiki_space"] = frappe.db.get_value("Source Document", imp.source_document, "wiki_space")
 	return preview
 
 

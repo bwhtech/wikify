@@ -49,6 +49,7 @@ def run(import_name: str) -> None:
 			title=imp.import_title,
 			import_name=import_name,
 			pdf_url=imp.pdf,
+			project=imp.project,
 			progress_cb=progress_cb,
 			page_cb=page_cb,
 			stage_cb=stage_cb,
@@ -63,7 +64,9 @@ def run(import_name: str) -> None:
 		imp.db_set("completed_at", now_datetime())
 		publish_progress(import_name, 100, f"Parsed {page_count} pages", status="Review")
 		log(
-			import_name, "info", "parse",
+			import_name,
+			"info",
+			"parse",
 			f"Done — {page_count} pages, {n_sections} sections, mean {mean_score}, status Review",
 		)
 	except Exception:

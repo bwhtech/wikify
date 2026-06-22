@@ -8,7 +8,7 @@ import { session } from "@/data/session";
 const { resolvedTheme, toggleTheme, initializeTheme } = useTheme();
 
 const nav = [
-	{ label: "Imports", to: { name: "Imports" }, icon: "lucide-inbox" },
+	{ label: "Projects", to: { name: "Projects" }, icon: "lucide-folder" },
 	{ label: "Explore", to: { name: "Explore" }, icon: "lucide-shapes" },
 ];
 

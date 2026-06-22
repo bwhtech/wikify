@@ -40,6 +40,7 @@ def parse_pdf(
 	title: str | None = None,
 	import_name: str | None = None,
 	pdf_url: str | None = None,
+	project: str | None = None,
 	progress_cb: Callable[[int, int], None] | None = None,
 	page_cb: Callable[..., None] | None = None,
 	stage_cb: Callable[[str], None] | None = None,
@@ -67,7 +68,11 @@ def parse_pdf(
 	with fitz.open(pdf_path) as doc:
 		total = doc.page_count
 		sd = store.create_document(
-			title=title, import_name=import_name, pdf_url=pdf_url, parser=baseline.NAME
+			title=title,
+			import_name=import_name,
+			pdf_url=pdf_url,
+			parser=baseline.NAME,
+			project=project,
 		)
 		for i, page in enumerate(doc):
 			page_no = i + 1

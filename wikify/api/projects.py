@@ -1,0 +1,48 @@
+"""Whitelisted APIs for the Projects flow (Slice 10).
+
+A Project is the top-level container: you create one, then upload documents into it. The
+seeded "Uncategorized" project is the catch-all for unfiled / backfilled work and the
+default for an import that doesn't name a project.
+"""
+
+from __future__ import annotations
+
+import frappe
+
+from wikify.seed import seed_uncategorized_project
+
+
+@frappe.whitelist()
+def create_project(project_name: str, description: str = "") -> str:
+	"""Create a Wikify Project and return its name."""
+	project_name = (project_name or "").strip()
+	if not project_name:
+		frappe.throw("Project name is required.")
+	proj = frappe.new_doc("Wikify Project")
+	proj.project_name = project_name
+	proj.description = description
+	proj.insert()
+	return proj.name
+
+
+@frappe.whitelist()
+def list_projects() -> list[dict]:
+	"""Projects for the list screen, default ("Uncategorized") pinned first."""
+	return frappe.get_all(
+		"Wikify Project",
+		fields=[
+			"name",
+			"project_name",
+			"description",
+			"status",
+			"is_default",
+			"import_count",
+		],
+		order_by="is_default desc, project_name asc",
+	)
+
+
+@frappe.whitelist()
+def default_project() -> str:
+	"""The "Uncategorized" project name (get-or-create). Used to preset the import dialog."""
+	return seed_uncategorized_project()

@@ -21,23 +21,48 @@ def _scope(source_document: str | None) -> dict:
 	return {"source_document": source_document} if source_document else {}
 
 
-@frappe.whitelist()
-def type_summary(source_document: str | None = None) -> list[dict]:
-	"""Per-type section counts for the chips/rail (global or per-doc).
+def _docs_in_project(project: str | None) -> list[str] | None:
+	"""Source Document names in a project, or None when no project filter is applied.
 
-	Returns every Section Type in display order with its count (incl. zero, so chips are
-	stable), then an `untagged` bucket appended only when some section has no type yet.
+	Returns `[]` (not None) when the project owns no documents yet, so callers scope to
+	an empty set instead of falling through to "all documents".
 	"""
+	if not project:
+		return None
+	return frappe.get_all("Source Document", filters={"project": project}, pluck="name")
+
+
+def _counts(scope: list | None) -> dict[str, int]:
+	"""Section counts grouped by type, keyed by type (untagged → sentinel). `scope` is an
+	optional `[fieldname, operator, value]` clause on `source_document`."""
 	table = frappe.qb.DocType("Source Section")
 	query = (
 		frappe.qb.from_(table)
 		.select(table.section_type, Count(table.name).as_("count"))
 		.groupby(table.section_type)
 	)
-	if source_document:
-		query = query.where(table.source_document == source_document)
+	if scope:
+		field, op, value = scope
+		column = getattr(table, field)
+		query = query.where(column.isin(value) if op == "in" else column == value)
 	rows = query.run(as_dict=True)
-	counts = {r["section_type"] or _UNTAGGED: r["count"] for r in rows}
+	return {r["section_type"] or _UNTAGGED: r["count"] for r in rows}
+
+
+@frappe.whitelist()
+def type_summary(source_document: str | None = None, project: str | None = None) -> list[dict]:
+	"""Per-type section counts for the chips/rail (global, per-project, or per-doc).
+
+	Returns every Section Type in display order with its count (incl. zero, so chips are
+	stable), then an `untagged` bucket appended only when some section has no type yet.
+	"""
+	doc_scope = _docs_in_project(project)
+	if source_document:
+		counts = _counts(["source_document", "=", source_document])
+	elif doc_scope is not None:
+		counts = _counts(["source_document", "in", doc_scope]) if doc_scope else {}
+	else:
+		counts = _counts(None)
 
 	types = frappe.get_all(
 		"Section Type",
@@ -68,14 +93,24 @@ def type_summary(source_document: str | None = None) -> list[dict]:
 
 
 @frappe.whitelist()
-def sections_by_type(section_type: str, source_document: str | None = None) -> list[dict]:
+def sections_by_type(
+	section_type: str, source_document: str | None = None, project: str | None = None
+) -> list[dict]:
 	"""Sections of one type, grouped by Source Document (the cross-document headline).
 
 	Each group: `{source_document, doc_title, sections: [...]}`, ordered by document
-	title then tree position. `section_type` may be the `untagged` sentinel.
+	title then tree position. `section_type` may be the `untagged` sentinel. Scope to a
+	single document (`source_document`) or a project (`project`), else spans all docs.
 	"""
 	filters = _scope(source_document)
 	filters["section_type"] = ["is", "not set"] if section_type == _UNTAGGED else section_type
+
+	if not source_document:
+		doc_scope = _docs_in_project(project)
+		if doc_scope is not None:
+			if not doc_scope:
+				return []
+			filters["source_document"] = ["in", doc_scope]
 
 	rows = frappe.get_all(
 		"Source Section",

@@ -1,14 +1,49 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Dialog, FileUploader, FormControl, Button, ErrorMessage, useCall } from "frappe-ui";
+import {
+	Dialog,
+	FileUploader,
+	FormControl,
+	Button,
+	ErrorMessage,
+	useCall,
+	useList,
+} from "frappe-ui";
 
 const open = defineModel("open", { type: Boolean, default: false });
+// When launched from a project, that project is preset; globally it falls back to the
+// seeded "Uncategorized" default.
+const props = defineProps({
+	project: { type: String, default: "" },
+});
 
 const router = useRouter();
 const pdfUrl = ref(null);
 const pdfName = ref("");
 const title = ref("");
+const project = ref(props.project);
+
+// Project picker options — pinned default first (server orders is_default desc).
+const projects = useList({
+	doctype: "Wikify Project",
+	fields: ["name", "project_name", "is_default"],
+	orderBy: "is_default desc, project_name asc",
+	limit: 100,
+});
+const projectOptions = computed(() =>
+	(projects.data || []).map((p) => ({ label: p.project_name, value: p.name }))
+);
+
+// Default the picker: the prop's project, else the seeded default once options load.
+watch(
+	[() => open.value, projectOptions],
+	([isOpen, opts]) => {
+		if (!isOpen || project.value) return;
+		project.value = props.project || opts.find((o) => o)?.value || "";
+	},
+	{ immediate: true }
+);
 
 const startImport = useCall({
 	url: "/api/v2/method/wikify.api.imports.start_import",
@@ -32,13 +67,18 @@ function onUpload(file) {
 
 function start() {
 	if (!pdfUrl.value || !title.value) return;
-	startImport.submit({ pdf_file_url: pdfUrl.value, title: title.value });
+	startImport.submit({
+		pdf_file_url: pdfUrl.value,
+		title: title.value,
+		project: project.value || undefined,
+	});
 }
 
 function reset() {
 	pdfUrl.value = null;
 	pdfName.value = "";
 	title.value = "";
+	project.value = props.project;
 	startImport.reset();
 }
 </script>
@@ -62,8 +102,8 @@ function reset() {
 										uploading
 											? `Uploading ${progress}%`
 											: pdfUrl
-												? 'Replace PDF'
-												: 'Choose PDF'
+											? 'Replace PDF'
+											: 'Choose PDF'
 									"
 									icon-left="lucide-upload"
 									@click="openFileSelector"
@@ -75,6 +115,13 @@ function reset() {
 						</template>
 					</FileUploader>
 				</div>
+
+				<FormControl
+					v-model="project"
+					label="Project"
+					type="select"
+					:options="projectOptions"
+				/>
 
 				<FormControl
 					v-model="title"
