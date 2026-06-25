@@ -4,7 +4,7 @@
 // session-history dropdown. Slice 16 adds a model picker, session rename/archive, error
 // retry, and empty states.
 import { computed, nextTick, ref, watch } from "vue";
-import { Button, Dialog, Dropdown, FormControl, Spinner } from "frappe-ui";
+import { Button, Dialog, Dropdown, FormControl, Spinner, Textarea } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useAgentChat } from "@/composables/useAgentChat";
 
@@ -295,14 +295,12 @@ function onKeydown(e) {
 						@click="chat.retry()"
 					/>
 				</div>
-				<div
-					class="flex items-end gap-2 rounded-lg border border-outline-gray-2 bg-surface-base px-2 py-1.5 focus-within:border-outline-gray-3"
-				>
-					<textarea
+				<div class="flex items-end gap-2">
+					<Textarea
 						v-model="prompt"
-						rows="1"
+						:rows="1"
 						placeholder="Ask the assistant…"
-						class="max-h-32 flex-1 resize-none bg-transparent py-1 text-base text-ink-gray-9 outline-none placeholder:text-ink-gray-4"
+						class="max-h-32 flex-1 resize-none"
 						@keydown="onKeydown"
 					/>
 					<Button

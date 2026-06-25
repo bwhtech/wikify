@@ -156,13 +156,32 @@ export function useAgentChat() {
 		const atts = attachments.value;
 		const projectChip = atts.find((a) => a.type === "project");
 		const docChip = atts.find((a) => a.type === "document");
+		const scope = scopeOf(atts);
+		const project = projectChip?.name || null;
+		const sourceDocument = docChip?.name || null;
 		try {
+			// Brand-new chat: create the session and subscribe to its realtime channel
+			// BEFORE enqueuing the run. The loop runs on a worker and emits
+			// wikify_agent_stream/complete:<sid> as it goes; Frappe realtime has no replay,
+			// so if we only bind after `run` returns (once we learn the id) the worker can
+			// emit before we're listening and the turn hangs on "Thinking…" forever even
+			// though the backend finished. Binding is synchronous, so doing it before `run`
+			// guarantees handlers exist before the job is enqueued.
+			if (!sessionId.value) {
+				const created = await call("wikify.api.agent.new_session", {
+					scope,
+					project,
+					source_document: sourceDocument,
+				});
+				sessionId.value = created.session_id;
+				rebind();
+			}
 			const res = await call("wikify.api.agent.run", {
 				prompt: text,
 				session_id: sessionId.value,
-				scope: scopeOf(atts),
-				project: projectChip?.name || null,
-				source_document: docChip?.name || null,
+				scope,
+				project,
+				source_document: sourceDocument,
 				model: model.value || null,
 				attachments: atts.map(({ type, name, label }) => ({ type, name, label })),
 				...extra,
