@@ -53,6 +53,21 @@ def render_section_preview(section: str) -> dict:
 
 	content = _content_for(sec.markdown, is_group=bool(sec.is_group), title=sec.title)
 
+	# Container page (a group with no own body): roll up a Contents list of its direct
+	# children, so the page shows navigable links rather than a bare heading. Mirrors
+	# `_WikiGenerator._rollup_empty_groups`, with preview routes.
+	if not content and sec.is_group:
+		children = frappe.get_all(
+			"Source Section",
+			filters={"parent_source_section": sec.name, "include_in_wiki": 1},
+			fields=["name", "title"],
+			order_by="lft",
+		)
+		if children:
+			content = "## Contents\n\n" + "".join(
+				f"- [{c.title}](/{_PREVIEW_ROUTE_PREFIX}/{c.name})\n" for c in children
+			)
+
 	# Dry pass-2: resolve "page N" → the smallest-span included section covering N.
 	included = frappe.get_all(
 		"Source Section",

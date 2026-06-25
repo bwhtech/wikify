@@ -122,6 +122,7 @@ class _WikiGenerator:
 		self._sweep_stale()
 		self._stage("Building wiki pages")
 		self._build_structure()
+		self._rollup_empty_groups()
 		self._stage("Resolving page references")
 		self._rewrite_links()
 		store.set_document_wiki(self.sd.name, self.space.name, self.root_group.name, status="Wiki-Generated")
@@ -216,6 +217,28 @@ class _WikiGenerator:
 			store.set_section_wiki_document(s["name"], doc.name)
 			if self.progress_cb:
 				self.progress_cb(i + 1, total)
+
+	def _rollup_empty_groups(self) -> None:
+		"""Give container pages (groups with no own body) a Contents list linking to their
+		direct children, so a section landing page renders links instead of a bare heading.
+		Runs after the build pass, when every child route is known."""
+		children_of: dict[str, list] = {}
+		for s in self.included:
+			if s["parent_source_section"]:
+				children_of.setdefault(s["parent_source_section"], []).append(s)
+		for s in self.included:
+			if not s["is_group"] or (s["markdown"] or "").strip():
+				continue  # leaf, or a group that has its own body
+			kids = children_of.get(s["name"], [])
+			if not kids:
+				continue
+			toc = "## Contents\n\n" + "".join(
+				f"- [{k['title']}](/{self.wiki_route[k['name']]})\n" for k in kids
+			)
+			self.content[s["name"]] = toc
+			frappe.db.set_value(
+				"Wiki Document", self.wiki_name[s["name"]], "content", toc, update_modified=False
+			)
 
 	def _route_for_page(self, n: int) -> str | None:
 		"""Smallest-span included section whose PDF page range contains n → its route."""
