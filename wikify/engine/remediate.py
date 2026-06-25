@@ -72,6 +72,13 @@ def remediate_pdf(
 	canon_src = {p["page_no"]: "baseline" for p in pages}
 
 	with fitz.open(pdf_path) as doc:
+		# Running furniture (banners, doc-code/date stamps, 'Page X of Y', prepared/issued/
+		# approved footers) recurs across pages. Cleanup is meant to strip it, but that drops
+		# its words from the page — so adoption scores cleanup recall against a furniture-free
+		# ground truth, else removing furniture looks like content loss and good cleanups get
+		# rejected (canonical falls back to the raw, artifact-laden baseline).
+		furniture = det.find_furniture_lines([doc[p["page_no"] - 1].get_text("text") for p in pages])
+
 		for i, p in enumerate(targets):
 			page = doc[p["page_no"] - 1]
 			gt = page.get_text("text")
@@ -100,8 +107,12 @@ def remediate_pdf(
 					p["page_no"], new_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind
 				)
 				if method == "cleanup":
-					# Adopt unless content was lost (a small recall drop = furniture removal).
-					adopted = new_ps.text_recall >= base_ps.text_recall - recall_tol
+					# Adopt unless real content was lost. Recall is measured against the
+					# furniture-stripped ground truth, so stripping running headers/footers
+					# (cleanup's job) doesn't count against it — only dropped substantive text does.
+					base_cr = det.content_recall(gt, base_md, furniture)
+					new_cr = det.content_recall(gt, new_md, furniture)
+					adopted = new_cr >= base_cr - recall_tol
 				else:
 					adopted = new_ps.composite > base_ps.composite
 				notes = "; ".join(new_ps.notes) if new_ps.notes else None

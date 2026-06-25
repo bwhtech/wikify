@@ -31,6 +31,44 @@ def text_recall(ground_truth: str, markdown: str) -> float:
 	return overlap / sum(gt.values())
 
 
+_DIGIT_RE = re.compile(r"\d+")
+
+
+def _norm_line(line: str) -> str:
+	"""Normalize a line for running-header/footer detection: lowercase, collapse digit
+	runs (so 'Pg 17 of 180' and 'Pg 18 of 180' match) and whitespace."""
+	return re.sub(r"\s+", " ", _DIGIT_RE.sub("#", line.lower())).strip()
+
+
+def find_furniture_lines(page_texts: list[str], min_fraction: float = 0.5) -> set[str]:
+	"""Normalized lines that recur across >= min_fraction of pages — i.e. running page
+	furniture (title banners, doc-code / version / date stamps, 'Page X of Y', and
+	prepared / issued / approved footers). Detected by repetition, not hardcoded patterns,
+	so it is document-agnostic. Returns empty for short docs where repetition is noise."""
+	n = len(page_texts)
+	if n < 3:
+		return set()
+	counts: Counter = Counter()
+	for text in page_texts:
+		# Dedup within a page so a line counts once per page it appears on.
+		counts.update({ln for ln in (_norm_line(x) for x in text.splitlines()) if len(ln) >= 6})
+	threshold = max(2, round(min_fraction * n))
+	return {ln for ln, c in counts.items() if c >= threshold}
+
+
+def strip_furniture(text: str, furniture: set[str]) -> str:
+	"""Drop lines whose normalized form is known running furniture."""
+	if not furniture:
+		return text
+	return "\n".join(ln for ln in text.splitlines() if _norm_line(ln) not in furniture)
+
+
+def content_recall(ground_truth: str, markdown: str, furniture: set[str] | None = None) -> float:
+	"""text_recall against furniture-stripped ground truth, so legitimately removing
+	running headers/footers during cleanup does NOT register as dropped content."""
+	return text_recall(strip_furniture(ground_truth, furniture or set()), markdown)
+
+
 def extra_ratio(ground_truth: str, markdown: str) -> float:
 	md = _tokens(markdown)
 	if not md:
