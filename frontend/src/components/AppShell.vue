@@ -11,6 +11,7 @@ const { resolvedTheme, toggleTheme, initializeTheme } = useTheme();
 const nav = [
 	{ label: "Projects", to: { name: "Projects" }, icon: "lucide-folder" },
 	{ label: "Explore", to: { name: "Explore" }, icon: "lucide-shapes" },
+	{ label: "Settings", to: { name: "Settings" }, icon: "lucide-settings" },
 ];
 
 // The agent panel + its floating button are mounted once here so they're available on
