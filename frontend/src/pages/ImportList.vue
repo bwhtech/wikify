@@ -57,13 +57,13 @@ function fmtDate(d) {
 			<div class="rounded-full bg-surface-gray-2 p-3 text-ink-gray-5">
 				<span class="lucide-inbox size-6" aria-hidden="true" />
 			</div>
-			<p class="text-base text-ink-gray-7">No imports yet</p>
-			<p class="text-sm text-ink-gray-5">Upload a PDF to start your first import.</p>
+			<p class="text-base text-ink-gray-7">No documents yet</p>
+			<p class="text-sm text-ink-gray-5">Upload a PDF to add your first document.</p>
 			<Button
 				variant="solid"
 				theme="gray"
 				icon-left="lucide-plus"
-				label="New Import"
+				label="New Document"
 				class="mt-2"
 				@click="emit('new-import')"
 			/>

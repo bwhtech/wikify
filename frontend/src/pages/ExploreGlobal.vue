@@ -86,7 +86,7 @@ function pageRange(s) {
 			</div>
 			<p class="text-base text-ink-gray-7">No classified sections yet</p>
 			<p class="text-sm text-ink-gray-5">
-				Import and parse a PDF — its sections are typed automatically.
+				Add and parse a PDF — its sections are typed automatically.
 			</p>
 		</div>
 

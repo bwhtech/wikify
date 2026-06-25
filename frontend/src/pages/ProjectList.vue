@@ -139,7 +139,7 @@ function openProject(name) {
 						{{ p.description || "No description" }}
 					</p>
 					<p class="text-sm text-ink-gray-6">
-						{{ p.import_count || 0 }} import{{ p.import_count === 1 ? "" : "s" }}
+						{{ p.import_count || 0 }} document{{ p.import_count === 1 ? "" : "s" }}
 					</p>
 				</button>
 			</div>

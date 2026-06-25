@@ -84,7 +84,7 @@ function reset() {
 </script>
 
 <template>
-	<Dialog v-model:open="open" title="New Import" @close="reset">
+	<Dialog v-model:open="open" title="New Document" @close="reset">
 		<template #default>
 			<div class="space-y-4">
 				<div>
@@ -127,7 +127,7 @@ function reset() {
 					v-model="title"
 					label="Title"
 					type="text"
-					placeholder="Import title"
+					placeholder="Document title"
 					:disabled="!pdfUrl"
 				/>
 

@@ -114,7 +114,7 @@ def seed_uncategorized_project() -> str:
 		{
 			"doctype": "Wikify Project",
 			"project_name": UNCATEGORIZED,
-			"description": "Catch-all for unfiled imports.",
+			"description": "Catch-all for unfiled documents.",
 			"is_default": 1,
 		}
 	).insert(ignore_permissions=True)

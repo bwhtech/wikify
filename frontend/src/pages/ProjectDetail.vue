@@ -62,7 +62,7 @@ const showNewImport = ref(false);
 					variant="solid"
 					theme="gray"
 					icon-left="lucide-plus"
-					label="New Import"
+					label="New Document"
 					@click="showNewImport = true"
 				/>
 			</div>
