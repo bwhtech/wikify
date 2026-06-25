@@ -48,6 +48,7 @@ def parse_pdf(
 	progress_cb: Callable[[int, int], None] | None = None,
 	page_cb: Callable[..., None] | None = None,
 	stage_cb: Callable[[str], None] | None = None,
+	sectionize: bool = True,
 ) -> str:
 	"""Render + baseline-parse + score every page → Source Document (+ pages).
 
@@ -110,5 +111,8 @@ def parse_pdf(
 
 	# Build the section tree over the (baseline == canonical at parse time) markdown,
 	# then tag each section with a Section Type (eager classify; no key → all "other").
-	rebuild_and_classify(sd, pdf_path, stage_cb, project_context=project_context)
+	# Skipped when the caller will remediate first (remediation rebuilds over the cleaned
+	# canonical markdown), so the tree + classify pass runs once, not twice.
+	if sectionize:
+		rebuild_and_classify(sd, pdf_path, stage_cb, project_context=project_context)
 	return sd

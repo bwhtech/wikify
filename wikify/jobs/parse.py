@@ -10,7 +10,8 @@ from __future__ import annotations
 import frappe
 from frappe.utils import now_datetime
 
-from wikify.engine import parse_pdf
+from wikify.engine import llm, parse_pdf, remediate_pdf
+from wikify.engine.sectionize import rebuild_and_classify
 from wikify.jobs._util import log, project_context, publish_progress
 
 
@@ -48,6 +49,8 @@ def run(import_name: str) -> None:
 				suffix += f" (${cost:.4f})"
 			log(import_name, "info", "parse", f"Page {page_no}/{total} ({kind}){suffix}", meta=meta)
 
+		# Parse + score only; the tree is built after remediation (below) so it's built once,
+		# over the cleaned canonical markdown rather than the raw baseline.
 		source_document = parse_pdf(
 			pdf_path,
 			title=imp.import_title,
@@ -58,13 +61,56 @@ def run(import_name: str) -> None:
 			progress_cb=progress_cb,
 			page_cb=page_cb,
 			stage_cb=stage_cb,
+			sectionize=False,
 		)
+		imp.db_set("source_document", source_document)
+
+		# Auto-remediate flagged pages before Review, so the section tree (and any wiki built
+		# from it) come from cleaned, artifact-free markdown — not raw baseline with omitted-
+		# picture wrappers / <br> blobs that break section attribution. remediate_pdf rebuilds
+		# the tree + classifies over the canonical markdown, standing in for parse's own
+		# sectionize pass. Needs cloud models; without a key, just build the tree on baseline.
+		flagged = frappe.db.count(
+			"Source Page", {"source_document": source_document, "verdict": ["!=", "pass"]}
+		)
+		if flagged and llm.has_openrouter():
+			imp.db_set("status", "Remediating")
+			publish_progress(import_name, 0, f"Remediating {flagged} flagged pages", status="Remediating")
+			log(import_name, "info", "remediate", f"Auto-remediating {flagged} flagged pages")
+
+			def rem_progress_cb(done: int, total: int) -> None:
+				publish_progress(
+					import_name, (done / total * 100) if total else 100, f"Remediating page {done}/{total}"
+				)
+
+			def rem_page_cb(page_no, total, method, adopted, base_c, new_c, metrics) -> None:
+				cost = sum(m["cost"] for m in metrics if m.get("cost")) or None
+				delta = round((new_c or 0) - (base_c or 0), 3)
+				verb = "adopted" if adopted else "kept baseline"
+				meta = {"page_no": page_no, "method": method, "adopted": adopted, "delta": delta}
+				suffix = f" — {method} {verb} ({base_c}→{new_c}, Δ{delta:+.3f})"
+				if cost:
+					meta["cost"] = cost
+					suffix += f" (${cost:.4f})"
+				log(import_name, "info", "remediate", f"Page {page_no}{suffix}", meta=meta)
+
+			remediate_pdf(
+				source_document,
+				pdf_path,
+				scope="flagged",
+				project_context=context,
+				progress_cb=rem_progress_cb,
+				page_cb=rem_page_cb,
+				stage_cb=stage_cb,
+			)
+		else:
+			# Nothing flagged (or no cloud key): build the tree over the baseline markdown.
+			rebuild_and_classify(source_document, pdf_path, stage_cb, project_context=context)
 
 		mean_score, page_count = frappe.db.get_value(
 			"Source Document", source_document, ["mean_score", "page_count"]
 		)
 		n_sections = frappe.db.count("Source Section", {"source_document": source_document})
-		imp.db_set("source_document", source_document)
 		imp.db_set("page_count", page_count)
 		imp.db_set("completed_at", now_datetime())
 		publish_progress(import_name, 100, f"Parsed {page_count} pages", status="Review")
