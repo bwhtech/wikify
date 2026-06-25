@@ -15,7 +15,7 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from wikify.engine import llm, pdf_utils, settings, store
+from wikify.engine import images, llm, pdf_utils, settings, store
 from wikify.engine.classify import classify_document
 from wikify.engine.finalize import finalize_document
 from wikify.engine.generate import generate_wiki, preview_wiki
@@ -84,6 +84,10 @@ def parse_pdf(
 			png = pdf_utils.render_png(page, dpi=dpi)
 			kind = pdf_utils.classify_page(page, min_chars, min_drawings)
 			markdown = baseline.parse_page(pdf_path, page_no)
+			# Rescue genuine graphics the baseline parser omits (diagrams/photos with no
+			# recoverable text) by embedding them inline; text-image placeholders are left
+			# for the cleanup pass. No-op on the common page with no genuine figure.
+			markdown = images.embed_genuine_images(page, markdown, sd, page_no, kind)
 			page_name = store.add_page(sd, page_no, kind, png, markdown)
 
 			# Visual pages MUST be judged (text GT is unreliable on diagrams); text
