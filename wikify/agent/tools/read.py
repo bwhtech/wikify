@@ -173,6 +173,64 @@ def _search_sections(ctx: Ctx, args: dict) -> str:
 	return f"{total} section(s) of type {section_type}:\n" + "\n".join(lines)
 
 
+def _read_rendered_preview(ctx: Ctx, args: dict) -> str:
+	"""What the user's wiki preview actually renders for a section (0.3 Slice 17).
+
+	Reuses `api.wiki.render_section_preview` — the same content pipeline (empty-group
+	rollup + page-ref resolution) the preview and wiki generation use. This is the
+	verification tool after any content mutation: it reads the layer the user sees,
+	not the layer that was just written.
+	"""
+	from wikify.api.wiki import render_section_preview
+
+	name = args.get("name")
+	if not name:
+		return _("Provide the section `name`.")
+	if not frappe.db.exists("Source Section", name):
+		return _("Section {0} not found.").format(name)
+	res = render_section_preview(name)
+	meta = [
+		f"Preview of: {' > '.join(res['breadcrumb'])}",
+		f"Included in wiki: {'yes' if res['include_in_wiki'] else 'no'}",
+		f"Page refs resolved: {res['page_refs_resolved']}",
+		"",
+		"Rendered markdown (what the user sees):",
+	]
+	return "\n".join(meta) + "\n" + _truncate(res["markdown"] or "(empty page)")
+
+
+def _read_wiki_page(ctx: Ctx, args: dict) -> str:
+	"""The GENERATED Wiki Document content for a section (0.3 Slice 19) — detects drift
+	between the section (preview) and the live wiki page."""
+	name = args.get("name")
+	if not name:
+		return _("Provide the section `name`.")
+	sec = frappe.db.get_value(
+		"Source Section", name, ["title", "markdown", "wiki_document"], as_dict=True
+	)
+	if not sec:
+		return _("Section {0} not found.").format(name)
+	if not sec.wiki_document or not frappe.db.exists("Wiki Document", sec.wiki_document):
+		return _(
+			"'{0}' has no generated wiki page yet. The wiki preview still works; generate the "
+			"wiki (or regenerate_wiki) to publish it."
+		).format(sec.title)
+	wd = frappe.db.get_value(
+		"Wiki Document", sec.wiki_document, ["content", "route", "modified"], as_dict=True
+	)
+	drift = (wd.content or "").strip() != (sec.markdown or "").strip()
+	meta = [
+		f"Generated wiki page for '{sec.title}' — route /{wd.route} (last written {wd.modified})",
+		(
+			"NOTE: differs from the section's current content — stale; sync_wiki_page will update it."
+			if drift
+			else "Matches the section's current content."
+		),
+		"",
+	]
+	return "\n".join(meta) + _truncate(wd.content or "(empty)")
+
+
 TOOLS = [
 	Tool(
 		name="read_tree",
@@ -222,6 +280,40 @@ TOOLS = [
 			"required": ["page_no"],
 		},
 		handler=_read_page,
+	),
+	Tool(
+		name="read_rendered_preview",
+		side="server",
+		description=(
+			"Read what the user's wiki preview renders for a section — the content after "
+			"empty-group rollup and page-ref resolution. ALWAYS verify content fixes with this "
+			"(it reads the layer the user sees), never with read_page alone."
+		),
+		parameters={
+			"type": "object",
+			"properties": {
+				"name": {"type": "string", "description": "Source Section id."},
+			},
+			"required": ["name"],
+		},
+		handler=_read_rendered_preview,
+	),
+	Tool(
+		name="read_wiki_page",
+		side="server",
+		description=(
+			"Read the GENERATED wiki page (Wiki Document) for a section, with a staleness note "
+			"when it differs from the section's current content. Use to check whether a content "
+			"fix still needs sync_wiki_page."
+		),
+		parameters={
+			"type": "object",
+			"properties": {
+				"name": {"type": "string", "description": "Source Section id."},
+			},
+			"required": ["name"],
+		},
+		handler=_read_wiki_page,
 	),
 	Tool(
 		name="list_section_types",

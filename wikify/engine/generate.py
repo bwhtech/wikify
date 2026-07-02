@@ -298,6 +298,66 @@ def generate_wiki(
 	).run()
 
 
+def sync_section(section_name: str) -> dict:
+	"""Push ONE section's current content into its existing Wiki Document (0.3 Slice 19).
+
+	Content-only: title/route/parent/sort order stay owned by full generation's
+	sweep-and-rebuild. Mirrors `_WikiGenerator` for a single node — `_content_for`,
+	the empty-group Contents rollup, and the pass-2 page-ref rewrite, all resolved
+	against the routes recorded on each section's `wiki_document`.
+
+	Returns `{synced: bool, reason?, chars?, links?, route?}` — `synced=False` with
+	`reason="no_wiki_document"` when the section has never been generated, or
+	`reason="needs_regenerate"` when an included child lacks a wiki page (a structural
+	change only full regeneration can project).
+	"""
+	sec = frappe.db.get_value(
+		"Source Section",
+		section_name,
+		["source_document", "title", "is_group", "markdown", "include_in_wiki", "wiki_document"],
+		as_dict=True,
+	)
+	if not sec:
+		frappe.throw(f"Section {section_name} not found.")
+	if not sec.wiki_document or not frappe.db.exists("Wiki Document", sec.wiki_document):
+		return {"synced": False, "reason": "no_wiki_document"}
+	if not sec.include_in_wiki:
+		return {"synced": False, "reason": "excluded"}
+
+	sections = store.get_sections_for_wiki(sec.source_document)
+	included = [s for s in sections if s["include_in_wiki"]]
+	routes = {
+		s["name"]: frappe.db.get_value("Wiki Document", s["wiki_document"], "route")
+		for s in included
+		if s["wiki_document"]
+	}
+
+	content = _WikiGenerator._content_for(
+		{"markdown": sec.markdown, "is_group": sec.is_group, "title": sec.title}
+	)
+	if not content and sec.is_group:
+		kids = [s for s in included if s["parent_source_section"] == section_name]
+		if any(k["name"] not in routes for k in kids):
+			return {"synced": False, "reason": "needs_regenerate"}
+		if kids:
+			content = "## Contents\n\n" + "".join(f"- [{k['title']}](/{routes[k['name']]})\n" for k in kids)
+
+	def route_for_page(n: int) -> str | None:
+		best = None
+		for s in included:
+			ps, pe = s["page_start"], s["page_end"]
+			if ps and pe and ps <= n <= pe and s["name"] in routes and (best is None or pe - ps < best[1]):
+				best = (routes[s["name"]], pe - ps)
+		return best[0] if best else None
+
+	own_route = routes.get(section_name)
+	page_count = frappe.db.get_value("Source Document", sec.source_document, "page_count")
+	content, links = rewrite_page_refs(content, page_count or 10**9, route_for_page, current_route=own_route)
+
+	frappe.db.set_value("Wiki Document", sec.wiki_document, "content", content, update_modified=False)
+	return {"synced": True, "chars": len(content), "links": links, "route": own_route}
+
+
 def preview_wiki(source_document: str) -> dict:
 	"""Projected wiki structure without writes — the included Source Section tree as a
 	nested list, plus counts. Drives the Wiki tab's pre-generation preview."""

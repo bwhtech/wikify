@@ -284,6 +284,174 @@ def delete_section(name: str) -> dict:
 
 
 @frappe.whitelist()
+def create_section(
+	source_document: str,
+	title: str,
+	parent: str | None = None,
+	is_group: bool | int | str = 0,
+	markdown: str = "",
+	section_type: str | None = None,
+	index: int | None = None,
+) -> dict:
+	"""Insert a new Source Section under `parent` (top level when omitted) — 0.3 Slice 20.
+
+	Sections are otherwise only born via sectionize; this unlocks "add a glossary page".
+	No page range is set (page refs simply never resolve to it). `index` is the 0-based
+	position among the destination's children (append when omitted).
+	"""
+	title = (title or "").strip()
+	if not title:
+		frappe.throw(_("Title can't be empty."))
+	if not frappe.db.exists("Source Document", source_document):
+		frappe.throw(_("Source Document {0} not found.").format(source_document))
+	if parent:
+		prow = frappe.db.get_value("Source Section", parent, "source_document")
+		if prow != source_document:
+			frappe.throw(_("Parent must belong to the same document."))
+	section_type = (section_type or "").strip() or None
+	if section_type and not frappe.db.exists("Section Type", section_type):
+		frappe.throw(_("Unknown Section Type {0}.").format(section_type))
+
+	doc = frappe.new_doc("Source Section")
+	doc.source_document = source_document
+	doc.parent_source_section = parent
+	doc.title = title
+	doc.is_group = 1 if frappe.parse_json(is_group) else 0
+	doc.markdown = markdown or ""
+	doc.section_type = section_type
+	doc.include_in_wiki = 1
+	doc.sort_order = 10**6  # append; move_section splices when an index is given
+	doc.insert(ignore_permissions=True)
+
+	if index is not None:
+		move_section(doc.name, new_parent=parent, new_index=int(index))
+	else:
+		_rebuild_tree(source_document)
+	return {"ok": True, "name": doc.name}
+
+
+@frappe.whitelist()
+def split_section(name: str, at_heading: str, new_title: str | None = None) -> dict:
+	"""Split one section into two siblings at a markdown heading — 0.3 Slice 20.
+
+	The split point is the first line whose heading text matches `at_heading` (with or
+	without the leading `#`s). The original keeps everything above it; a new sibling
+	inserted immediately after gets the heading line and everything below. Both keep the
+	original page range (smallest-span page-ref resolution tolerates the overlap).
+	"""
+	sec = frappe.db.get_value(
+		"Source Section",
+		name,
+		["source_document", "parent_source_section", "title", "markdown", "page_start", "page_end", "section_type", "include_in_wiki", "sort_order"],
+		as_dict=True,
+	)
+	if not sec:
+		frappe.throw(_("Section {0} not found.").format(name))
+
+	want = (at_heading or "").strip().lstrip("#").strip().lower()
+	if not want:
+		frappe.throw(_("Provide the heading to split at."))
+	lines = (sec.markdown or "").splitlines()
+	split_at = next(
+		(
+			i
+			for i, line in enumerate(lines)
+			if line.lstrip().startswith("#") and line.lstrip().lstrip("#").strip().lower() == want
+		),
+		None,
+	)
+	if split_at is None:
+		frappe.throw(_("No heading matching '{0}' found in '{1}' — nothing was split.").format(at_heading, sec.title))
+
+	head = "\n".join(lines[:split_at]).strip()
+	tail = "\n".join(lines[split_at:]).strip()
+	title = (new_title or "").strip() or lines[split_at].lstrip().lstrip("#").strip()
+
+	new = frappe.new_doc("Source Section")
+	new.source_document = sec.source_document
+	new.parent_source_section = sec.parent_source_section
+	new.title = title
+	new.markdown = tail
+	new.page_start = sec.page_start
+	new.page_end = sec.page_end
+	new.section_type = sec.section_type
+	new.include_in_wiki = sec.include_in_wiki
+	new.sort_order = (sec.sort_order or 0)  # placed right after via move_section below
+	new.insert(ignore_permissions=True)
+
+	frappe.db.set_value("Source Section", name, "markdown", head, update_modified=False)
+
+	# Splice the new sibling immediately after the original.
+	sib_filters = {"source_document": sec.source_document}
+	sib_filters["parent_source_section"] = sec.parent_source_section or ["is", "not set"]
+	siblings = frappe.get_all(
+		"Source Section", filters=sib_filters, order_by="sort_order asc, name asc", pluck="name"
+	)
+	move_section(new.name, new_parent=sec.parent_source_section, new_index=siblings.index(name) + 1 if name in siblings else None)
+	return {"ok": True, "name": name, "new_name": new.name, "new_title": title}
+
+
+@frappe.whitelist()
+def merge_sections(names: list | str) -> dict:
+	"""Merge sibling sections into the FIRST listed — 0.3 Slice 20.
+
+	Markdown is concatenated in tree order; the other sections' children reparent to the
+	survivor; the husks are deleted (their wiki pages get swept on the next regenerate).
+	The survivor's page range widens to cover the merged set.
+	"""
+	if isinstance(names, str):
+		names = frappe.parse_json(names)
+	names = [n for n in (names or []) if n]
+	if len(names) < 2:
+		frappe.throw(_("Pass at least two section ids to merge."))
+
+	rows = {
+		r.name: r
+		for r in frappe.get_all(
+			"Source Section",
+			filters={"name": ["in", names]},
+			fields=["name", "source_document", "parent_source_section", "title", "markdown", "page_start", "page_end", "lft"],
+		)
+	}
+	missing = [n for n in names if n not in rows]
+	if missing:
+		frappe.throw(_("Section(s) not found: {0}").format(", ".join(missing)))
+	docs = {r.source_document for r in rows.values()}
+	parents = {r.parent_source_section or "" for r in rows.values()}
+	if len(docs) > 1 or len(parents) > 1:
+		frappe.throw(_("Sections must be siblings (same document and same parent) to merge."))
+
+	survivor = rows[names[0]]
+	ordered = sorted(rows.values(), key=lambda r: r.lft)
+	merged_md = "\n\n".join((r.markdown or "").strip() for r in ordered if (r.markdown or "").strip())
+	starts = [r.page_start for r in ordered if r.page_start]
+	ends = [r.page_end for r in ordered if r.page_end]
+
+	husks = [n for n in names if n != survivor.name]
+	for husk in husks:
+		frappe.db.set_value(
+			"Source Section",
+			{"parent_source_section": husk},
+			"parent_source_section",
+			survivor.name,
+			update_modified=False,
+		)
+	frappe.db.delete("Source Section", {"name": ["in", husks]})
+	frappe.db.set_value(
+		"Source Section",
+		survivor.name,
+		{
+			"markdown": merged_md,
+			"page_start": min(starts) if starts else survivor.page_start,
+			"page_end": max(ends) if ends else survivor.page_end,
+		},
+		update_modified=False,
+	)
+	_rebuild_tree(survivor.source_document)
+	return {"ok": True, "name": survivor.name, "merged": len(husks)}
+
+
+@frappe.whitelist()
 def build_graph(import_name: str) -> dict:
 	"""Approve the reviewed tree — advance the import + document to `Graphed`.
 

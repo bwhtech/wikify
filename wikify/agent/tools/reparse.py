@@ -8,9 +8,12 @@
     confirm-gated**: the loop holds it for a UI confirm card and enqueues the remediate
     job only once the user approves.
 
-Page-scoped edits update the page's canonical (shown in the Page Review immediately)
-without a full-tree rebuild, so manual tree structure is preserved; the user runs
-reclassify / a document re-parse to propagate canonical into the section tree + wiki.
+Page-scoped edits update the page's canonical, then **propagate** (0.3 Slice 18): when
+exactly one deepest section owns the page, its markdown is rebuilt from canonical so the
+fix reaches the wiki preview in the same turn — tree untouched. When the page is a
+boundary page shared between sections, nothing is silently rewritten; the result string
+names the candidates and the follow-up tools, so the model reports honestly instead of
+claiming a user-visible fix it didn't make.
 """
 
 from __future__ import annotations
@@ -45,6 +48,38 @@ def _page_no(args: dict) -> int | None:
 		return None
 
 
+def _propagate_page(source_document: str, page_no: int) -> str:
+	"""Push a fresh page canonical into the owning section (0.3 Slice 18).
+
+	Exactly one deepest covering section → rebuild its markdown and report both layers
+	updated. Zero or several → change nothing at the section layer and say exactly what
+	is still stale and which tool fixes it.
+	"""
+	from wikify.engine.sectionize import rebuild_section_markdown, sections_covering_page
+
+	owners = sections_covering_page(source_document, page_no)
+	if len(owners) == 1:
+		try:
+			res = rebuild_section_markdown(owners[0].name)
+		except ValueError as e:
+			return _(" Section propagation failed ({0}) — the wiki preview is still stale.").format(str(e))
+		return _(
+			" Propagated into section '{0}' ({1} chars) — the wiki preview now shows it. If this "
+			"document has a generated wiki, finish with sync_wiki_page on <{2}>."
+		).format(res["title"], res["chars"], owners[0].name)
+	if not owners:
+		return _(
+			" No section's page range covers this page, so the wiki preview is NOT updated. "
+			"Use edit_section_content on the right section if the fix must reach the wiki."
+		)
+	names = ", ".join(f"'{o.title}' <{o.name}>" for o in owners)
+	return _(
+		" NOT yet visible in the wiki preview — this is a boundary page shared by {0}. "
+		"Run rebuild_section_from_pages or edit_section_content on the right one, then "
+		"sync_wiki_page if a wiki is generated."
+	).format(names)
+
+
 def _use_page_image(ctx: Ctx, args: dict) -> str:
 	from wikify.engine import embed_page_image
 
@@ -58,7 +93,10 @@ def _use_page_image(ctx: Ctx, args: dict) -> str:
 		embed_page_image(source_document, page_no)
 	except (ValueError, RuntimeError) as e:
 		return _("Couldn't embed the page image: {0}").format(str(e))
-	return _("Page {0} now embeds its rendered image as canonical markdown (no re-parse).").format(page_no)
+	return (
+		_("Page {0} now embeds its rendered image as canonical markdown (no re-parse).").format(page_no)
+		+ _propagate_page(source_document, page_no)
+	)
 
 
 def _reparse_page(ctx: Ctx, args: dict) -> str:
@@ -89,7 +127,7 @@ def _reparse_page(ctx: Ctx, args: dict) -> str:
 		return _("Re-parse failed: {0}").format(str(e))
 	return _("Re-parsed page {0} via {1} (composite {2}, {3} chars). Canonical updated.").format(
 		res["page_no"], res["method"], res["composite"], res["chars"]
-	)
+	) + _propagate_page(source_document, page_no)
 
 
 def _reparse_document(ctx: Ctx, args: dict) -> str:
@@ -163,8 +201,8 @@ TOOLS = [
 		side="server",
 		description=(
 			"Re-parse the WHOLE document, steered by a plain-English instruction. Expensive — "
-			"this runs cleanup/VLM over every page and rebuilds the tree. The user must confirm "
-			"before it runs."
+			"this runs cleanup/VLM over every page and rebuilds the tree, so MANUAL TREE EDITS "
+			"AND SECTION-LEVEL CONTENT EDITS ARE LOST. The user must confirm before it runs."
 		),
 		parameters={
 			"type": "object",
