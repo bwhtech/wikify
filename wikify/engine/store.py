@@ -192,6 +192,33 @@ def get_canonical_pages(source_document: str) -> list[tuple[int, str]]:
 	return [(p["page_no"], p["canonical_markdown"] or p["baseline_markdown"] or "") for p in pages]
 
 
+# --- 0.3 Slice 18: single-section rebuild ---
+
+
+def get_section_span(name: str) -> dict | None:
+	"""One section's identity + page range + tree interval (the rebuild seam's input)."""
+	return frappe.db.get_value(
+		"Source Section",
+		name,
+		["name", "source_document", "title", "page_start", "page_end", "lft", "rgt", "wiki_document"],
+		as_dict=True,
+	)
+
+
+def get_section_spans(source_document: str) -> list[dict]:
+	"""Every section's page range + tree interval, ordered by tree position."""
+	return frappe.get_all(
+		"Source Section",
+		filters={"source_document": source_document},
+		fields=["name", "title", "page_start", "page_end", "lft", "rgt", "is_group", "wiki_document"],
+		order_by="lft asc",
+	)
+
+
+def set_section_markdown(name: str, markdown: str) -> None:
+	frappe.db.set_value("Source Section", name, "markdown", markdown)
+
+
 # --- Slice 6: classification ---
 
 

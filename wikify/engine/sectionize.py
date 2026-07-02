@@ -150,7 +150,7 @@ def rebuild_section_markdown(section_name: str) -> dict:
 	cleaned = clean_pages(pages)
 	markdown = "\n\n".join(md.strip() for _, md in cleaned if md.strip())
 	overlaps = overlapping_sections(section_name)
-	frappe.db.set_value("Source Section", section_name, "markdown", markdown, update_modified=False)
+	store.set_section_markdown(section_name, markdown)
 	return {
 		"section": section_name,
 		"title": sec.title,
