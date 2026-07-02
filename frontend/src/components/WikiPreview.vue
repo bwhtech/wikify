@@ -106,7 +106,7 @@ function onBodyClick(e) {
 					v-if="mode === 'rendered'"
 					class="mx-auto max-w-3xl px-6 py-6"
 				>
-					<h1 class="mb-4 text-2xl font-semibold text-ink-gray-9">
+					<h1 class="mb-4 text-xl-semibold text-ink-gray-9">
 						{{ data.title }}
 					</h1>
 					<div

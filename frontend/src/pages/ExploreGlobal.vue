@@ -66,7 +66,7 @@ function pageRange(s) {
 		<header
 			class="sticky top-0 z-10 flex min-h-12 items-center gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
 		>
-			<h1 class="text-lg text-ink-gray-9">Explore</h1>
+			<h1 class="text-md text-ink-gray-9">Explore</h1>
 			<span class="text-sm text-ink-gray-5">Sections by type across documents</span>
 			<FormControl
 				v-model="selectedProject"

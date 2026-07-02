@@ -64,7 +64,7 @@ function openProject(name) {
 		<header
 			class="sticky top-0 z-10 flex min-h-12 items-center justify-between border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
 		>
-			<h1 class="text-lg text-ink-gray-9">Projects</h1>
+			<h1 class="text-md text-ink-gray-9">Projects</h1>
 			<div class="flex items-center gap-2">
 				<Button
 					v-if="archivedCount"

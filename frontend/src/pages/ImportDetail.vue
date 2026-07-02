@@ -166,7 +166,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					>{{ imp.doc.project_name || "Project" }}
 					<span class="text-ink-gray-4" aria-hidden="true">/</span></RouterLink
 				>
-				<h1 class="truncate text-lg text-ink-gray-9">
+				<h1 class="truncate text-md text-ink-gray-9">
 					{{ imp.doc?.import_title || name }}
 				</h1>
 				<Badge

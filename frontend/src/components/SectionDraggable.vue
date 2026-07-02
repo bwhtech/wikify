@@ -117,7 +117,7 @@ function rowActions(el) {
 					<input
 						v-if="editingKey === element.name"
 						v-model="draft"
-						class="min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-1 py-0.5 text-sm text-ink-gray-9 outline-none focus:border-outline-gray-4"
+						class="min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-base px-1 py-0.5 text-sm text-ink-gray-9 outline-none focus:border-outline-gray-4"
 						@click.stop
 						@keydown.enter.prevent="commitRename(element)"
 						@keydown.esc.prevent="editingKey = null"
