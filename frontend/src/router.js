@@ -30,11 +30,9 @@ const routes = [
 		name: "Explore",
 		component: () => import("@/pages/ExploreGlobal.vue"),
 	},
-	{
-		path: "/settings",
-		name: "Settings",
-		component: () => import("@/pages/Settings.vue"),
-	},
+	// Settings moved from a page to a dialog (opened from the sidebar header menu);
+	// keep the old URL working for bookmarks.
+	{ path: "/settings", redirect: { name: "Projects" } },
 ];
 
 // __FRONTEND_ROUTE__ is injected by the frappe-ui vite plugin (= '/wikify').
