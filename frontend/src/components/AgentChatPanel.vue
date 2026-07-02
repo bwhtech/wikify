@@ -4,7 +4,7 @@
 // session-history dropdown. Slice 16 adds a model picker, session rename/archive, error
 // retry, and empty states.
 import { computed, nextTick, ref, watch } from "vue";
-import { Button, Dialog, Dropdown, FormControl, Spinner, Textarea } from "frappe-ui";
+import { Button, dialog, Dropdown, Spinner, Textarea } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useAgentChat } from "@/composables/useAgentChat";
 
@@ -56,16 +56,24 @@ watch(
 );
 
 // Rename dialog.
-const showRename = ref(false);
-const renameText = ref("");
 function openRename() {
 	const s = (chat.sessions.value || []).find((x) => x.name === sessionId.value);
-	renameText.value = s?.title || "";
-	showRename.value = true;
-}
-async function saveRename() {
-	await chat.renameSession(renameText.value);
-	showRename.value = false;
+	dialog.prompt({
+		title: "Rename chat",
+		confirmLabel: "Save",
+		fields: [
+			{
+				name: "title",
+				label: "Chat title",
+				placeholder: "e.g. Nephrology tree cleanup",
+				defaultValue: s?.title || "",
+				required: true,
+			},
+		],
+		async onConfirm({ values }) {
+			await chat.renameSession(values.title);
+		},
+	});
 }
 
 // Show a Retry affordance when the last message is an agent error.
@@ -333,26 +341,6 @@ function onKeydown(e) {
 				</div>
 			</div>
 
-			<Dialog v-model:open="showRename" title="Rename chat">
-				<template #default>
-					<FormControl
-						v-model="renameText"
-						label="Chat title"
-						type="text"
-						placeholder="e.g. Nephrology tree cleanup"
-						@keyup.enter="saveRename"
-					/>
-				</template>
-				<template #actions>
-					<Button
-						variant="solid"
-						theme="gray"
-						label="Save"
-						:disabled="!renameText.trim()"
-						@click="saveRename"
-					/>
-				</template>
-			</Dialog>
 		</aside>
 	</Transition>
 </template>

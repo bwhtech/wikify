@@ -1,7 +1,16 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Dialog, ErrorMessage, FormControl, useCall, useList } from "frappe-ui";
+import {
+	Badge,
+	Button,
+	Dialog,
+	ErrorMessage,
+	FormControl,
+	Skeleton,
+	useCall,
+	useList,
+} from "frappe-ui";
 import { clear as clearAgentContext } from "@/data/agentContext";
 
 const router = useRouter();
@@ -84,9 +93,28 @@ function openProject(name) {
 		</header>
 
 		<div class="body-container pt-5 pb-40">
+			<!-- Loading skeleton (first load only — reloads keep the cards) -->
+			<div
+				v-if="projects.loading && !projects.data"
+				class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+			>
+				<div
+					v-for="i in 6"
+					:key="i"
+					class="flex flex-col gap-2 rounded-md border border-outline-gray-1 p-4"
+				>
+					<div class="flex items-center gap-2">
+						<Skeleton class="size-4 rounded" />
+						<Skeleton class="h-4 w-32 rounded" />
+					</div>
+					<Skeleton class="h-4 w-44 rounded" />
+					<Skeleton class="mt-2 h-3 w-24 rounded" />
+				</div>
+			</div>
+
 			<!-- Empty state -->
 			<div
-				v-if="!projects.loading && visibleProjects.length === 0"
+				v-else-if="!projects.loading && visibleProjects.length === 0"
 				class="flex flex-col items-center justify-center gap-3 py-16 text-center"
 			>
 				<div class="rounded-full bg-surface-gray-2 p-3 text-ink-gray-5">

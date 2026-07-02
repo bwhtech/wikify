@@ -287,12 +287,10 @@ const previewOpen = computed({
 		</div>
 
 		<!-- Wiki preview of a projected node (same component as the Tree tab) -->
-		<Dialog v-model:open="previewOpen" :options="{ size: '4xl' }">
-			<template #body>
-				<div class="h-[75vh]">
-					<WikiPreview :section="previewSection" @navigate="(n) => (previewSection = n)" />
-				</div>
-			</template>
+		<Dialog v-model:open="previewOpen" size="4xl" bare>
+			<div class="h-[75vh]">
+				<WikiPreview :section="previewSection" @navigate="(n) => (previewSection = n)" />
+			</div>
 		</Dialog>
 	</div>
 </template>

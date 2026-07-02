@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Progress, useList } from "frappe-ui";
+import { Badge, Button, Progress, Skeleton, useList } from "frappe-ui";
 import { useSocket } from "@/socket";
 import { statusTheme, isActive } from "@/utils/status";
 
@@ -49,9 +49,26 @@ function fmtDate(d) {
 
 <template>
 	<div class="body-container pt-5 pb-40">
+		<!-- Loading skeleton (first load only — reloads keep the rows) -->
+		<div
+			v-if="imports.loading && !imports.data"
+			class="rounded-md border border-outline-gray-1"
+		>
+			<div
+				v-for="i in 5"
+				:key="i"
+				class="flex items-center gap-4 border-b border-outline-gray-1 px-4 py-3 last:border-b-0"
+			>
+				<Skeleton class="h-4 flex-1 rounded" />
+				<Skeleton class="h-4 w-40 shrink-0 rounded" />
+				<Skeleton class="h-4 w-16 shrink-0 rounded" />
+				<Skeleton class="h-4 w-44 shrink-0 rounded" />
+			</div>
+		</div>
+
 		<!-- Empty state -->
 		<div
-			v-if="!imports.loading && (imports.data?.length ?? 0) === 0"
+			v-else-if="!imports.loading && (imports.data?.length ?? 0) === 0"
 			class="flex flex-col items-center justify-center gap-3 py-16 text-center"
 		>
 			<div class="rounded-full bg-surface-gray-2 p-3 text-ink-gray-5">
