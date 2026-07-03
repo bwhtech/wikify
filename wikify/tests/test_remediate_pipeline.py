@@ -38,6 +38,20 @@ def _fake_chat(model, messages, label="", **kw):
 
 
 class TestRemediatePipeline(FrappeTestCase):
+	def setUp(self):
+		# These tests assume only VISUAL pages are judged ("text pages stay
+		# deterministic"); pin judge_all_pages off so the site's live Wikify Settings
+		# (0.4's always-VLM toggle) can't leak in and flag the text pages.
+		from wikify.engine import settings as engine_settings
+
+		real_get = engine_settings.get
+		patcher = patch(
+			"wikify.engine.settings.get",
+			side_effect=lambda field: 0 if field == "judge_all_pages" else real_get(field),
+		)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
 	def _parse(self):
 		path = Path(tempfile.mkdtemp()) / "sample.pdf"
 		_make_sample_pdf(str(path))
