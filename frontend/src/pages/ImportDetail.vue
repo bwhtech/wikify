@@ -84,6 +84,20 @@ watch(
 const pageReview = ref(null);
 const sectionTree = ref(null);
 
+// Document-level audit score + LLM spend (0.4 slice 23) live on Source Document.
+const sdStats = useList({
+	doctype: "Source Document",
+	fields: ["name", "mean_score", "canonical_mean", "llm_cost"],
+	filters: computed(() => ({ name: imp.doc?.source_document || "__none__" })),
+	limit: 1,
+	auto: true,
+});
+const sourceStats = computed(() => sdStats.data?.[0] || null);
+const docAudit = computed(() => sourceStats.value?.canonical_mean ?? sourceStats.value?.mean_score);
+function fmtCost(v) {
+	return v ? `$${Number(v).toFixed(4)}` : "—";
+}
+
 // Remediation — route flagged (or all) pages through cleanup/VLM, adopt the best.
 const remediate = useCall({
 	url: "/api/v2/method/wikify.api.imports.trigger_remediation",
@@ -109,6 +123,7 @@ function onProgress(payload) {
 			pageReview.value?.reload();
 			sectionTree.value?.reload();
 		}
+		sdStats.reload();
 	}
 }
 function onLog(payload) {
@@ -123,12 +138,16 @@ function onLog(payload) {
 		});
 	}
 }
-// The AI agent's write tools (Slice 14) change this document's tree/pages from the chat
-// panel — refetch the affected views when a mutation lands on this document.
+// The AI agent's write tools change this document's data from the chat panel. Since
+// 0.4 slice 25 the loop emits ONE aggregated event per turn (at answer-completion /
+// confirm pauses) instead of one per tool — refetch everything the batch touched.
 function onAgentMutation(payload) {
-	if (!imp.doc || payload.source_document !== imp.doc.source_document) return;
+	const docs =
+		payload.source_documents || (payload.source_document ? [payload.source_document] : []);
+	if (!imp.doc || !docs.includes(imp.doc.source_document)) return;
 	pageReview.value?.reload();
 	sectionTree.value?.reload();
+	sdStats.reload();
 }
 onMounted(() => {
 	socket?.on("wikify_import_progress", onProgress);
@@ -228,6 +247,18 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 							<p class="text-sm text-ink-gray-5">Completed</p>
 							<p class="text-base text-ink-gray-8">
 								{{ imp.doc?.completed_at || "—" }}
+							</p>
+						</div>
+						<div>
+							<p class="text-sm text-ink-gray-5">Audit score</p>
+							<p class="text-base text-ink-gray-8">
+								{{ docAudit != null ? Number(docAudit).toFixed(2) : "—" }}
+							</p>
+						</div>
+						<div>
+							<p class="text-sm text-ink-gray-5">LLM cost</p>
+							<p class="text-base tabular-nums text-ink-gray-8">
+								{{ fmtCost(sourceStats?.llm_cost) }}
 							</p>
 						</div>
 					</div>

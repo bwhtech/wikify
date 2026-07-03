@@ -89,6 +89,35 @@ def set_mean_score(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "mean_score", mean)
 
 
+# --- 0.4 Slice 22: LLM cost accounting ---
+
+
+def cost_of(metrics: list[dict]) -> float:
+	"""Total USD cost across an `llm.get_metrics()` buffer."""
+	return sum(m["cost"] for m in metrics if m.get("cost"))
+
+
+def add_page_cost(page_name: str, metrics: list[dict]) -> float:
+	"""Accumulate the LLM spend in `metrics` onto a page. Returns the added cost (USD)."""
+	cost = cost_of(metrics)
+	if cost:
+		current = frappe.db.get_value("Source Page", page_name, "llm_cost") or 0
+		frappe.db.set_value(
+			"Source Page", page_name, "llm_cost", round(current + cost, 6), update_modified=False
+		)
+	return cost
+
+
+def add_document_cost(source_document: str, cost: float) -> None:
+	"""Accumulate LLM spend (USD) onto a document's running total."""
+	if not cost:
+		return
+	current = frappe.db.get_value("Source Document", source_document, "llm_cost") or 0
+	frappe.db.set_value(
+		"Source Document", source_document, "llm_cost", round(current + cost, 6), update_modified=False
+	)
+
+
 # --- Slice 3: remediation + canonical selection ---
 
 

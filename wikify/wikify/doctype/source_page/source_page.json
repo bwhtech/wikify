@@ -18,6 +18,7 @@
   "column_break_scores",
   "table_score",
   "judge_score",
+  "llm_cost",
   "notes",
   "baseline_section",
   "baseline_markdown",
@@ -115,6 +116,15 @@
    "fieldtype": "Float",
    "label": "Judge Score",
    "precision": "3",
+   "read_only": 1
+  },
+  {
+   "description": "Cumulative LLM spend (USD) attributable to this page \u2014 VLM re-parse, cleanup, judge. Additive across re-parses.",
+   "fieldname": "llm_cost",
+   "fieldtype": "Float",
+   "label": "LLM Cost",
+   "non_negative": 1,
+   "precision": "6",
    "read_only": 1
   },
   {

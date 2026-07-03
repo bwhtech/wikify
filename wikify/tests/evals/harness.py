@@ -224,10 +224,17 @@ def run_scenarios(which: str = "all", *, keep: bool = False) -> dict:
 	results = []
 	for name in names:
 		print(f"\n=== eval: {name} ===")
+		# The live agent can mint Section Types (create_section_type tool) and the loop
+		# commits, so rollback can't tidy them — diff the taxonomy and delete strays.
+		types_before = set(frappe.get_all("Section Type", pluck="name"))
 		try:
 			result = sc.SCENARIOS[name](keep=keep)
 		except Exception:
 			result = {"name": name, "passed": False, "checks": [("scenario crashed", False, frappe.get_traceback())]}
+		leaked = set(frappe.get_all("Section Type", pluck="name")) - types_before
+		if leaked and not keep:
+			frappe.db.delete("Section Type", {"name": ["in", list(leaked)]})
+			frappe.db.commit()
 		for label, ok, detail in result["checks"]:
 			print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f" — {detail}" if detail and not ok else ""))
 		print(f"  => {'PASSED' if result['passed'] else 'FAILED'}")

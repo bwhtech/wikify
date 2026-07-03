@@ -72,8 +72,26 @@ function onClassifyDone(payload) {
 	loadResults();
 	toast.success("Sections reclassified");
 }
-onMounted(() => socket?.on("wikify_classify_done", onClassifyDone));
-onUnmounted(() => socket?.off("wikify_classify_done", onClassifyDone));
+// The agent's end-of-turn batch (0.4 slice 25) can retag/reshape sections — refresh
+// the type summary + results when a structure-bearing layer changed on this document.
+function onAgentMutation(payload) {
+	const docs =
+		payload.source_documents || (payload.source_document ? [payload.source_document] : []);
+	if (!docs.includes(props.sourceDocument)) return;
+	const layers = payload.layers;
+	if (!layers || ["tree", "section", "taxonomy"].some((l) => layers.includes(l))) {
+		loadSummary();
+		loadResults();
+	}
+}
+onMounted(() => {
+	socket?.on("wikify_classify_done", onClassifyDone);
+	socket?.on("wikify_agent_mutation", onAgentMutation);
+});
+onUnmounted(() => {
+	socket?.off("wikify_classify_done", onClassifyDone);
+	socket?.off("wikify_agent_mutation", onAgentMutation);
+});
 
 function pageRange(s) {
 	if (s.page_start == null) return "";

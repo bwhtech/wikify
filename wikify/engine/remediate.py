@@ -1,13 +1,17 @@
 """Remediation pass — ported from the POC `pipeline.remediate_document`.
 
-For each target page, route to the cheaper fix that fits and re-score:
-  - **cleanup** (cheap text model): text present + decent recall → restructure the
-    baseline markdown + strip page furniture, WITHOUT the image.
-  - **vlm** (image): visual/diagram page or low recall → re-parse from the page image.
-Adoption: cleanup is kept when it preserves content (recall within tolerance — a small
-drop is the intended furniture removal); vlm is kept when it scores higher. The adopted
-(or baseline) markdown becomes each page's **canonical** markdown; cross-page tables are
-then stitched, and the doc's canonical mean is recomputed.
+Every target page gets the **vlm** (image) re-parse — 0.4 slice 22 removed the
+recall-gated routing, so a subtly mangled table on a "good enough" page can't dodge the
+pass. Text pages additionally get the cheap **cleanup** (text model) variant, so
+adoption picks best-of-three {baseline, cleanup, vlm}:
+  - cleanup is adopt-eligible when it preserves content (recall within tolerance — a
+    small drop is the intended furniture removal);
+  - vlm is adopt-eligible when it beats the baseline composite;
+  - vlm wins over an eligible cleanup only when it also scores at least as high.
+Always-run ≠ always-adopt. The adopted (or baseline) markdown becomes each page's
+**canonical** markdown; cross-page tables are then stitched, the doc's canonical mean is
+recomputed, and per-page LLM spend lands on `Source Page.llm_cost` /
+`Source Document.llm_cost`.
 
 I/O-boundary changes vs the POC: persistence goes through `store` (the Frappe ORM seam)
 instead of `loader/graph`; pages are re-rendered from the PDF via `pdf_utils` instead of
@@ -30,9 +34,17 @@ from wikify.engine.sectionize import rebuild_and_classify
 from wikify.engine.verify import deterministic as det
 from wikify.engine.verify import score_page
 
-# Below this baseline recall a text page has likely dropped content — route to the
-# image-based VLM rather than a text-only cleanup that can't recover what's missing.
-_LOW_RECALL = 0.85
+
+def _pick_winner(candidates: list[tuple]) -> tuple | None:
+	"""Best adopt-eligible candidate: vlm when it also matches/beats cleanup's composite
+	(cleanup's composite is depressed by intended furniture removal, so a tie goes to
+	vlm), else the eligible cleanup, else None (keep baseline)."""
+	eligible = [c for c in candidates if c[3]]
+	vlm_c = next((c for c in eligible if c[0] == "vlm"), None)
+	cleanup_c = next((c for c in eligible if c[0] == "cleanup"), None)
+	if vlm_c and (not cleanup_c or vlm_c[2].composite >= cleanup_c[2].composite):
+		return vlm_c
+	return cleanup_c
 
 
 def remediate_pdf(
@@ -79,6 +91,7 @@ def remediate_pdf(
 		# rejected (canonical falls back to the raw, artifact-laden baseline).
 		furniture = det.find_furniture_lines([doc[p["page_no"] - 1].get_text("text") for p in pages])
 
+		doc_cost = 0.0
 		for i, p in enumerate(targets):
 			page = doc[p["page_no"] - 1]
 			gt = page.get_text("text")
@@ -86,8 +99,6 @@ def remediate_pdf(
 			base_md = p["baseline_markdown"] or ""
 			data_url = pdf_utils.png_to_data_url(pdf_utils.render_png(page, dpi=dpi))
 
-			# Route: visual/diagram or low recall → vlm (needs image); else text cleanup.
-			method = "vlm" if (kind == "visual" or det.text_recall(gt, base_md) < _LOW_RECALL) else "cleanup"
 			use_judge = judge_all or kind == "visual"
 			img = data_url if use_judge else None
 			llm.reset_metrics()
@@ -95,37 +106,56 @@ def remediate_pdf(
 				p["page_no"], base_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind
 			)
 
+			# Every page gets the vlm pass; text pages also get the cheap cleanup variant.
 			# A single page's model call failing (rate limit, billing, transient) must not
-			# abort the whole pass — log it, keep the baseline for that page, move on.
+			# abort the whole pass — note it, try the other candidate / keep baseline, move on.
+			candidates: list[tuple] = []  # (method, markdown, PageScore, adopt_eligible)
+			errors: list[str] = []
 			try:
-				new_md = (
-					vlm.parse_page_image(data_url, project_context=project_context, instruction=instruction)
-					if method == "vlm"
-					else clean_markdown(base_md, project_context=project_context, instruction=instruction)
+				vlm_md = vlm.parse_page_image(data_url, project_context=project_context, instruction=instruction)
+				vlm_ps = score_page(
+					p["page_no"], vlm_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind
 				)
-				new_ps = score_page(
-					p["page_no"], new_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind
-				)
-				if method == "cleanup":
-					# Adopt unless real content was lost. Recall is measured against the
-					# furniture-stripped ground truth, so stripping running headers/footers
+				candidates.append(("vlm", vlm_md, vlm_ps, vlm_ps.composite > base_ps.composite))
+			except Exception as e:
+				errors.append(f"vlm failed: {e}")
+			if kind != "visual":
+				try:
+					clean_md = clean_markdown(base_md, project_context=project_context, instruction=instruction)
+					clean_ps = score_page(
+						p["page_no"], clean_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind
+					)
+					# Adopt-eligible unless real content was lost. Recall is measured against
+					# the furniture-stripped ground truth, so stripping running headers/footers
 					# (cleanup's job) doesn't count against it — only dropped substantive text does.
 					base_cr = det.content_recall(gt, base_md, furniture)
-					new_cr = det.content_recall(gt, new_md, furniture)
-					adopted = new_cr >= base_cr - recall_tol
-				else:
-					adopted = new_ps.composite > base_ps.composite
-				notes = "; ".join(new_ps.notes) if new_ps.notes else None
+					new_cr = det.content_recall(gt, clean_md, furniture)
+					candidates.append(("cleanup", clean_md, clean_ps, new_cr >= base_cr - recall_tol))
+				except Exception as e:
+					errors.append(f"cleanup failed: {e}")
+
+			winner = _pick_winner(candidates)
+			# Record the adopted candidate; when nothing is adopted, record the vlm attempt
+			# (the expensive audit trail) so the review UI shows what was tried and why not.
+			record = winner or next((c for c in candidates if c[0] == "vlm"), None) or (
+				candidates[0] if candidates else None
+			)
+			if record:
+				method, new_md, new_ps, _ = record
+				adopted = winner is not None
+				notes = "; ".join([*(new_ps.notes or []), *errors]) or None
 				store.set_remediation(p["name"], method, new_md, new_ps, adopted, notes)
 				new_composite = new_ps.composite
-			except Exception as e:
-				adopted, new_composite = False, base_ps.composite
-				store.set_remediation(p["name"], method, "", base_ps, False, f"{method} failed: {e}")
+			else:
+				method, adopted, new_composite = "vlm", False, base_ps.composite
+				store.set_remediation(p["name"], "vlm", "", base_ps, False, "; ".join(errors) or None)
 
 			if adopted:
-				canon_md[p["page_no"]] = new_md
+				canon_md[p["page_no"]] = record[1]
 				canon_comp[p["page_no"]] = new_composite
 				canon_src[p["page_no"]] = method
+
+			doc_cost += store.add_page_cost(p["name"], llm.get_metrics())
 
 			if page_cb:
 				page_cb(
@@ -151,7 +181,11 @@ def remediate_pdf(
 	store.set_canonical_mean(source_document, canonical_mean)
 
 	# Rebuild the section tree over the now-canonical (adopted) markdown, then re-tag.
+	# Classify spend isn't attributable to a single page — it lands on the doc total only.
+	llm.reset_metrics()
 	n_sections = rebuild_and_classify(source_document, pdf_path, stage_cb, project_context=project_context)
+	doc_cost += store.cost_of(llm.get_metrics())
+	store.add_document_cost(source_document, doc_cost)
 
 	adopted_count = sum(1 for src in canon_src.values() if src != "baseline")
 	return {
@@ -159,4 +193,5 @@ def remediate_pdf(
 		"adopted": adopted_count,
 		"canonical_mean": canonical_mean,
 		"sections": n_sections,
+		"cost": round(doc_cost, 6),
 	}

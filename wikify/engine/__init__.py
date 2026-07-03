@@ -69,6 +69,7 @@ def parse_pdf(
 	judge_all = bool(settings.get("judge_all_pages"))
 
 	composites: list[float] = []
+	doc_cost = 0.0
 
 	with fitz.open(pdf_path) as doc:
 		total = doc.page_count
@@ -105,6 +106,7 @@ def parse_pdf(
 			)
 			store.set_page_scores(page_name, score)
 			composites.append(score.composite)
+			doc_cost += store.add_page_cost(page_name, llm.get_metrics())
 
 			if page_cb:
 				page_cb(page_no, total, kind, score, llm.get_metrics())
@@ -118,5 +120,8 @@ def parse_pdf(
 	# Skipped when the caller will remediate first (remediation rebuilds over the cleaned
 	# canonical markdown), so the tree + classify pass runs once, not twice.
 	if sectionize:
+		llm.reset_metrics()
 		rebuild_and_classify(sd, pdf_path, stage_cb, project_context=project_context)
+		doc_cost += store.cost_of(llm.get_metrics())
+	store.add_document_cost(sd, doc_cost)
 	return sd

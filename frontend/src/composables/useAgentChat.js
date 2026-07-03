@@ -98,11 +98,21 @@ export function useAgentChat() {
 					options: options || [],
 				});
 			},
-			onComplete: ({ message_id }) => {
+			onComplete: ({ message_id, mutation_count, mutated_tools }) => {
 				isRunning.value = false;
 				dropThinking();
 				const m = messages.value.find((x) => x.id === message_id);
 				if (m) m.status = "done";
+				// The turn's edits land as one batch at completion (0.4 slice 25) — show
+				// what was applied right where the answer ends.
+				if (mutation_count) {
+					messages.value.push({
+						id: `applied-${message_id || Date.now()}`,
+						role: "applied",
+						count: mutation_count,
+						tools: [...new Set(mutated_tools || [])],
+					});
+				}
 			},
 			onError: ({ message }) => {
 				isRunning.value = false;

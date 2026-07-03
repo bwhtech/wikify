@@ -22,12 +22,7 @@ import fitz  # PyMuPDF
 from wikify.engine import llm, pdf_utils, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
 from wikify.engine.parsers import vlm
-from wikify.engine.verify import deterministic as det
 from wikify.engine.verify import score_page
-
-# Mirror remediate's routing threshold: below this baseline recall a text page has likely
-# dropped content → re-parse from the image (VLM) rather than a text-only cleanup.
-_LOW_RECALL = 0.85
 
 
 def _page_row(source_document: str, page_no: int) -> dict:
@@ -48,10 +43,11 @@ def reparse_page(
 ) -> dict:
 	"""Re-parse one page (cleanup/VLM) steered by `instruction`; adopt it as canonical.
 
-	`method` forces `"cleanup"` or `"vlm"`; when omitted it's routed exactly as remediate
-	routes (visual/low-recall → vlm, else cleanup). Because the user explicitly asked for
-	this re-parse, the result is adopted as canonical regardless of the score delta (the
-	new composite is still recorded). Returns a summary dict.
+	`method` forces `"cleanup"` or `"vlm"`; when omitted the page is re-parsed from its
+	image (vlm) — 0.4 slice 22 removed the recall-gated routing, matching remediate.
+	Because the user explicitly asked for this re-parse, the result is adopted as
+	canonical regardless of the score delta (the new composite is still recorded).
+	Returns a summary dict.
 	"""
 	if not llm.has_openrouter():
 		raise RuntimeError("OpenRouter key not set — re-parsing needs cloud models.")
@@ -68,7 +64,7 @@ def reparse_page(
 
 	kind = page["kind"]
 	if method not in ("cleanup", "vlm"):
-		method = "vlm" if (kind == "visual" or det.text_recall(gt, base_md) < _LOW_RECALL) else "cleanup"
+		method = "vlm"
 	use_judge = judge_all or kind == "visual"
 	img = data_url if use_judge else None
 
@@ -85,6 +81,7 @@ def reparse_page(
 	store.set_remediation(page["name"], method, new_md, new_ps, adopted=True, notes=notes)
 	store.set_canonical(page["name"], new_md, new_ps.composite, method)
 	_recompute_canonical_mean(source_document)
+	store.add_document_cost(source_document, store.add_page_cost(page["name"], llm.get_metrics()))
 
 	return {
 		"page_no": page_no,

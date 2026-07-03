@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Badge, Button, useList } from "frappe-ui";
+import { Badge, Button, Popover, useList } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
@@ -38,6 +38,7 @@ const pages = useList({
 		"canonical_source",
 		"canonical_composite",
 		"canonical_markdown",
+		"llm_cost",
 	],
 	filters: computed(() => ({ source_document: props.sourceDocument || "__none__" })),
 	orderBy: "page_no asc",
@@ -116,15 +117,47 @@ const filterOptions = computed(() => [
 	{ label: "Passed", key: "passed", count: passedCount.value },
 ]);
 
-// Per-page views: the rendered page image (default — "what it looked like"), the
-// formatted markdown, and the raw markdown source. Viewing the whole PDF lives at the
-// document level (ImportDetail's top-level PDF tab), since it isn't page-specific.
-const tabs = [
-	{ label: "Page", key: "page" },
-	{ label: "Preview", key: "preview" },
-	{ label: "Markdown", key: "markdown" },
-];
-const activeTab = ref("page");
+// Wide viewports show the page image and the rendered result side-by-side (0.4 slice
+// 23) — the Page tab only exists in the narrow fallback, where the split collapses
+// back to tabs. Viewing the whole PDF lives at the document level (ImportDetail's
+// top-level PDF tab), since it isn't page-specific.
+const wideQuery = window.matchMedia("(min-width: 1100px)");
+const isWide = ref(wideQuery.matches);
+const onWideChange = (e) => (isWide.value = e.matches);
+wideQuery.addEventListener("change", onWideChange);
+onBeforeUnmount(() => wideQuery.removeEventListener("change", onWideChange));
+
+const tabs = computed(() =>
+	isWide.value
+		? [
+				{ label: "Preview", key: "preview" },
+				{ label: "Markdown", key: "markdown" },
+		  ]
+		: [
+				{ label: "Page", key: "page" },
+				{ label: "Preview", key: "preview" },
+				{ label: "Markdown", key: "markdown" },
+		  ]
+);
+const activeTab = ref(isWide.value ? "preview" : "page");
+watch(isWide, (wide) => {
+	if (wide && activeTab.value === "page") activeTab.value = "preview";
+});
+
+// User-draggable image∥preview ratio, persisted like other pane sizes.
+const SPLIT_KEY = "wikify:pageReviewSplit";
+const imgPaneSize = ref(Number(localStorage.getItem(SPLIT_KEY)) || 50);
+function onSplitResized(event) {
+	const size = (event?.panes || event)?.[0]?.size;
+	if (size) {
+		imgPaneSize.value = size;
+		localStorage.setItem(SPLIT_KEY, String(size));
+	}
+}
+
+// Fit-to-width by default; click toggles natural size. Reset per page.
+const zoomed = ref(false);
+watch(selected, () => (zoomed.value = false));
 
 const verdictTheme = { pass: "green", escalate: "orange", review: "red" };
 
@@ -166,8 +199,18 @@ function fmtOptional(v) {
 	return v ? Number(v).toFixed(2) : "—";
 }
 
-// Scores strip: text pages show the full deterministic set; visual pages drop
-// recall/extra (meaningless on diagrams) and lean on the judge.
+// The user-facing surface is verdict + audit score + cost (0.4 slice 23). The audit
+// score is the canonical composite once remediation has produced one, else baseline.
+function pageAudit(p) {
+	return p.canonical_source && p.canonical_composite ? p.canonical_composite : p.composite;
+}
+const auditScore = computed(() => (selected.value ? pageAudit(selected.value) : null));
+function fmtCost(v) {
+	return v ? `$${Number(v).toFixed(4)}` : "—";
+}
+
+// Diagnostic sub-metrics live in the Details popover: text pages show the full
+// deterministic set; visual pages drop recall/extra (meaningless on diagrams).
 const scoreCells = computed(() => {
 	const p = selected.value;
 	if (!p) return [];
@@ -274,7 +317,7 @@ function fmtDelta(v) {
 									size="sm"
 								/>
 								<span class="text-xs text-ink-gray-5">{{
-									fmt(page.composite)
+									fmt(pageAudit(page))
 								}}</span>
 								<Badge
 									v-if="page.remediation_adopted"
@@ -292,155 +335,268 @@ function fmtDelta(v) {
 			<!-- Right: detail -->
 			<Pane :size="70" class="flex flex-col">
 				<template v-if="selected">
-					<!-- Scores strip -->
+					<!-- Audit strip: verdict + audit score + cost; sub-metrics in Details -->
 					<div class="border-b border-outline-gray-1 px-4 py-3">
-						<div class="mb-2 flex items-center gap-2">
-							<span class="text-base font-medium text-ink-gray-9"
-								>Page {{ selected.page_no }}</span
-							>
-							<Badge
-								:label="selected.verdict || '—'"
-								:theme="verdictTheme[selected.verdict] || 'gray'"
-								variant="subtle"
-							/>
-							<Badge
-								:label="selected.kind"
-								:theme="selected.kind === 'visual' ? 'orange' : 'gray'"
-								variant="subtle"
-							/>
-						</div>
-						<div class="flex flex-wrap gap-x-6 gap-y-1">
-							<div
-								v-for="c in scoreCells"
-								:key="c.label"
-								class="flex items-baseline gap-1.5"
-							>
-								<span class="text-xs uppercase tracking-wide text-ink-gray-5">{{
-									c.label
-								}}</span>
-								<span
-									class="text-sm tabular-nums"
-									:class="
-										c.strong
-											? 'font-semibold text-ink-gray-9'
-											: 'text-ink-gray-7'
-									"
-									>{{ c.value }}</span
+						<div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+							<div class="flex items-center gap-2">
+								<span class="text-base font-medium text-ink-gray-9"
+									>Page {{ selected.page_no }}</span
 								>
+								<Badge
+									:label="selected.verdict || '—'"
+									:theme="verdictTheme[selected.verdict] || 'gray'"
+									variant="subtle"
+								/>
+								<Badge
+									:label="selected.kind"
+									:theme="selected.kind === 'visual' ? 'orange' : 'gray'"
+									variant="subtle"
+								/>
+								<Badge
+									v-if="selected.remediation_adopted"
+									label="remediated"
+									theme="blue"
+									variant="subtle"
+								/>
 							</div>
+							<div class="flex items-baseline gap-1.5">
+								<span class="text-xs uppercase tracking-wide text-ink-gray-5"
+									>Audit</span
+								>
+								<span class="text-sm font-semibold tabular-nums text-ink-gray-9">{{
+									fmt(auditScore)
+								}}</span>
+							</div>
+							<div class="flex items-baseline gap-1.5">
+								<span class="text-xs uppercase tracking-wide text-ink-gray-5"
+									>Cost</span
+								>
+								<span class="text-sm tabular-nums text-ink-gray-7">{{
+									fmtCost(selected.llm_cost)
+								}}</span>
+							</div>
+							<Popover placement="bottom-end">
+								<template #target="{ togglePopover }">
+									<Button label="Details" size="sm" variant="ghost" @click="togglePopover()" />
+								</template>
+								<template #body-main>
+									<div class="w-80 p-3">
+										<div class="flex flex-wrap gap-x-5 gap-y-1">
+											<div
+												v-for="c in scoreCells"
+												:key="c.label"
+												class="flex items-baseline gap-1.5"
+											>
+												<span
+													class="text-xs uppercase tracking-wide text-ink-gray-5"
+													>{{ c.label }}</span
+												>
+												<span
+													class="text-sm tabular-nums"
+													:class="
+														c.strong
+															? 'font-semibold text-ink-gray-9'
+															: 'text-ink-gray-7'
+													"
+													>{{ c.value }}</span
+												>
+											</div>
+										</div>
+										<p
+											v-if="selected.kind === 'visual'"
+											class="mt-1.5 text-xs text-ink-gray-5"
+										>
+											Recall / extra are not meaningful on visual pages —
+											judged on the rendered image.
+										</p>
+
+										<!-- Remediation before↔after -->
+										<div
+											v-if="remediation"
+											class="mt-2 flex flex-wrap items-center gap-2 border-t border-outline-gray-1 pt-2"
+										>
+											<Badge
+												:label="remediation.method"
+												theme="blue"
+												variant="subtle"
+												size="sm"
+											/>
+											<Badge
+												:label="
+													remediation.adopted ? 'adopted' : 'kept baseline'
+												"
+												:theme="remediation.adopted ? 'green' : 'gray'"
+												variant="subtle"
+												size="sm"
+											/>
+											<span class="text-xs text-ink-gray-6">
+												{{ fmt(remediation.base) }} →
+												{{ fmt(remediation.after) }}
+												<span
+													class="ml-1 tabular-nums"
+													:class="
+														remediation.delta >= 0
+															? 'text-ink-green-6'
+															: 'text-ink-red-6'
+													"
+													>({{ fmtDelta(remediation.delta) }})</span
+												>
+											</span>
+											<span class="text-xs text-ink-gray-5">
+												canonical {{ fmt(remediation.canonical) }}
+											</span>
+										</div>
+										<p
+											v-if="remediation?.notes"
+											class="mt-1 text-xs text-ink-gray-5"
+										>
+											{{ remediation.notes }}
+										</p>
+									</div>
+								</template>
+							</Popover>
 						</div>
-						<p
-							v-if="selected.kind === 'visual'"
-							class="mt-1.5 text-xs text-ink-gray-5"
-						>
-							Recall / extra are not meaningful on visual pages — judged on the
-							rendered image.
-						</p>
 						<p v-if="selected.notes" class="mt-1.5 text-xs text-ink-amber-6">
 							{{ selected.notes }}
 						</p>
+					</div>
 
-						<!-- Remediation before↔after -->
-						<div
-							v-if="remediation"
-							class="mt-2 flex flex-wrap items-center gap-2 border-t border-outline-gray-1 pt-2"
-						>
-							<Badge
-								:label="remediation.method"
-								theme="blue"
-								variant="subtle"
-								size="sm"
-							/>
-							<Badge
-								:label="remediation.adopted ? 'adopted' : 'kept baseline'"
-								:theme="remediation.adopted ? 'green' : 'gray'"
-								variant="subtle"
-								size="sm"
-							/>
-							<span class="text-xs text-ink-gray-6">
-								{{ fmt(remediation.base) }} → {{ fmt(remediation.after) }}
-								<span
-									class="ml-1 tabular-nums"
-									:class="
-										remediation.delta >= 0
-											? 'text-ink-green-6'
-											: 'text-ink-red-6'
-									"
-									>({{ fmtDelta(remediation.delta) }})</span
+					<!-- Wide: page image ∥ rendered result, side by side -->
+					<div v-if="isWide" class="min-h-0 flex-1">
+						<Splitpanes class="h-full" @resized="onSplitResized">
+							<Pane :size="imgPaneSize" :min-size="20">
+								<div class="h-full overflow-auto border-r border-outline-gray-1 p-4">
+									<img
+										v-if="selected.image"
+										:src="selected.image"
+										:alt="`Page ${selected.page_no}`"
+										class="rounded border border-outline-gray-1"
+										:class="
+											zoomed
+												? 'max-w-none cursor-zoom-out'
+												: 'mx-auto max-w-full cursor-zoom-in'
+										"
+										@click="zoomed = !zoomed"
+									/>
+									<p v-else class="text-sm text-ink-gray-5">
+										No page image rendered.
+									</p>
+								</div>
+							</Pane>
+							<Pane :size="100 - imgPaneSize" class="flex min-h-0 flex-col">
+								<div
+									class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
 								>
-							</span>
-							<span class="text-xs text-ink-gray-5">
-								canonical {{ fmt(remediation.canonical) }}
-							</span>
-						</div>
-						<p v-if="remediation?.notes" class="mt-1 text-xs text-ink-gray-5">
-							{{ remediation.notes }}
-						</p>
+									<Button
+										v-for="t in tabs"
+										:key="t.key"
+										:label="t.label"
+										size="sm"
+										:variant="activeTab === t.key ? 'subtle' : 'ghost'"
+										@click="activeTab = t.key"
+									/>
+									<template v-if="mdViews.length > 1">
+										<span class="mx-1 h-4 w-px bg-outline-gray-2" />
+										<Button
+											v-for="v in mdViews"
+											:key="v.key"
+											:label="v.label"
+											size="sm"
+											:variant="mdView === v.key ? 'subtle' : 'ghost'"
+											@click="mdView = v.key"
+										/>
+									</template>
+								</div>
+								<div class="min-h-0 flex-1 overflow-auto">
+									<MarkdownPreview
+										v-if="activeTab === 'preview'"
+										:content="mdContent"
+										class="p-4"
+									/>
+									<div v-else class="flex h-full flex-col p-3">
+										<CodeEditor
+											:model-value="mdContent"
+											language="markdown"
+											variant="outline"
+											:disabled="true"
+											class="min-h-0 flex-1"
+										/>
+									</div>
+								</div>
+							</Pane>
+						</Splitpanes>
 					</div>
 
-					<!-- Tabs (PDF / Snapshot / Markdown) -->
-					<div
-						class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
-					>
-						<Button
-							v-for="t in tabs"
-							:key="t.key"
-							:label="t.label"
-							size="sm"
-							:variant="activeTab === t.key ? 'subtle' : 'ghost'"
-							@click="activeTab = t.key"
-						/>
-					</div>
-
-					<!-- Markdown source toggle (Baseline / Remediation / Canonical) — applies
-					     to both the formatted Preview and the raw Markdown tabs. -->
-					<div
-						v-if="
-							(activeTab === 'preview' || activeTab === 'markdown') &&
-							mdViews.length > 1
-						"
-						class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
-					>
-						<Button
-							v-for="v in mdViews"
-							:key="v.key"
-							:label="v.label"
-							size="sm"
-							:variant="mdView === v.key ? 'subtle' : 'ghost'"
-							@click="mdView = v.key"
-						/>
-					</div>
-
-					<div class="min-h-0 flex-1 overflow-auto">
-						<!-- Page (rendered image of the original page) -->
-						<div v-if="activeTab === 'page'" class="p-4">
-							<img
-								v-if="selected.image"
-								:src="selected.image"
-								:alt="`Page ${selected.page_no}`"
-								class="mx-auto max-w-full rounded border border-outline-gray-1"
-							/>
-							<p v-else class="text-sm text-ink-gray-5">No page image rendered.</p>
-						</div>
-
-						<!-- Preview (formatted markdown + mermaid diagrams) -->
-						<MarkdownPreview
-							v-else-if="activeTab === 'preview'"
-							:content="mdContent"
-							class="p-4"
-						/>
-
-						<!-- Markdown (raw source) -->
-						<div v-else-if="activeTab === 'markdown'" class="flex h-full flex-col p-3">
-							<CodeEditor
-								:model-value="mdContent"
-								language="markdown"
-								variant="outline"
-								:disabled="true"
-								class="min-h-0 flex-1"
+					<!-- Narrow fallback: the split collapses back to Page/Preview/Markdown tabs -->
+					<template v-else>
+						<div
+							class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
+						>
+							<Button
+								v-for="t in tabs"
+								:key="t.key"
+								:label="t.label"
+								size="sm"
+								:variant="activeTab === t.key ? 'subtle' : 'ghost'"
+								@click="activeTab = t.key"
 							/>
 						</div>
-					</div>
+
+						<!-- Markdown source toggle (Baseline / Remediation / Canonical) — applies
+						     to both the formatted Preview and the raw Markdown tabs. -->
+						<div
+							v-if="
+								(activeTab === 'preview' || activeTab === 'markdown') &&
+								mdViews.length > 1
+							"
+							class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
+						>
+							<Button
+								v-for="v in mdViews"
+								:key="v.key"
+								:label="v.label"
+								size="sm"
+								:variant="mdView === v.key ? 'subtle' : 'ghost'"
+								@click="mdView = v.key"
+							/>
+						</div>
+
+						<div class="min-h-0 flex-1 overflow-auto">
+							<!-- Page (rendered image of the original page) -->
+							<div v-if="activeTab === 'page'" class="p-4">
+								<img
+									v-if="selected.image"
+									:src="selected.image"
+									:alt="`Page ${selected.page_no}`"
+									class="mx-auto max-w-full rounded border border-outline-gray-1"
+								/>
+								<p v-else class="text-sm text-ink-gray-5">
+									No page image rendered.
+								</p>
+							</div>
+
+							<!-- Preview (formatted markdown + mermaid diagrams) -->
+							<MarkdownPreview
+								v-else-if="activeTab === 'preview'"
+								:content="mdContent"
+								class="p-4"
+							/>
+
+							<!-- Markdown (raw source) -->
+							<div
+								v-else-if="activeTab === 'markdown'"
+								class="flex h-full flex-col p-3"
+							>
+								<CodeEditor
+									:model-value="mdContent"
+									language="markdown"
+									variant="outline"
+									:disabled="true"
+									class="min-h-0 flex-1"
+								/>
+							</div>
+						</div>
+					</template>
 				</template>
 				<p v-else class="py-10 text-center text-sm text-ink-gray-5">
 					Select a page to review.

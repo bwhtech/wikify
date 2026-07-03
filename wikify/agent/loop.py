@@ -21,6 +21,29 @@ from wikify.agent.registry import build_default_registry
 
 MAX_ROUNDS = 25
 
+# Which data plane each write tool touches — the aggregated mutation payload names the
+# changed layers so open views refetch only what they show (0.4 slice 25).
+_TOOL_LAYERS = {
+	"edit_section_content": ["section"],
+	"rebuild_section_from_pages": ["section"],
+	"sync_wiki_page": ["wiki"],
+	"read_wiki_page": [],
+	"reparse_page": ["page", "section"],
+	"use_page_image": ["page", "section"],
+	"reparse_document": ["document"],
+	"reclassify": ["tree"],
+	"regenerate_wiki": ["wiki"],
+	"move_section": ["tree"],
+	"rename_section": ["tree"],
+	"set_section_type": ["tree"],
+	"toggle_include_in_wiki": ["tree"],
+	"create_section": ["tree"],
+	"delete_section": ["tree"],
+	"split_section": ["tree"],
+	"merge_sections": ["tree"],
+	"create_section_type": ["taxonomy"],
+}
+
 # No-op guard (Builder's `claims_unbacked_action`): the model narrates a mutating action
 # in the past tense but called no tool, so nothing actually changed. We only trip on the
 # verbs that map to a real write tool to avoid false positives on benign phrasing.
@@ -76,6 +99,9 @@ class AgentRunner:
 		# we already spent the single corrective round?
 		self._turn_mutated = False
 		self._correction_used = False
+		# Mutations queue up per turn and flush as ONE aggregated event when the answer
+		# lands (or at a confirm pause / error) — 0.4 slice 25.
+		self._pending_mutations: list[dict] = []
 		self.ctx = Ctx(
 			session=session_id,
 			user=user,
@@ -157,10 +183,20 @@ class AgentRunner:
 				messages.append({"role": "assistant", "content": text_acc})
 				messages.append({"role": "user", "content": _NO_OP_NUDGE})
 				return False
-			# Model answered — turn ends.
+			# Model answered — turn ends: flush the mutation batch, then complete (the
+			# complete payload carries the counts so the chat card renders immediately).
 			session.update_message(message_id, content=text_acc, status="done")
 			session.touch(self.session_id)
-			self._emit("wikify_agent_complete", {"message_id": message_id})
+			mutated_tools = [m["tool"] for m in self._pending_mutations]
+			self._flush_mutations()
+			self._emit(
+				"wikify_agent_complete",
+				{
+					"message_id": message_id,
+					"mutation_count": len(mutated_tools),
+					"mutated_tools": mutated_tools,
+				},
+			)
 			return True
 
 		# A terminal tool (ask_clarification) ends the turn with a question — no result is
@@ -177,6 +213,7 @@ class AgentRunner:
 				message_id, content=question, status="clarification", metadata={"options": options}
 			)
 			session.touch(self.session_id)
+			self._flush_mutations()  # the turn pauses on a question — show work done so far
 			self._emit(
 				"wikify_agent_clarify",
 				{"message_id": message_id, "question": question, "options": options},
@@ -234,6 +271,9 @@ class AgentRunner:
 		# (the tool name arrives in `ctx.approved` on the follow-up run) the tool does NOT
 		# run — we feed back a sentinel so the model asks the user to confirm.
 		if tool and tool.confirm and name not in self.ctx.approved:
+			# The user is about to look at the screen to decide — flush what's applied so
+			# far so the views behind the confirm card are current.
+			self._flush_mutations()
 			self._emit(
 				"wikify_agent_confirm",
 				{"name": name, "args": args, "call_id": call["id"], "summary": tool.description},
@@ -253,9 +293,9 @@ class AgentRunner:
 				result = tool.handler(self.ctx, args)
 				if tool.mutates:
 					self._turn_mutated = True
-					if self.ctx.source_document:
-						# A DocType changed — tell open Tree/Pages views to refetch.
-						self._emit_mutation(name)
+					# Commit now (durability + confirm-gating rely on it) but queue the
+					# frontend signal — open views refresh once, when the answer lands.
+					self._record_mutation(name)
 			except Exception:
 				frappe.log_error(title=f"Wikify agent tool failed: {name}")
 				result = _("Tool {0} failed: {1}").format(name, frappe.get_traceback(with_context=False))
@@ -278,17 +318,43 @@ class AgentRunner:
 			{"name": call["name"], "args": args, "status": status, "summary": summary, "call_id": call["id"]},
 		)
 
-	def _emit_mutation(self, tool_name: str) -> None:
-		"""Broadcast that the agent changed a document's data (open views refetch).
+	def _record_mutation(self, tool_name: str) -> None:
+		"""Commit a mutating tool's write and queue it for the end-of-turn batch.
 
-		Commit first: the loop runs in a background job whose transaction would otherwise
-		not be visible until the turn ends, so a frontend refetch fired by this event would
-		read stale rows. Committing here makes the change durable + immediately readable.
+		Commit now: the loop runs in a background job whose transaction would otherwise
+		not be visible until the turn ends, so the eventual frontend refetch would read
+		stale rows — and a crash mid-turn must not lose applied edits. Only the *signal*
+		is deferred (0.4 slice 25), not the write.
 		"""
 		frappe.db.commit()
+		self._pending_mutations.append(
+			{"tool": tool_name, "source_document": self.ctx.source_document}
+		)
+
+	def _flush_mutations(self) -> None:
+		"""Emit ONE aggregated `wikify_agent_mutation` for everything queued this turn.
+
+		Fired at turn completion (and at confirm pauses / clarify questions / errors, so
+		partial-but-committed work is never invisible). `source_document` is kept beside
+		the aggregate fields for any listener still on the per-tool payload shape.
+		"""
+		if not self._pending_mutations:
+			return
+		batch, self._pending_mutations = self._pending_mutations, []
+		layers: list[str] = []
+		for m in batch:
+			for layer in _TOOL_LAYERS.get(m["tool"], ["document"]):
+				if layer not in layers:
+					layers.append(layer)
 		frappe.publish_realtime(
 			"wikify_agent_mutation",
-			{"source_document": self.ctx.source_document, "tool": tool_name},
+			{
+				"source_documents": sorted({m["source_document"] for m in batch if m["source_document"]}),
+				"source_document": self.ctx.source_document,
+				"layers": layers,
+				"mutations": batch,
+				"count": len(batch),
+			},
 			user=self.user,
 		)
 
@@ -327,10 +393,12 @@ class AgentRunner:
 	def _finish_cancelled(self) -> None:
 		self._clear_cancel()
 		session.touch(self.session_id)
+		self._flush_mutations()
 		self._emit("wikify_agent_complete", {"message_id": None, "cancelled": True})
 
 	def _emit_error(self, message: str) -> None:
 		session.append_message(self.session_id, "assistant", message, status="error")
+		self._flush_mutations()  # partial work is committed — the UI must reflect it
 		self._emit("wikify_agent_error", {"message": message})
 
 

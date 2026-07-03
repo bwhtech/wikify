@@ -1,15 +1,104 @@
 <script setup>
-// Slide-over chat panel for the Wikify AI agent. Slice 12 shipped the message list +
-// tool-call cards + streaming bubble + input. Slice 13 added the context chips row + a
-// session-history dropdown. Slice 16 adds a model picker, session rename/archive, error
-// retry, and empty states.
-import { computed, nextTick, ref, watch } from "vue";
+// Floating chat window for the Wikify AI agent (0.4 slice 24 — was a fixed slide-over).
+// Slice 12 shipped the message list + tool-call cards + streaming bubble + input.
+// Slice 13 added the context chips row + a session-history dropdown. Slice 16 added a
+// model picker, session rename/archive, error retry, and empty states. The window is
+// draggable by its header, resizable from the corner, minimizes to a pill, and
+// remembers its geometry; under 640px it falls back to a full-screen sheet.
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Button, dialog, Dropdown, Spinner, Textarea } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useAgentChat } from "@/composables/useAgentChat";
 
 const props = defineProps({ open: { type: Boolean, default: false } });
 const emit = defineEmits(["update:open"]);
+
+// --- floating-window geometry -----------------------------------------------------------
+
+const GEO_KEY = "wikify:agentWindow";
+const DEFAULT_SIZE = { w: 416, h: Math.round(window.innerHeight * 0.65) };
+
+const phoneQuery = window.matchMedia("(max-width: 639px)");
+const isPhone = ref(phoneQuery.matches);
+const onPhoneChange = (e) => (isPhone.value = e.matches);
+phoneQuery.addEventListener("change", onPhoneChange);
+onBeforeUnmount(() => phoneQuery.removeEventListener("change", onPhoneChange));
+
+function clamped(geo) {
+	const w = Math.min(geo.w || DEFAULT_SIZE.w, window.innerWidth - 16);
+	const h = Math.min(geo.h || DEFAULT_SIZE.h, window.innerHeight - 16);
+	// Keep at least the header reachable so the window can't restore off-screen.
+	const x = Math.min(Math.max(geo.x ?? window.innerWidth - w - 24, 8), window.innerWidth - 80);
+	const y = Math.min(Math.max(geo.y ?? window.innerHeight - h - 24, 8), window.innerHeight - 80);
+	return { x, y, w, h };
+}
+
+const geo = reactive(clamped(JSON.parse(localStorage.getItem(GEO_KEY) || "{}")));
+function saveGeo() {
+	localStorage.setItem(GEO_KEY, JSON.stringify({ ...geo }));
+}
+
+const windowStyle = computed(() =>
+	isPhone.value
+		? {}
+		: { left: `${geo.x}px`, top: `${geo.y}px`, width: `${geo.w}px`, height: `${geo.h}px` }
+);
+
+const minimized = ref(false);
+
+// Drag by the header. Buttons inside the header still work — drag only starts on the
+// header surface itself (pointerdown on a button never reaches threshold behavior).
+let dragFrom = null;
+function startDrag(e) {
+	if (isPhone.value || e.target.closest("button")) return;
+	dragFrom = { px: e.clientX, py: e.clientY, x: geo.x, y: geo.y };
+	window.addEventListener("pointermove", onDrag);
+	window.addEventListener("pointerup", endDrag);
+}
+function onDrag(e) {
+	if (!dragFrom) return;
+	const next = clamped({
+		...geo,
+		x: dragFrom.x + (e.clientX - dragFrom.px),
+		y: dragFrom.y + (e.clientY - dragFrom.py),
+	});
+	geo.x = next.x;
+	geo.y = next.y;
+}
+function endDrag() {
+	dragFrom = null;
+	window.removeEventListener("pointermove", onDrag);
+	window.removeEventListener("pointerup", endDrag);
+	saveGeo();
+}
+onBeforeUnmount(endDrag);
+
+// CSS `resize` supplies the corner handle; observe the element to persist the size.
+// Observation starts only after the enter transition settles — the observer would
+// otherwise capture the mid-animation (min-size) box and persist a shrunken window.
+const windowEl = ref(null);
+let resizeObserver = null;
+let observeTimer = null;
+onMounted(() => {
+	resizeObserver = new ResizeObserver(([entry]) => {
+		if (isPhone.value || !entry || dragFrom) return;
+		const { width, height } = entry.contentRect;
+		if (width && height && (Math.abs(width - geo.w) > 2 || Math.abs(height - geo.h) > 2)) {
+			geo.w = Math.round(width);
+			geo.h = Math.round(height);
+			saveGeo();
+		}
+	});
+});
+watch(windowEl, (el) => {
+	resizeObserver?.disconnect();
+	clearTimeout(observeTimer);
+	if (el) observeTimer = setTimeout(() => resizeObserver?.observe(el), 300);
+});
+onBeforeUnmount(() => {
+	clearTimeout(observeTimer);
+	resizeObserver?.disconnect();
+});
 
 const chat = useAgentChat();
 const { messages, prompt, isRunning, errorText, attachments, sessionId, model, models } = chat;
@@ -100,18 +189,39 @@ function onKeydown(e) {
 </script>
 
 <template>
+	<!-- Minimized pill — pulses while a run streams so background work stays visible. -->
+	<button
+		v-if="props.open && minimized"
+		class="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full border border-outline-gray-2 bg-surface-base px-4 py-2 shadow-lg hover:bg-surface-gray-2"
+		aria-label="Restore assistant"
+		@click="minimized = false"
+	>
+		<span
+			class="lucide-sparkles size-4 text-ink-gray-7"
+			:class="isRunning ? 'animate-pulse' : ''"
+			aria-hidden="true"
+		/>
+		<span class="text-sm font-medium text-ink-gray-8">Assistant</span>
+		<Spinner v-if="isRunning" class="size-3.5" />
+	</button>
+
 	<Transition
-		enter-active-class="transition-transform duration-200 ease-out"
-		leave-active-class="transition-transform duration-150 ease-in"
-		enter-from-class="translate-x-full"
-		leave-to-class="translate-x-full"
+		enter-active-class="transition duration-150 ease-out"
+		leave-active-class="transition duration-100 ease-in"
+		enter-from-class="scale-95 opacity-0"
+		leave-to-class="scale-95 opacity-0"
 	>
 		<aside
-			v-if="props.open"
-			class="fixed inset-y-0 right-0 z-40 flex w-[26rem] max-w-[90vw] flex-col border-l border-outline-gray-1 bg-surface-base shadow-2xl"
+			v-if="props.open && !minimized"
+			ref="windowEl"
+			class="fixed z-40 flex origin-bottom-right flex-col border border-outline-gray-1 bg-surface-base shadow-2xl"
+			:class="isPhone ? 'inset-0' : 'min-h-80 min-w-80 resize overflow-hidden rounded-lg'"
+			:style="windowStyle"
 		>
 			<header
 				class="flex min-h-12 items-center justify-between gap-2 border-b border-outline-gray-1 px-3"
+				:class="isPhone ? '' : 'cursor-move select-none'"
+				@pointerdown="startDrag"
 			>
 				<div class="flex items-center gap-2">
 					<span class="lucide-sparkles size-4 text-ink-gray-7" aria-hidden="true" />
@@ -145,6 +255,13 @@ function onKeydown(e) {
 						icon="lucide-plus"
 						tooltip="New chat"
 						@click="chat.newSession()"
+					/>
+					<Button
+						v-if="!isPhone"
+						variant="ghost"
+						icon="lucide-minus"
+						tooltip="Minimize"
+						@click="minimized = true"
 					/>
 					<Button
 						variant="ghost"
@@ -224,6 +341,22 @@ function onKeydown(e) {
 						</div>
 						<p v-else class="mt-2 text-xs text-ink-gray-5">
 							{{ m.status === "approved" ? "Approved — running." : "Cancelled." }}
+						</p>
+					</div>
+
+					<!-- Applied-changes card — the turn's mutation batch landed (slice 25) -->
+					<div
+						v-else-if="m.role === 'applied'"
+						class="rounded-lg border border-outline-green-1 bg-surface-green-1 px-3 py-2"
+					>
+						<div class="flex items-center gap-2 text-sm text-ink-green-6">
+							<span class="lucide-check-check size-4" aria-hidden="true" />
+							<span class="font-medium"
+								>Applied {{ m.count }} change{{ m.count === 1 ? "" : "s" }}</span
+							>
+						</div>
+						<p v-if="m.tools?.length" class="mt-1 text-xs text-ink-gray-6">
+							{{ m.tools.join(", ") }}
 						</p>
 					</div>
 

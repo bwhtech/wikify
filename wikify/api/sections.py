@@ -135,13 +135,19 @@ def create_section_type(
 	"""Add a Section Type to the taxonomy (the agent's "new tag" capability).
 
 	`type_name` is slugified to a snake_case machine key (matching the classifier's seeded
-	keys); a pre-existing key is returned as-is (idempotent) rather than erroring.
+	keys); a pre-existing key — or an existing type whose *label* matches (normalized) —
+	is returned as-is (idempotent) rather than erroring or duplicating.
 	"""
+	from wikify.wikify.doctype.section_type.section_type import find_by_normalized_label
+
 	key = frappe.scrub((type_name or "").strip()).strip("_")
 	if not key:
 		frappe.throw(_("Provide a type name."))
 	if frappe.db.exists("Section Type", key):
 		return {"ok": True, "type_name": key, "existed": True}
+	canonical = find_by_normalized_label(label or type_name)
+	if canonical:
+		return {"ok": True, "type_name": canonical, "existed": True}
 	doc = frappe.new_doc("Section Type")
 	doc.type_name = key
 	doc.label = (label or type_name).strip()

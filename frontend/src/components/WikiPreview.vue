@@ -4,10 +4,11 @@
 // which renders with the *same* renderer the wiki uses (markdown-it-py), so this preview
 // matches the eventual generated Wiki Document page. We only post-process ```mermaid
 // fences into SVG client-side via the shared wiki mermaid loader (same as today).
-import { computed, ref, watch, nextTick } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from "vue";
 import { Badge, TabButtons, useCall } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { renderMermaidIn } from "@/utils/mermaid";
+import { useSocket } from "@/socket";
 
 const props = defineProps({
 	section: { type: String, default: null },
@@ -23,6 +24,17 @@ function load() {
 	if (props.section) preview.submit({ section: props.section });
 }
 watch(() => props.section, load, { immediate: true });
+
+// The agent's end-of-turn mutation batch (0.4 slice 25) may have rewritten the section
+// this preview shows — re-render when a content-bearing layer changed. The payload
+// doesn't carry section names, so any matching batch re-fetches (one cheap render call).
+const socket = useSocket();
+function onAgentMutation(payload) {
+	const layers = payload.layers;
+	if (!layers || ["section", "page", "wiki", "tree"].some((l) => layers.includes(l))) load();
+}
+onMounted(() => socket?.on("wikify_agent_mutation", onAgentMutation));
+onUnmounted(() => socket?.off("wikify_agent_mutation", onAgentMutation));
 
 const data = computed(() => preview.data || null);
 const mode = ref("rendered");

@@ -239,3 +239,37 @@ class TestAgentWrite(FrappeTestCase):
 		):
 			AgentRunner(sess.name, "Administrator").run()
 		self.assertIn("wikify_agent_mutation", events)
+
+	def test_mutations_batch_into_single_event_per_turn(self):
+		"""0.4 slice 25 — N mutating tools → ONE aggregated mutation event at completion."""
+		sess = self._make_session()
+		secs = self._sections()
+		fake = FakeLLM(
+			[
+				[
+					_tool_chunk(0, "c1", "rename_section", f'{{"name": "{secs[0].name}", "title": "Y"}}'),
+					_tool_chunk(1, "c2", "rename_section", f'{{"name": "{secs[2].name}", "title": "Z"}}'),
+				],
+				[_text_chunk("Renamed both sections.")],
+			]
+		)
+		events = []
+		with (
+			patch("wikify.agent.llm.complete_with_tools", fake),
+			patch(
+				"frappe.publish_realtime",
+				lambda event, payload=None, *a, **k: events.append((event, payload)),
+			),
+		):
+			AgentRunner(sess.name, "Administrator").run()
+
+		mutation_events = [e for e in events if e[0] == "wikify_agent_mutation"]
+		self.assertEqual(len(mutation_events), 1)
+		payload = mutation_events[0][1]
+		self.assertEqual(payload["count"], 2)
+		self.assertEqual(payload["layers"], ["tree"])
+		self.assertEqual(payload["source_documents"], [self.sd.name])
+		# The complete event carries the counts so the chat card renders immediately.
+		complete = next(e for e in events if e[0].startswith("wikify_agent_complete"))
+		self.assertEqual(complete[1]["mutation_count"], 2)
+		self.assertEqual(complete[1]["mutated_tools"], ["rename_section", "rename_section"])

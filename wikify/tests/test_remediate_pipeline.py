@@ -116,6 +116,59 @@ class TestRemediatePipeline(FrappeTestCase):
 		self.assertGreater(canonical_mean, mean_before)
 		self.assertGreaterEqual(result["adopted"], 1)
 
+	def test_every_page_gets_vlm_attempt_even_with_perfect_recall(self):
+		"""0.4 slice 22 — no recall gate: passing text pages still get the vlm pass."""
+		sd, path = self._parse()
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+			patch(
+				"wikify.engine.remediate.clean_markdown",
+				side_effect=lambda md, model=None, project_context="", instruction="": md,
+			),
+			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID) as vlm_mock,
+		):
+			remediate_pdf(sd, path, scope="all")
+		total = frappe.db.count("Source Page", {"source_document": sd})
+		self.assertEqual(vlm_mock.call_count, total)
+
+	def test_vlm_failure_falls_back_to_cleanup_with_note(self):
+		sd, path = self._parse()
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+			patch(
+				"wikify.engine.remediate.clean_markdown",
+				side_effect=lambda md, model=None, project_context="", instruction="": md,
+			),
+			patch("wikify.engine.remediate.vlm.parse_page_image", side_effect=RuntimeError("rate limit")),
+		):
+			remediate_pdf(sd, path, scope="all")
+		page = frappe.db.get_value(
+			"Source Page",
+			{"source_document": sd, "page_no": 1},
+			["remediation_method", "remediation_adopted", "remediation_notes"],
+			as_dict=True,
+		)
+		# Text page: vlm blew up, identity cleanup still adopted; the failure is on record.
+		self.assertEqual(page.remediation_method, "cleanup")
+		self.assertTrue(page.remediation_adopted)
+		self.assertIn("vlm failed", page.remediation_notes or "")
+
+	def test_cost_accumulates_on_page_and_document(self):
+		sd, _ = self._parse()
+		page = frappe.db.get_value("Source Page", {"source_document": sd, "page_no": 1}, "name")
+		from wikify.engine import store
+
+		metrics = [{"model": "m", "cost": 0.0021}, {"model": "j", "cost": 0.0009}, {"model": "x"}]
+		added = store.add_page_cost(page, metrics)
+		self.assertAlmostEqual(added, 0.003)
+		store.add_page_cost(page, metrics)  # additive across re-parses
+		self.assertAlmostEqual(frappe.db.get_value("Source Page", page, "llm_cost"), 0.006)
+		store.add_document_cost(sd, added)
+		store.add_document_cost(sd, added)
+		self.assertAlmostEqual(frappe.db.get_value("Source Document", sd, "llm_cost"), 0.006)
+
 	def test_remediate_flagged_scope_skips_passing_pages(self):
 		sd, path = self._parse()
 		with (

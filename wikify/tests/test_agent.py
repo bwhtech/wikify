@@ -223,13 +223,20 @@ class TestAgent(FrappeTestCase):
 		self.assertIn("Page 1", out)
 
 	def _make_type(self, **kwargs):
+		# Unique label too — Section Type labels are identity (0.4 slice 21), and a
+		# committed leak of a real-looking label ("Introduction") once polluted the dev
+		# taxonomy. Cleanup is registered because the agent loop commits mid-test,
+		# defeating the FrappeTestCase rollback.
 		tname = f"t_{frappe.generate_hash(length=6)}"
-		return frappe.get_doc({"doctype": "Section Type", "type_name": tname, **kwargs}).insert(
+		kwargs.setdefault("label", f"Test Type {tname}")
+		doc = frappe.get_doc({"doctype": "Section Type", "type_name": tname, **kwargs}).insert(
 			ignore_permissions=True
 		)
+		self.addCleanup(frappe.db.delete, "Section Type", {"name": tname})
+		return doc
 
 	def test_list_section_types_lists_taxonomy(self):
-		st = self._make_type(label="Introduction")
+		st = self._make_type()
 		out = _list_section_types(Ctx(session="x", user="Administrator"), {})
 		self.assertIn(st.type_name, out)
 

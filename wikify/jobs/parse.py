@@ -65,18 +65,17 @@ def run(import_name: str) -> None:
 		)
 		imp.db_set("source_document", source_document)
 
-		# Auto-remediate flagged pages before Review, so the section tree (and any wiki built
-		# from it) come from cleaned, artifact-free markdown — not raw baseline with omitted-
-		# picture wrappers / <br> blobs that break section attribution. remediate_pdf rebuilds
-		# the tree + classifies over the canonical markdown, standing in for parse's own
-		# sectionize pass. Needs cloud models; without a key, just build the tree on baseline.
-		flagged = frappe.db.count(
-			"Source Page", {"source_document": source_document, "verdict": ["!=", "pass"]}
-		)
-		if flagged and llm.has_openrouter():
+		# Auto-remediate EVERY page before Review (0.4 slice 22 — no flagged-only gate), so
+		# the section tree (and any wiki built from it) come from cleaned, artifact-free
+		# markdown and no "good enough" page dodges the VLM pass. remediate_pdf rebuilds the
+		# tree + classifies over the canonical markdown, standing in for parse's own
+		# sectionize pass. Needs cloud models; without a key, build the tree on baseline —
+		# loudly, never silently.
+		page_count_ = frappe.db.count("Source Page", {"source_document": source_document})
+		if llm.has_openrouter():
 			imp.db_set("status", "Remediating")
-			publish_progress(import_name, 0, f"Remediating {flagged} flagged pages", status="Remediating")
-			log(import_name, "info", "remediate", f"Auto-remediating {flagged} flagged pages")
+			publish_progress(import_name, 0, f"Remediating {page_count_} pages", status="Remediating")
+			log(import_name, "info", "remediate", f"Remediating all {page_count_} pages (dual-pass)")
 
 			def rem_progress_cb(done: int, total: int) -> None:
 				publish_progress(
@@ -94,17 +93,30 @@ def run(import_name: str) -> None:
 					suffix += f" (${cost:.4f})"
 				log(import_name, "info", "remediate", f"Page {page_no}{suffix}", meta=meta)
 
-			remediate_pdf(
+			result = remediate_pdf(
 				source_document,
 				pdf_path,
-				scope="flagged",
+				scope="all",
 				project_context=context,
 				progress_cb=rem_progress_cb,
 				page_cb=rem_page_cb,
 				stage_cb=stage_cb,
 			)
+			if result.get("cost"):
+				log(
+					import_name,
+					"info",
+					"remediate",
+					f"Remediation done — {result['adopted']}/{result['targets']} adopted, ${result['cost']:.4f}",
+					meta={"cost": result["cost"], "adopted": result["adopted"]},
+				)
 		else:
-			# Nothing flagged (or no cloud key): build the tree over the baseline markdown.
+			log(
+				import_name,
+				"warn",
+				"remediate",
+				"VLM pass skipped: no OPENROUTER_KEY — pages are baseline-only",
+			)
 			rebuild_and_classify(source_document, pdf_path, stage_cb, project_context=context)
 
 		mean_score, page_count = frappe.db.get_value(

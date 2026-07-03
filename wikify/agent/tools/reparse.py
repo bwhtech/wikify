@@ -113,7 +113,7 @@ def _reparse_page(ctx: Ctx, args: dict) -> str:
 		return _("Couldn't locate the source PDF for {0}.").format(source_document)
 	method = args.get("method")
 	if method not in (None, "cleanup", "vlm"):
-		return _("`method` must be 'cleanup' or 'vlm' (or omit to auto-route).")
+		return _("`method` must be 'cleanup' or 'vlm' (or omit for vlm, the default).")
 	try:
 		res = reparse_page(
 			source_document,
@@ -176,7 +176,7 @@ TOOLS = [
 		description=(
 			"Re-parse a single page, steered by a plain-English instruction (e.g. 'keep the "
 			"table as a real markdown table', 'don't make this a mermaid diagram'). method "
-			"forces 'cleanup' (text) or 'vlm' (from the image); omit to auto-route. The result "
+			"forces 'cleanup' (text) or 'vlm' (from the image); omit for vlm (the default). The result "
 			"becomes the page's canonical markdown. Defaults to the attached document."
 		),
 		parameters={
@@ -187,7 +187,7 @@ TOOLS = [
 				"method": {
 					"type": "string",
 					"enum": ["cleanup", "vlm"],
-					"description": "Force a method; omit to auto-route.",
+					"description": "Force a method; omit for vlm (the default).",
 				},
 				"instruction": {"type": "string", "description": "Plain-English steering for the re-parse."},
 			},

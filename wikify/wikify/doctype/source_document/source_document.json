@@ -15,6 +15,7 @@
   "parser_used",
   "mean_score",
   "canonical_mean",
+  "llm_cost",
   "status",
   "wiki_section",
   "wiki_space",
@@ -81,6 +82,15 @@
    "fieldtype": "Float",
    "label": "Canonical Mean",
    "precision": "3",
+   "read_only": 1
+  },
+  {
+   "description": "Running total LLM spend (USD) for this document: parse, remediation, classify, re-parses. Agent-chat spend is excluded.",
+   "fieldname": "llm_cost",
+   "fieldtype": "Float",
+   "label": "LLM Cost",
+   "non_negative": 1,
+   "precision": "6",
    "read_only": 1
   },
   {
