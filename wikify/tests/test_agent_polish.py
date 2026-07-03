@@ -15,6 +15,7 @@ from wikify.agent import llm, session
 from wikify.agent.loop import AgentRunner, claims_unbacked_action
 from wikify.api import agent as agent_api
 from wikify.engine import store
+from wikify.tests import _cleanup
 from wikify.tests.test_agent import FakeLLM, _sec, _text_chunk, _tool_chunk
 
 
@@ -23,6 +24,9 @@ class TestAgentPolish(FrappeTestCase):
 		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Polish Test"}).insert(
 			ignore_permissions=True
 		)
+		# The loop commits mid-turn, defeating rollback — raw-delete what we insert.
+		self.addCleanup(_cleanup.delete_document, self.sd.name)
+		_cleanup.register_session_sweep(self)
 		store.replace_sections(self.sd.name, [_sec("1. Alpha", 1, ["1. Alpha"], 1, 1)])
 
 	def _settings_agent_model(self, value):

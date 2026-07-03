@@ -20,6 +20,7 @@ from wikify.agent.tools import reparse as rep
 from wikify.agent.tools import taxonomy as tax
 from wikify.agent.tools import tree as tt
 from wikify.engine import store
+from wikify.tests import _cleanup
 from wikify.engine.loader.sectionizer import Section
 
 # A 1x1 PNG so `embed_page_image` has a real image File to point at.
@@ -65,6 +66,9 @@ class TestAgentWrite(FrappeTestCase):
 		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Write Test"}).insert(
 			ignore_permissions=True
 		)
+		# The loop commits mid-turn, defeating rollback — raw-delete what we insert.
+		self.addCleanup(_cleanup.delete_document, self.sd.name)
+		_cleanup.register_session_sweep(self)
 		store.replace_sections(
 			self.sd.name,
 			[

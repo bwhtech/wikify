@@ -17,6 +17,7 @@ from frappe.utils.nestedset import get_descendants_of
 from wikify.engine import generate_wiki, preview_wiki, store
 from wikify.engine.loader.sectionizer import Section
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
+from wikify.tests import _cleanup
 
 
 def _sec(title, level, path, p_start, p_end, markdown=None):
@@ -68,7 +69,9 @@ class TestWikiGenerate(FrappeTestCase):
 				for n in names:
 					frappe.delete_doc("Wiki Document", n, ignore_permissions=True, force=True)
 			frappe.delete_doc("Wiki Space", space, ignore_permissions=True, force=True)
-		frappe.db.delete("Source Section", {"source_document": self.sd.name})
+		# Covers sections + pages + the Source Document row itself: the commit below
+		# is what used to persist the doc insert and leak one fixture per test run.
+		_cleanup._delete_document_rows(self.sd.name)
 		frappe.db.commit()
 
 	def _generate(self, **kwargs):

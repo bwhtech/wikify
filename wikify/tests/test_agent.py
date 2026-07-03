@@ -23,6 +23,7 @@ from wikify.agent.tools.read import (
 )
 from wikify.api import agent as agent_api
 from wikify.engine import store
+from wikify.tests import _cleanup
 from wikify.engine.loader.sectionizer import Section
 
 
@@ -74,6 +75,9 @@ class TestAgent(FrappeTestCase):
 		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Agent Test"}).insert(
 			ignore_permissions=True
 		)
+		# The loop commits mid-turn, defeating rollback — raw-delete what we insert.
+		self.addCleanup(_cleanup.delete_document, self.sd.name)
+		_cleanup.register_session_sweep(self)
 		store.replace_sections(
 			self.sd.name,
 			[
@@ -275,6 +279,7 @@ class TestAgent(FrappeTestCase):
 				"context_prompt": "Use UK spelling.",
 			}
 		).insert(ignore_permissions=True)
+		self.addCleanup(_cleanup.delete_project, proj.name)
 		resolved = resolve_attachments([{"type": "project", "name": proj.name}])
 		self.assertEqual(resolved.project, proj.name)
 		self.assertEqual(resolved.project_context, "Use UK spelling.")

@@ -19,6 +19,7 @@ from wikify.agent.tools.reparse import _propagate_page
 from wikify.engine import generate_wiki, store
 from wikify.engine.generate import sync_section
 from wikify.engine.loader.sectionizer import Section
+from wikify.tests import _cleanup
 from wikify.engine.sectionize import (
 	rebuild_section_markdown,
 	sections_covering_page,
@@ -80,7 +81,9 @@ class TestAgentContent(FrappeTestCase):
 				for n in names:
 					frappe.delete_doc("Wiki Document", n, ignore_permissions=True, force=True)
 			frappe.delete_doc("Wiki Space", space, ignore_permissions=True, force=True)
-		frappe.db.delete("Source Section", {"source_document": self.sd.name})
+		# Covers sections + pages + the Source Document row itself: the commit below
+		# is what used to persist the doc insert and leak one fixture per test run.
+		_cleanup._delete_document_rows(self.sd.name)
 		frappe.db.commit()
 
 	def _rows(self):
