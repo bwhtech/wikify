@@ -22,6 +22,7 @@ import frappe
 
 from wikify.engine import store
 from wikify.engine.classify import classify_document
+from wikify.engine.lint import fix_table_separators
 from wikify.engine.loader.cleanup import clean_pages
 from wikify.engine.loader.sectionizer import sectionize
 from wikify.engine.loader.toc import toc_level_map
@@ -32,6 +33,10 @@ def sectionize_document(source_document: str, pdf_path: str) -> int:
 	level_map = toc_level_map(str(pdf_path))
 	pages = clean_pages(store.get_canonical_pages(source_document))
 	sections = sectionize(pages, level_map)
+	# 0.6 auto-fix boundary: repair separator-less tables in the assembled section
+	# product, pre-review. Page canonical stays untouched — pages are evidence.
+	for sec in sections:
+		sec.markdown = fix_table_separators(sec.markdown)
 	return store.replace_sections(source_document, sections)
 
 
@@ -123,7 +128,7 @@ def overlapping_sections(section_name: str) -> list[dict]:
 def rebuild_section_markdown(section_name: str) -> dict:
 	"""Re-derive ONE section's markdown from its pages' canonical, tree untouched.
 
-	Adopts the whole `page_start`–`page_end` canonical slice (boilerplate-stripped, same
+	Adopts the whole `page_start`-`page_end` canonical slice (boilerplate-stripped, same
 	`clean_pages` pass full sectionize uses). Boundary pages shared with neighboring
 	sections are reported in `overlaps` — the caller decides whether whole-page adoption
 	is acceptable or a surgical `edit_section_content` is the better fix.
@@ -148,7 +153,7 @@ def rebuild_section_markdown(section_name: str) -> dict:
 		raise ValueError(f"No pages found in range {sec.page_start}-{sec.page_end}.")
 
 	cleaned = clean_pages(pages)
-	markdown = "\n\n".join(md.strip() for _, md in cleaned if md.strip())
+	markdown = fix_table_separators("\n\n".join(md.strip() for _, md in cleaned if md.strip()))
 	overlaps = overlapping_sections(section_name)
 	store.set_section_markdown(section_name, markdown)
 	return {

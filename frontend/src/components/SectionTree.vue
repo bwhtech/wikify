@@ -30,6 +30,7 @@ const sections = useList({
 		"sort_order",
 		"include_in_wiki",
 		"markdown",
+		"lint_issues",
 	],
 	filters: computed(() => ({ source_document: props.sourceDocument || "__none__" })),
 	orderBy: "lft asc",
@@ -39,6 +40,17 @@ const sections = useList({
 defineExpose({ reload: () => sections.reload() });
 
 const sectionCount = computed(() => (sections.data || []).length);
+
+// Stored `lint_issues` JSON (0.6) → the row badge count; tolerant of the field
+// arriving as a string or already-parsed list.
+function lintCount(value) {
+	if (Array.isArray(value)) return value.length;
+	try {
+		return value ? JSON.parse(value).length : 0;
+	} catch {
+		return 0;
+	}
+}
 
 // Nested tree for frappe-ui Tree. Rebuilt from the flat rows on every server read;
 // each node's `expanded` flag is the Tree's per-node state, so carry it across rebuilds.
@@ -63,7 +75,12 @@ watch(
 
 		const nodes = {};
 		for (const r of rows || [])
-			nodes[r.name] = { ...r, children: [], expanded: prevExpanded[r.name] ?? true };
+			nodes[r.name] = {
+				...r,
+				lint_count: lintCount(r.lint_issues),
+				children: [],
+				expanded: prevExpanded[r.name] ?? true,
+			};
 		const roots = [];
 		for (const r of rows || []) {
 			const parent = r.parent_source_section;
@@ -192,9 +209,7 @@ function subtreeSize(node) {
 }
 function onRemove(node) {
 	const nested = subtreeSize(node) - 1;
-	const suffix = nested
-		? ` and its ${nested} nested section${nested === 1 ? "" : "s"}`
-		: "";
+	const suffix = nested ? ` and its ${nested} nested section${nested === 1 ? "" : "s"}` : "";
 	dialog.danger({
 		title: "Delete section",
 		message: `Delete "${node.title}"${suffix}? This can't be undone.`,
@@ -217,7 +232,6 @@ async function buildGraph() {
 		toast.error(e?.messages?.[0] || e?.message || "Could not build graph");
 	}
 }
-
 </script>
 
 <template>
@@ -318,6 +332,16 @@ async function buildGraph() {
 										variant="subtle"
 										size="sm"
 									/>
+									<Badge
+										v-if="node.lint_count"
+										:label="`⚠ ${node.lint_count}`"
+										theme="orange"
+										variant="subtle"
+										size="sm"
+										:title="`${node.lint_count} markdown issue${
+											node.lint_count === 1 ? '' : 's'
+										} — open the preview for details`"
+									/>
 									<span
 										v-if="pageRange(node)"
 										class="shrink-0 text-xs tabular-nums text-ink-gray-4"
@@ -330,7 +354,10 @@ async function buildGraph() {
 										class="shrink-0 rounded p-0.5 text-ink-gray-5 opacity-0 hover:bg-surface-gray-3 group-hover:opacity-100"
 										@click.stop
 									>
-										<span class="lucide-more-horizontal size-4" aria-hidden="true" />
+										<span
+											class="lucide-more-horizontal size-4"
+											aria-hidden="true"
+										/>
 									</button>
 								</Dropdown>
 							</div>
@@ -344,6 +371,5 @@ async function buildGraph() {
 				<WikiPreview :section="selectedName" @navigate="onSelect" />
 			</Pane>
 		</Splitpanes>
-
 	</div>
 </template>

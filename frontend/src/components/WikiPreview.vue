@@ -39,6 +39,14 @@ onUnmounted(() => socket?.off("wikify_agent_mutation", onAgentMutation));
 const data = computed(() => preview.data || null);
 const mode = ref("rendered");
 
+// "table missing separator row (L16), ragged table rows (L18)" — line numbers point
+// into the Source view.
+const lintSummary = computed(() =>
+	(data.value?.lint_issues || [])
+		.map((i) => (i.line ? `${i.message} (L${i.line})` : i.message))
+		.join(", ")
+);
+
 const container = ref(null);
 async function renderDiagrams() {
 	await nextTick();
@@ -63,10 +71,7 @@ function onBodyClick(e) {
 
 <template>
 	<div class="flex h-full flex-col">
-		<p
-			v-if="preview.loading && !data"
-			class="py-10 text-center text-sm text-ink-gray-5"
-		>
+		<p v-if="preview.loading && !data" class="py-10 text-center text-sm text-ink-gray-5">
 			Loading preview…
 		</p>
 		<template v-else-if="data">
@@ -112,12 +117,18 @@ function onBodyClick(e) {
 				This section is excluded from the wiki — it won't be generated.
 			</div>
 
+			<!-- Broken-markdown banner (0.6) — explains why the render looks wrong -->
+			<div
+				v-if="data.lint_issues?.length"
+				class="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400"
+			>
+				<span class="font-medium">Broken markdown:</span>
+				{{ lintSummary }}
+			</div>
+
 			<div class="min-h-0 flex-1 overflow-auto">
 				<!-- Rendered wiki page frame -->
-				<article
-					v-if="mode === 'rendered'"
-					class="mx-auto max-w-3xl px-6 py-6"
-				>
+				<article v-if="mode === 'rendered'" class="mx-auto max-w-3xl px-6 py-6">
 					<h1 class="mb-4 text-xl-semibold text-ink-gray-9">
 						{{ data.title }}
 					</h1>

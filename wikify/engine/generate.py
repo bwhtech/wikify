@@ -363,6 +363,9 @@ def preview_wiki(source_document: str) -> dict:
 	nested list, plus counts. Drives the Wiki tab's pre-generation preview."""
 	sections = store.get_sections_for_wiki(source_document)
 	included = [s for s in sections if s["include_in_wiki"]]
+	# Ship a count, not the raw issue JSON — the Wiki tab badges on it (0.6 Slice 31).
+	for s in included:
+		s["lint_count"] = store.lint_count(s.pop("lint_issues", None))
 	by_name = {s["name"]: {**s, "children": []} for s in included}
 	roots: list[dict] = []
 	for s in included:

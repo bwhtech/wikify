@@ -9,3 +9,10 @@ class SourceSection(NestedSet):
 	# (engine.sectionize), so there is no per-row lifecycle logic here — NestedSet
 	# manages lft/rgt on insert. Drag-reparent/reorder lands in Slice 5.
 	nsm_parent_field = "parent_source_section"
+
+	def validate(self):
+		# Document-path half of the 0.6 lint funnel (insert/save); raw db.set_value
+		# markdown writes go through store.set_section_markdown instead.
+		from wikify.engine.store import lint_json
+
+		self.lint_issues = lint_json(self.markdown or "")

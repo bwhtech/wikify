@@ -102,9 +102,14 @@ _ARTIFACT_PATTERNS = [
 def parser_artifacts(markdown: str) -> list[str]:
 	"""Tell-tale signs the extractor mangled structure (text may be complete but
 	the layout is destroyed) — a strong signal to remediate even if recall is high."""
+	from wikify.engine.lint import table_artifacts
+
 	found = [name for name, pat in _ARTIFACT_PATTERNS if pat.search(markdown)]
 	if markdown.count("<br>") > 15:
 		found.append("flattened <br> blob")
+	# 0.6: broken-table structure (missing separator / ragged / orphaned rows) —
+	# same detector the section lint uses, so page verdicts flag it at parse time.
+	found.extend(table_artifacts(markdown))
 	return found
 
 

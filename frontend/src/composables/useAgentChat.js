@@ -193,7 +193,9 @@ export function useAgentChat() {
 				project,
 				source_document: sourceDocument,
 				model: model.value || null,
-				attachments: atts.map(({ type, name, label }) => ({ type, name, label })),
+				attachments: atts.map(({ type, name, label, view }) =>
+					view ? { type, name, label, view } : { type, name, label }
+				),
 				...extra,
 			});
 			sessionId.value = res.session_id;

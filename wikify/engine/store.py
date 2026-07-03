@@ -244,8 +244,42 @@ def get_section_spans(source_document: str) -> list[dict]:
 	)
 
 
-def set_section_markdown(name: str, markdown: str) -> None:
-	frappe.db.set_value("Source Section", name, "markdown", markdown)
+def lint_json(markdown: str) -> str | None:
+	"""`engine.lint` issues as a JSON string (None when clean) — the stored
+	`lint_issues` shape. Lint must never block a write: a crash degrades to None
+	plus an error-log entry (0.6 principle: lint is derived, saves are sacred)."""
+	import json
+
+	from wikify.engine.lint import lint_markdown
+
+	try:
+		issues = lint_markdown(markdown or "")
+	except Exception:
+		frappe.log_error(title="wikify: markdown lint failed")
+		return None
+	return json.dumps(issues) if issues else None
+
+
+def lint_count(lint_issues: str | None) -> int:
+	"""Issue count from a stored `lint_issues` JSON string — the badge number."""
+	import json
+
+	try:
+		return len(json.loads(lint_issues)) if lint_issues else 0
+	except Exception:
+		return 0
+
+
+def set_section_markdown(
+	name: str, markdown: str, *, update_modified: bool = True, extra_values: dict | None = None
+) -> None:
+	"""THE write funnel for `Source Section.markdown` (0.6) — every raw markdown write
+	goes through here so `lint_issues` always reflects the stored body. Document-path
+	writes (`doc.insert`/`doc.save`, e.g. `replace_sections`) are covered by the
+	controller instead. `extra_values` keeps multi-field callers on a single UPDATE
+	(merge writes page ranges alongside)."""
+	values = {"markdown": markdown, "lint_issues": lint_json(markdown), **(extra_values or {})}
+	frappe.db.set_value("Source Section", name, values, update_modified=update_modified)
 
 
 # --- Slice 6: classification ---
@@ -323,6 +357,7 @@ def get_sections_for_wiki(source_document: str) -> list[dict]:
 			"sort_order",
 			"include_in_wiki",
 			"wiki_document",
+			"lint_issues",
 		],
 		order_by="lft asc",
 	)

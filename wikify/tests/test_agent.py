@@ -23,8 +23,8 @@ from wikify.agent.tools.read import (
 )
 from wikify.api import agent as agent_api
 from wikify.engine import store
-from wikify.tests import _cleanup
 from wikify.engine.loader.sectionizer import Section
+from wikify.tests import _cleanup
 
 
 def _sec(title, level, path, p_start, p_end):
@@ -270,6 +270,15 @@ class TestAgent(FrappeTestCase):
 		resolved = resolve_attachments([{"type": "section", "name": name}])
 		self.assertEqual(resolved.source_document, self.sd.name)
 		self.assertIn("body of 1. Alpha", resolved.block)
+
+	def test_resolve_wiki_view_section_adds_framing_line(self):
+		"""A section attached from the Wiki tab (view=wiki) frames the block as a
+		rendered wiki page; a plain section attachment doesn't."""
+		name = self._first_section()
+		wiki = resolve_attachments([{"type": "section", "name": name, "view": "wiki"}])
+		self.assertIn("rendered wiki page", wiki.block)
+		plain = resolve_attachments([{"type": "section", "name": name}])
+		self.assertNotIn("rendered wiki page", plain.block)
 
 	def test_resolve_project_attachment_injects_context_prompt(self):
 		proj = frappe.get_doc(

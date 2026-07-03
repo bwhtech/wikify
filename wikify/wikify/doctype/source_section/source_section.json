@@ -20,6 +20,7 @@
   "section_break_body",
   "hierarchy_path",
   "markdown",
+  "lint_issues",
   "wiki_document",
   "lft",
   "rgt",
@@ -118,6 +119,15 @@
    "fieldtype": "Code",
    "label": "Markdown",
    "options": "Markdown"
+  },
+  {
+   "description": "Deterministic structure lint of `markdown` (engine.lint) — recomputed on every write; empty when clean.",
+   "fieldname": "lint_issues",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Lint Issues",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "description": "The generated wiki page (set on generation, Slice 7).",

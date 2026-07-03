@@ -16,6 +16,8 @@ from frappe import _
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce
 
+from wikify.engine import store
+
 
 @frappe.whitelist()
 def get_tree(source_document: str) -> list[dict]:
@@ -39,10 +41,14 @@ def get_tree(source_document: str) -> list[dict]:
 			"page_end",
 			"sort_order",
 			"markdown",
+			"lint_issues",
 		],
 		order_by="lft asc",
 	)
 
+	# Ship a count, not the raw issue JSON — tree rows badge on it (0.6 Slice 31).
+	for r in rows:
+		r["lint_count"] = store.lint_count(r.pop("lint_issues", None))
 	by_name = {r["name"]: {**r, "children": []} for r in rows}
 	roots: list[dict] = []
 	for r in rows:
@@ -348,7 +354,17 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 	sec = frappe.db.get_value(
 		"Source Section",
 		name,
-		["source_document", "parent_source_section", "title", "markdown", "page_start", "page_end", "section_type", "include_in_wiki", "sort_order"],
+		[
+			"source_document",
+			"parent_source_section",
+			"title",
+			"markdown",
+			"page_start",
+			"page_end",
+			"section_type",
+			"include_in_wiki",
+			"sort_order",
+		],
 		as_dict=True,
 	)
 	if not sec:
@@ -367,7 +383,9 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 		None,
 	)
 	if split_at is None:
-		frappe.throw(_("No heading matching '{0}' found in '{1}' — nothing was split.").format(at_heading, sec.title))
+		frappe.throw(
+			_("No heading matching '{0}' found in '{1}' — nothing was split.").format(at_heading, sec.title)
+		)
 
 	head = "\n".join(lines[:split_at]).strip()
 	tail = "\n".join(lines[split_at:]).strip()
@@ -382,10 +400,12 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 	new.page_end = sec.page_end
 	new.section_type = sec.section_type
 	new.include_in_wiki = sec.include_in_wiki
-	new.sort_order = (sec.sort_order or 0)  # placed right after via move_section below
+	# +1 so the pre-splice sibling sort (sort_order, then name) can't randomly place the
+	# new section before the original — a tie fell to the generated-name hash order.
+	new.sort_order = (sec.sort_order or 0) + 1
 	new.insert(ignore_permissions=True)
 
-	frappe.db.set_value("Source Section", name, "markdown", head, update_modified=False)
+	store.set_section_markdown(name, head, update_modified=False)
 
 	# Splice the new sibling immediately after the original.
 	sib_filters = {"source_document": sec.source_document}
@@ -393,7 +413,11 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 	siblings = frappe.get_all(
 		"Source Section", filters=sib_filters, order_by="sort_order asc, name asc", pluck="name"
 	)
-	move_section(new.name, new_parent=sec.parent_source_section, new_index=siblings.index(name) + 1 if name in siblings else None)
+	move_section(
+		new.name,
+		new_parent=sec.parent_source_section,
+		new_index=siblings.index(name) + 1 if name in siblings else None,
+	)
 	return {"ok": True, "name": name, "new_name": new.name, "new_title": title}
 
 
@@ -416,7 +440,16 @@ def merge_sections(names: list | str) -> dict:
 		for r in frappe.get_all(
 			"Source Section",
 			filters={"name": ["in", names]},
-			fields=["name", "source_document", "parent_source_section", "title", "markdown", "page_start", "page_end", "lft"],
+			fields=[
+				"name",
+				"source_document",
+				"parent_source_section",
+				"title",
+				"markdown",
+				"page_start",
+				"page_end",
+				"lft",
+			],
 		)
 	}
 	missing = [n for n in names if n not in rows]
@@ -443,15 +476,14 @@ def merge_sections(names: list | str) -> dict:
 			update_modified=False,
 		)
 	frappe.db.delete("Source Section", {"name": ["in", husks]})
-	frappe.db.set_value(
-		"Source Section",
+	store.set_section_markdown(
 		survivor.name,
-		{
-			"markdown": merged_md,
+		merged_md,
+		update_modified=False,
+		extra_values={
 			"page_start": min(starts) if starts else survivor.page_start,
 			"page_end": max(ends) if ends else survivor.page_end,
 		},
-		update_modified=False,
 	)
 	_rebuild_tree(survivor.source_document)
 	return {"ok": True, "name": survivor.name, "merged": len(husks)}

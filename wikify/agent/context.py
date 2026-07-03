@@ -119,7 +119,7 @@ def resolve_attachments(attachments: list[dict] | None) -> ResolvedContext:
 				resolved.source_document = resolved.source_document or sd
 				sections.append(block)
 		elif atype == "section":
-			block, sd = _render_section(name)
+			block, sd = _render_section(name, view=att.get("view"))
 			if block:
 				resolved.source_document = resolved.source_document or sd
 				sections.append(block)
@@ -175,15 +175,46 @@ def _render_page(name: str) -> tuple[str, str | None]:
 	return f"{header}\n{_truncate(body)}", row.source_document
 
 
-def _render_section(name: str) -> tuple[str, str | None]:
+def _render_section(name: str, view: str | None = None) -> tuple[str, str | None]:
 	row = frappe.db.get_value(
 		"Source Section",
 		name,
-		["source_document", "title", "section_type", "hierarchy_path", "markdown"],
+		["source_document", "title", "section_type", "hierarchy_path", "markdown", "lint_issues"],
 		as_dict=True,
 	)
 	if not row:
 		return "", None
 	stype = f" — type: {row.section_type}" if row.section_type else ""
 	header = f"## Section: {row.hierarchy_path or row.title}{stype}"
+	if view == "wiki":
+		# Wiki-tab preview (0.6 Slice 29): the user sees the rendered page, not raw
+		# markdown — bias the agent toward visible formatting/structure problems.
+		header += (
+			"\nThe user is reading this section as a rendered wiki page (Wiki tab preview) — "
+			"they see the final formatted output, not raw markdown. Formatting and structure "
+			"problems are what they can see."
+		)
+	lint = _lint_line(row.lint_issues)
+	if lint:
+		header += f"\n{lint}"
 	return f"{header}\n{_truncate(row.markdown or '(no body)')}", row.source_document
+
+
+def _lint_line(lint_issues: str | None) -> str:
+	"""Stored lint issues as one context line (0.6 Slice 31), so 'fix this page' needs
+	no diagnosis round-trip. Empty string when clean."""
+	import json
+
+	try:
+		issues = json.loads(lint_issues) if lint_issues else []
+	except Exception:
+		issues = []
+	if not issues:
+		return ""
+	listed = "; ".join(
+		f"{i['message']} (line {i['line']})" if i.get("line") else i["message"] for i in issues
+	)
+	return (
+		f"Markdown lint: {listed}. These render broken on the wiki page — "
+		"fix with edit_section_content unless the user asks otherwise."
+	)

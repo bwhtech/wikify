@@ -1,7 +1,17 @@
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
-import { Badge, Button, Dialog, FormControl, TabButtons, useCall, useList, toast } from "frappe-ui";
+import {
+	Badge,
+	Button,
+	Dialog,
+	FormControl,
+	TabButtons,
+	useCall,
+	useList,
+	toast,
+} from "frappe-ui";
 import WikiPreview from "@/components/WikiPreview.vue";
+import { setSection } from "@/data/agentContext";
 import { useSocket } from "@/socket";
 
 const props = defineProps({
@@ -39,7 +49,7 @@ watch(
 		if (!list?.length) mode.value = "new";
 		else if (!targetSpace.value) targetSpace.value = props.wikiSpace || list[0]?.name;
 	},
-	{ immediate: true },
+	{ immediate: true }
 );
 // Suggest a slug-y route from the typed name.
 watch(newName, (n) => {
@@ -50,7 +60,7 @@ watch(newName, (n) => {
 });
 
 const spaceOptions = computed(() =>
-	(spaces.data || []).map((s) => ({ label: `${s.space_name} (/${s.route})`, value: s.name })),
+	(spaces.data || []).map((s) => ({ label: `${s.space_name} (/${s.route})`, value: s.name }))
 );
 
 // Preview — projected structure, no writes. Flattened to indented rows for display.
@@ -73,6 +83,7 @@ const previewRows = computed(() => {
 				depth,
 				page_start: n.page_start,
 				page_end: n.page_end,
+				lint_count: n.lint_count,
 			});
 			walk(n.children, depth + 1);
 		}
@@ -89,7 +100,7 @@ const generate = useCall({
 	immediate: false,
 });
 const canGenerate = computed(() =>
-	mode.value === "existing" ? !!targetSpace.value : !!(newName.value && newRoute.value),
+	mode.value === "existing" ? !!targetSpace.value : !!(newName.value && newRoute.value)
 );
 async function runGenerate() {
 	const params = { import_name: props.importName };
@@ -113,8 +124,21 @@ function onWikiDone(payload) {
 	emit("generated");
 	toast.success("Wiki generated");
 }
-onMounted(() => socket?.on("wikify_wiki_done", onWikiDone));
-onUnmounted(() => socket?.off("wikify_wiki_done", onWikiDone));
+// Agent end-of-turn mutation batch (0.4 slice 25) may have restructured the tree or
+// fixed section markdown — refetch so the projected rows + lint badges stay current.
+function onAgentMutation(payload) {
+	const layers = payload.layers;
+	if (!layers || ["section", "page", "wiki", "tree"].some((l) => layers.includes(l)))
+		loadPreview();
+}
+onMounted(() => {
+	socket?.on("wikify_wiki_done", onWikiDone);
+	socket?.on("wikify_agent_mutation", onAgentMutation);
+});
+onUnmounted(() => {
+	socket?.off("wikify_wiki_done", onWikiDone);
+	socket?.off("wikify_agent_mutation", onAgentMutation);
+});
 
 const wikiUrl = computed(() => {
 	const route = lastRoute.value || currentSpace.value?.route;
@@ -133,6 +157,23 @@ const previewOpen = computed({
 	set: (v) => {
 		if (!v) previewSection.value = null;
 	},
+});
+
+// The open wiki page IS a Source Section — attach it as the agent's context so "this
+// page" resolves without ids (0.6 Slice 29). `view: "wiki"` tells the backend the user
+// sees the rendered page, not raw markdown. Closing the preview falls back to the
+// document chip; in-preview "page N" navigation re-points the chip via the same watch.
+watch(previewSection, (name) => {
+	if (!name) {
+		setSection(null);
+		return;
+	}
+	const row = previewRows.value.find((r) => r.name === name);
+	setSection({ name, label: `Wiki: ${row?.title || "page"}`, view: "wiki" });
+});
+onUnmounted(() => {
+	// Leaving the Wiki tab with a preview open would otherwise strand a stale chip.
+	if (previewSection.value) setSection(null);
 });
 </script>
 
@@ -273,6 +314,17 @@ const previewOpen = computed({
 							aria-hidden="true"
 						/>
 						<span class="truncate text-sm text-ink-gray-8">{{ row.title }}</span>
+						<Badge
+							v-if="row.lint_count"
+							:label="`⚠ ${row.lint_count}`"
+							theme="orange"
+							variant="subtle"
+							size="sm"
+							class="shrink-0"
+							:title="`${row.lint_count} markdown issue${
+								row.lint_count === 1 ? '' : 's'
+							} — open the preview for details`"
+						/>
 						<Badge
 							v-if="pageRange(row)"
 							:label="pageRange(row)"

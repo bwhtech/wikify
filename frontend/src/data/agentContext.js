@@ -58,7 +58,14 @@ export const defaultAttachments = computed(() => {
 		out.push({ type: "document", name: state.document.name, label: state.document.label });
 	if (state.page) out.push({ type: "page", name: state.page.name, label: state.page.label });
 	if (state.section)
-		out.push({ type: "section", name: state.section.name, label: state.section.label });
+		out.push({
+			type: "section",
+			name: state.section.name,
+			label: state.section.label,
+			// Which surface the section was attached from ("wiki" = Wiki tab preview) —
+			// the backend frames the context block accordingly (0.6 Slice 29).
+			...(state.section.view ? { view: state.section.view } : {}),
+		});
 	return out;
 });
 

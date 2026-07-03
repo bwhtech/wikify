@@ -19,6 +19,8 @@ the frontend intercepts to navigate the tree, and we report how many refs resolv
 
 from __future__ import annotations
 
+import json
+
 import frappe
 from frappe import _
 from wiki.wiki.markdown import render_markdown
@@ -94,9 +96,7 @@ def render_section_preview(section: str) -> dict:
 	html = render_markdown(rewritten)
 
 	# Breadcrumb: Project > Document > <hierarchy_path ancestors + self>.
-	project_name = (
-		frappe.db.get_value("Wikify Project", sd.project, "project_name") if sd.project else None
-	)
+	project_name = frappe.db.get_value("Wikify Project", sd.project, "project_name") if sd.project else None
 	crumbs = [project_name or _("Project"), sd.title]
 	if sec.hierarchy_path:
 		crumbs.extend(p for p in sec.hierarchy_path.split(" > ") if p)
@@ -110,4 +110,7 @@ def render_section_preview(section: str) -> dict:
 		"markdown": content,
 		"include_in_wiki": bool(sec.include_in_wiki),
 		"page_refs_resolved": resolved,
+		# Stored structure-lint issues (0.6) — the preview banner explains why the
+		# rendered page looks broken.
+		"lint_issues": json.loads(sec.lint_issues) if sec.lint_issues else [],
 	}
