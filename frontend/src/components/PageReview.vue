@@ -127,16 +127,17 @@ const onWideChange = (e) => (isWide.value = e.matches);
 wideQuery.addEventListener("change", onWideChange);
 onBeforeUnmount(() => wideQuery.removeEventListener("change", onWideChange));
 
+// Icon-only tabs (tooltip carries the name) — same icons WikiPreview's toggle uses.
 const tabs = computed(() =>
 	isWide.value
 		? [
-				{ label: "Preview", key: "preview" },
-				{ label: "Markdown", key: "markdown" },
+				{ label: "Preview", key: "preview", icon: "lucide-eye" },
+				{ label: "Markdown", key: "markdown", icon: "lucide-code" },
 		  ]
 		: [
-				{ label: "Page", key: "page" },
-				{ label: "Preview", key: "preview" },
-				{ label: "Markdown", key: "markdown" },
+				{ label: "Page", key: "page", icon: "lucide-image" },
+				{ label: "Preview", key: "preview", icon: "lucide-eye" },
+				{ label: "Markdown", key: "markdown", icon: "lucide-code" },
 		  ]
 );
 const activeTab = ref(isWide.value ? "preview" : "page");
@@ -490,7 +491,9 @@ function fmtDelta(v) {
 									<Button
 										v-for="t in tabs"
 										:key="t.key"
-										:label="t.label"
+										:icon="t.icon"
+										:tooltip="t.label"
+										:aria-label="t.label"
 										size="sm"
 										:variant="activeTab === t.key ? 'subtle' : 'ghost'"
 										@click="activeTab = t.key"
@@ -535,7 +538,9 @@ function fmtDelta(v) {
 							<Button
 								v-for="t in tabs"
 								:key="t.key"
-								:label="t.label"
+								:icon="t.icon"
+								:tooltip="t.label"
+								:aria-label="t.label"
 								size="sm"
 								:variant="activeTab === t.key ? 'subtle' : 'ghost'"
 								@click="activeTab = t.key"
