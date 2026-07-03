@@ -16,3 +16,13 @@ class SourceSection(NestedSet):
 		from wikify.engine.store import lint_json
 
 		self.lint_issues = lint_json(self.markdown or "")
+
+	def on_trash(self, allow_root_deletion: bool = False):
+		# 0.5: reference edges die with their endpoints. Raw-delete paths
+		# (api.sections.delete_section, store.replace_sections) don't come through
+		# here — they run a full extract_references afterwards instead.
+		import frappe
+
+		frappe.db.delete("Section Reference", {"from_section": self.name})
+		frappe.db.delete("Section Reference", {"to_section": self.name})
+		super().on_trash(allow_root_deletion)

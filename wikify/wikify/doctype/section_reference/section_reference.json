@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-07-03 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "from_section",
+  "to_section",
+  "source_document",
+  "target_page",
+  "anchor_text",
+  "occurrences"
+ ],
+ "fields": [
+  {
+   "fieldname": "from_section",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "From Section",
+   "options": "Source Section",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "to_section",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "To Section",
+   "options": "Source Section",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "source_document",
+   "fieldtype": "Link",
+   "label": "Source Document",
+   "options": "Source Document",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "target_page",
+   "fieldtype": "Int",
+   "label": "Target Page"
+  },
+  {
+   "fieldname": "anchor_text",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Anchor Text"
+  },
+  {
+   "default": "1",
+   "fieldname": "occurrences",
+   "fieldtype": "Int",
+   "label": "Occurrences"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-03 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Wikify",
+ "name": "Section Reference",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

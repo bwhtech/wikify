@@ -62,6 +62,10 @@ def set_page_count(source_document: str, count: int) -> None:
 	frappe.db.set_value("Source Document", source_document, "page_count", count)
 
 
+def get_page_count(source_document: str) -> int | None:
+	return frappe.db.get_value("Source Document", source_document, "page_count")
+
+
 def set_page_scores(page_name: str, score) -> None:
 	"""Write a `PageScore` (verify.harness) onto a Source Page row.
 
@@ -274,12 +278,16 @@ def set_section_markdown(
 	name: str, markdown: str, *, update_modified: bool = True, extra_values: dict | None = None
 ) -> None:
 	"""THE write funnel for `Source Section.markdown` (0.6) — every raw markdown write
-	goes through here so `lint_issues` always reflects the stored body. Document-path
+	goes through here so `lint_issues` always reflects the stored body, and (0.5) the
+	section's outgoing `Section Reference` rows follow the new content. Document-path
 	writes (`doc.insert`/`doc.save`, e.g. `replace_sections`) are covered by the
-	controller instead. `extra_values` keeps multi-field callers on a single UPDATE
-	(merge writes page ranges alongside)."""
+	controller / an explicit full-document extract instead. `extra_values` keeps
+	multi-field callers on a single UPDATE (merge writes page ranges alongside)."""
+	from wikify.engine.refs import extract_references
+
 	values = {"markdown": markdown, "lint_issues": lint_json(markdown), **(extra_values or {})}
 	frappe.db.set_value("Source Section", name, values, update_modified=update_modified)
+	extract_references(frappe.db.get_value("Source Section", name, "source_document"), [name])
 
 
 # --- Slice 6: classification ---
@@ -333,6 +341,13 @@ def replace_sections(source_document: str, sections) -> int:
 		doc.markdown = sec.markdown
 		doc.insert(ignore_permissions=True)
 		path_to_name[tuple(sec.hierarchy_path)] = doc.name
+
+	# 0.5: the tree (and its page spans) just changed wholesale — rebuild the
+	# document's reference edges against it. Runs after all inserts so every
+	# "page N" target can resolve.
+	from wikify.engine.refs import extract_references
+
+	extract_references(source_document)
 	return len(sections)
 
 
@@ -374,3 +389,33 @@ def set_document_wiki(
 	if status:
 		values["status"] = status
 	frappe.db.set_value("Source Document", source_document, values)
+
+
+# --- 0.5 Slice 26: Section Reference rows (see engine/refs.py) ---
+
+
+def get_section_bodies(source_document: str, names: list[str] | None = None) -> list[dict]:
+	"""(name, markdown) of a document's sections — all of them, or just `names` — the
+	from-side input of reference extraction."""
+	filters: dict = {"source_document": source_document}
+	if names is not None:
+		filters["name"] = ["in", names]
+	return frappe.get_all(
+		"Source Section", filters=filters, fields=["name", "markdown"], order_by="lft asc"
+	)
+
+
+def replace_references(
+	source_document: str, rows: list[dict], from_sections: list[str] | None = None
+) -> None:
+	"""Wipe and re-insert a document's `Section Reference` rows (all of them, or just
+	the ones *outgoing from* `from_sections`). Raw delete + insert — rows are derived
+	data with no lifecycle of their own."""
+	filters: dict = {"source_document": source_document}
+	if from_sections is not None:
+		filters["from_section"] = ["in", from_sections]
+	frappe.db.delete("Section Reference", filters)
+	for row in rows:
+		doc = frappe.new_doc("Section Reference")
+		doc.update(row)
+		doc.insert(ignore_permissions=True)

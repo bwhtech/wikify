@@ -50,6 +50,7 @@ def _delete_document_rows(sd_name: str) -> None:
 			"File", {"attached_to_doctype": "Source Page", "attached_to_name": ("in", pages)}
 		)
 		frappe.db.delete("Source Page", {"name": ("in", pages)})
+	frappe.db.delete("Section Reference", {"source_document": sd_name})
 	frappe.db.delete("Source Section", {"source_document": sd_name})
 	frappe.db.delete("Source Document", {"name": sd_name})
 

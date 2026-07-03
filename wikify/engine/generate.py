@@ -29,6 +29,7 @@ from frappe.utils.nestedset import get_descendants_of
 
 from wikify.engine import store
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
+from wikify.engine.refs import smallest_covering
 
 
 def _upsert_wiki_document(
@@ -242,12 +243,8 @@ class _WikiGenerator:
 
 	def _route_for_page(self, n: int) -> str | None:
 		"""Smallest-span included section whose PDF page range contains n → its route."""
-		best = None
-		for s in self.included:
-			ps, pe = s["page_start"], s["page_end"]
-			if ps and pe and ps <= n <= pe and (best is None or pe - ps < best[1]):
-				best = (self.wiki_route[s["name"]], pe - ps)
-		return best[0] if best else None
+		best = smallest_covering(self.included, n)
+		return self.wiki_route[best["name"]] if best else None
 
 	def _rewrite_links(self) -> None:
 		"""Pass 2: every target exists now, so "page N" refs resolve to wiki links."""
@@ -342,13 +339,11 @@ def sync_section(section_name: str) -> dict:
 		if kids:
 			content = "## Contents\n\n" + "".join(f"- [{k['title']}](/{routes[k['name']]})\n" for k in kids)
 
+	routed = [s for s in included if s["name"] in routes]
+
 	def route_for_page(n: int) -> str | None:
-		best = None
-		for s in included:
-			ps, pe = s["page_start"], s["page_end"]
-			if ps and pe and ps <= n <= pe and s["name"] in routes and (best is None or pe - ps < best[1]):
-				best = (routes[s["name"]], pe - ps)
-		return best[0] if best else None
+		best = smallest_covering(routed, n)
+		return routes[best["name"]] if best else None
 
 	own_route = routes.get(section_name)
 	page_count = frappe.db.get_value("Source Document", sec.source_document, "page_count")

@@ -287,11 +287,16 @@ def toggle_include(name: str, include: bool | int | str) -> dict:
 @frappe.whitelist()
 def delete_section(name: str) -> dict:
 	"""Delete a section and its entire subtree, then rebuild the doc tree."""
+	from wikify.engine.refs import extract_references
+
 	source_document, names = _subtree_names(name)
 	# Raw-delete the subtree (the same wholesale approach store.replace_sections uses);
 	# _rebuild_tree re-numbers what remains, so NestedSet stays consistent.
 	frappe.db.delete("Source Section", {"name": ["in", names]})
 	_rebuild_tree(source_document)
+	# Full re-extract: sweeps rows from AND to the deleted subtree, and lets refs that
+	# targeted it re-resolve to a surviving covering section.
+	extract_references(source_document)
 	return {"ok": True, "deleted": len(names)}
 
 
@@ -339,6 +344,9 @@ def create_section(
 		move_section(doc.name, new_parent=parent, new_index=int(index))
 	else:
 		_rebuild_tree(source_document)
+	from wikify.engine.refs import extract_references
+
+	extract_references(source_document, [doc.name])
 	return {"ok": True, "name": doc.name}
 
 
@@ -418,6 +426,11 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 		new_parent=sec.parent_source_section,
 		new_index=siblings.index(name) + 1 if name in siblings else None,
 	)
+	# Full re-extract: both halves have new bodies, and incoming refs to the shared
+	# page range may now resolve to the new sibling.
+	from wikify.engine.refs import extract_references
+
+	extract_references(sec.source_document)
 	return {"ok": True, "name": name, "new_name": new.name, "new_title": title}
 
 
@@ -486,6 +499,11 @@ def merge_sections(names: list | str) -> dict:
 		},
 	)
 	_rebuild_tree(survivor.source_document)
+	# Full re-extract: husks' outgoing rows die with them, and refs that targeted a
+	# husk re-resolve (the survivor now covers the merged page range).
+	from wikify.engine.refs import extract_references
+
+	extract_references(survivor.source_document)
 	return {"ok": True, "name": survivor.name, "merged": len(husks)}
 
 
@@ -502,4 +520,9 @@ def build_graph(import_name: str) -> dict:
 		frappe.throw(_("Nothing to graph — parse hasn't produced a document yet."))
 	imp.db_set("status", "Graphed")
 	frappe.db.set_value("Source Document", imp.source_document, "status", "Graphed")
+	# 0.5: idempotence guard — re-derive the reference edges at the approval milestone
+	# (covers documents parsed before extraction existed, and any drift).
+	from wikify.engine.refs import extract_references
+
+	extract_references(imp.source_document)
 	return {"status": "Graphed"}

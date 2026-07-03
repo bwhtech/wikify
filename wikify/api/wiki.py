@@ -26,6 +26,7 @@ from frappe import _
 from wiki.wiki.markdown import render_markdown
 
 from wikify.engine.loader.wiki import rewrite_page_refs
+from wikify.engine.refs import smallest_covering
 
 _PREVIEW_ROUTE_PREFIX = "section-preview"
 
@@ -78,12 +79,8 @@ def render_section_preview(section: str) -> dict:
 	)
 
 	def route_for_page(n: int) -> str | None:
-		best = None
-		for s in included:
-			ps, pe = s["page_start"], s["page_end"]
-			if ps and pe and ps <= n <= pe and (best is None or pe - ps < best[1]):
-				best = (f"{_PREVIEW_ROUTE_PREFIX}/{s['name']}", pe - ps)
-		return best[0] if best else None
+		best = smallest_covering(included, n)
+		return f"{_PREVIEW_ROUTE_PREFIX}/{best['name']}" if best else None
 
 	current_route = f"{_PREVIEW_ROUTE_PREFIX}/{sec.name}"
 	rewritten, resolved = rewrite_page_refs(

@@ -28,6 +28,14 @@ def slugify(text: str) -> str:
 	return _SLUG_RE.sub("-", text.lower()).strip("-")[:60] or "page"
 
 
+def is_internal_ref(cue: str | None, kind: str, num: int, page_count: int) -> bool:
+	"""A `_PAGEREF_RE` match is an internal cross-reference (vs an external citation like
+	"Williams p820") when it carries a see/refer cue or the "Page No." form, and N is a
+	real page of this PDF. The one definition behind link rewriting (here) and reference
+	extraction (`engine.refs`)."""
+	return (bool(cue) or "no" in kind.lower()) and 1 <= num <= page_count
+
+
 def rewrite_page_refs(
 	markdown: str,
 	page_count: int,
@@ -46,8 +54,7 @@ def rewrite_page_refs(
 
 	def repl(m: re.Match) -> str:
 		cue, kind, num = m.group(1), m.group(2), int(m.group(3))
-		internal = bool(cue) or "no" in kind.lower()  # cross-ref cue or "Page No." form
-		if internal and 1 <= num <= page_count:
+		if is_internal_ref(cue, kind, num, page_count):
 			route = route_for_page(num)
 			if route and route != current_route:
 				links[0] += 1
