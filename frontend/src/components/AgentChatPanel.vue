@@ -118,10 +118,12 @@ const CHIP_ICON = {
 
 const shortModel = (m) => (m || "").split("/").pop() || "Default";
 
-// Session-history dropdown — fetched lazily when opened.
+// Session-history dropdown — fetched lazily when opened. Titles are often whole
+// first prompts; clamp them so the menu stays a sane width next to the window.
+const clamp = (s, n = 48) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 const sessionOptions = computed(() => {
 	const list = (chat.sessions.value || []).map((s) => ({
-		label: s.title || "Untitled chat",
+		label: clamp(s.title || "Untitled chat"),
 		onClick: () => chat.loadSession(s.name),
 	}));
 	return list.length
