@@ -10,8 +10,9 @@
  * Canvas can't consume Tailwind classes, so semantic-token colors are resolved from
  * probe elements at mount and re-resolved on theme change.
  */
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useCall } from "frappe-ui";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { Button, FormControl, useCall } from "frappe-ui";
+import TypeChip from "@/components/TypeChip.vue";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
@@ -28,6 +29,28 @@ const canvas = ref(null);
 const tooltip = ref(null); // {x, y, lines} | null
 const empty = ref(false);
 const refCount = ref(0);
+const meta = ref({ types: [], documents: [] });
+
+// Lenses (Slice 28). Filters dim rather than remove, so the layout stays stable.
+const search = ref("");
+const hiddenTypes = ref(new Set());
+const showHierarchy = ref(true);
+const showRefs = ref(true);
+const sizeMode = ref("pages"); // "pages" | "links"
+const focusDoc = ref(""); // project scope: isolate one document ("" = all)
+const showDocFilter = computed(() => (meta.value.documents || []).length > 1);
+const docOptions = computed(() => [
+	{ label: "All documents", value: "" },
+	...(meta.value.documents || []).map((d) => ({ label: d.label, value: d.id })),
+]);
+
+function toggleType(name) {
+	const next = new Set(hiddenTypes.value);
+	next.has(name) ? next.delete(name) : next.add(name);
+	hiddenTypes.value = next;
+}
+
+watch([search, hiddenTypes, showHierarchy, showRefs, sizeMode, focusDoc], () => scheduleDraw());
 
 const graph = useCall({ url: props.url, method: "POST", immediate: false });
 watch(
@@ -43,6 +66,8 @@ let links = [];
 let neighbors = new Map(); // node id → Set of node ids (REFERENCES + hierarchy)
 let sim = null;
 let transform = zoomIdentity;
+let zoomBehavior = null;
+let userInteracted = false; // a manual pan/zoom disables the settle-time auto-fit
 let hovered = null;
 let hoveredLink = null;
 let dragging = false;
@@ -81,6 +106,7 @@ function resolveColors() {
 
 function radius(n) {
 	if (n.kind === "document") return 11;
+	if (sizeMode.value === "links") return Math.min(14, 4 + Math.sqrt(n.degree || 0) * 2);
 	return Math.min(14, 4 + Math.sqrt(n.span || 0) * 1.1);
 }
 
@@ -101,8 +127,12 @@ function setGraph(data) {
 	empty.value = nodes.filter((n) => n.kind === "section").length === 0;
 	refCount.value = links.filter((l) => l.rel === "REFERENCES").length;
 
+	meta.value = data.meta || { types: [], documents: [] };
 	typeColor = {};
-	for (const t of data.meta?.types || []) typeColor[t.name] = `hsl(${hashHue(t.name)}, 60%, 52%)`;
+	// Prefer the Section Type's stored hex (what TypeChip shows elsewhere in the app);
+	// fall back to the deterministic palette for types without one.
+	for (const t of data.meta?.types || [])
+		typeColor[t.name] = t.color || `hsl(${hashHue(t.name)}, 60%, 52%)`;
 
 	neighbors = new Map(nodes.map((n) => [n.id, new Set([n.id])]));
 	for (const l of links) {
@@ -111,6 +141,7 @@ function setGraph(data) {
 	}
 
 	sim?.stop();
+	userInteracted = false;
 	sim = forceSimulation(nodes)
 		.force(
 			"link",
@@ -124,7 +155,22 @@ function setGraph(data) {
 		// Gentle centering (not forceCenter): keeps disconnected components on-canvas.
 		.force("x", forceX(0).strength(0.06))
 		.force("y", forceY(0).strength(0.06))
-		.on("tick", scheduleDraw);
+		.on("tick", scheduleDraw)
+		.on("end", () => !userInteracted && zoomToFit());
+}
+
+function zoomToFit() {
+	if (!nodes.length || !canvas.value || !zoomBehavior) return;
+	const dpr = window.devicePixelRatio || 1;
+	const w = canvas.value.width / dpr;
+	const h = canvas.value.height / dpr;
+	const xs = nodes.map((n) => n.x);
+	const ys = nodes.map((n) => n.y);
+	const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+	const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+	const k = Math.min(2, 0.9 * Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0)));
+	const t = zoomIdentity.translate(w / 2 - (k * (x0 + x1)) / 2, h / 2 - (k * (y0 + y1)) / 2).scale(k);
+	select(canvas.value).call(zoomBehavior.transform, t);
 }
 
 watch(
@@ -140,7 +186,15 @@ function scheduleDraw() {
 
 function activeSet() {
 	if (hovered) return neighbors.get(hovered.id);
+	const q = search.value.trim().toLowerCase();
+	if (q) return new Set(nodes.filter((n) => n.label.toLowerCase().includes(q)).map((n) => n.id));
 	return null;
+}
+
+function dimmed(n) {
+	if (n.kind === "document") return !!focusDoc.value && n.id !== focusDoc.value;
+	if (n.section_type && hiddenTypes.value.has(n.section_type)) return true;
+	return !!focusDoc.value && n.doc !== focusDoc.value;
 }
 
 function draw() {
@@ -156,11 +210,13 @@ function draw() {
 
 	const active = activeSet();
 	const showAllLabels = transform.k > 1.1;
+	const lit = (n) => !dimmed(n) && (!active || active.has(n.id));
 
 	for (const l of links) {
 		const isRef = l.rel === "REFERENCES";
-		const lit = !active || (active.has(l.source.id) && active.has(l.target.id));
-		ctx.globalAlpha = lit ? (isRef ? 0.85 : 0.45) : 0.06;
+		if (isRef ? !showRefs.value : !showHierarchy.value) continue;
+		const on = lit(l.source) && lit(l.target);
+		ctx.globalAlpha = on ? (isRef ? 0.85 : 0.45) : 0.06;
 		ctx.strokeStyle = isRef ? colors.reference : colors.hierarchy;
 		ctx.lineWidth = l === hoveredLink ? 2.5 : isRef ? 1 + Math.log2(l.weight || 1) : 0.7;
 		ctx.beginPath();
@@ -170,8 +226,7 @@ function draw() {
 	}
 
 	for (const n of nodes) {
-		const lit = !active || active.has(n.id);
-		ctx.globalAlpha = lit ? 1 : 0.12;
+		ctx.globalAlpha = lit(n) ? 1 : 0.12;
 		ctx.fillStyle = nodeColor(n);
 		ctx.beginPath();
 		ctx.arc(n.x, n.y, radius(n), 0, 2 * Math.PI);
@@ -179,7 +234,7 @@ function draw() {
 		if (n.kind === "document") {
 			ctx.strokeStyle = colors.document;
 			ctx.lineWidth = 1.5;
-			ctx.globalAlpha = lit ? 0.4 : 0.08;
+			ctx.globalAlpha = lit(n) ? 0.4 : 0.08;
 			ctx.beginPath();
 			ctx.arc(n.x, n.y, radius(n) + 3, 0, 2 * Math.PI);
 			ctx.stroke();
@@ -190,8 +245,8 @@ function draw() {
 	ctx.textAlign = "center";
 	ctx.font = `${10 / Math.max(1, transform.k * 0.8)}px sans-serif`;
 	for (const n of nodes) {
-		const lit = active ? active.has(n.id) : showAllLabels || n.kind === "document";
-		if (!lit) continue;
+		if (!lit(n)) continue;
+		if (!(active || showAllLabels || n.kind === "document")) continue;
 		ctx.globalAlpha = active ? 1 : 0.75;
 		const label = n.label.length > 34 ? n.label.slice(0, 32) + "…" : n.label;
 		ctx.fillText(label, n.x, n.y - radius(n) - 4 / transform.k);
@@ -292,28 +347,26 @@ function setupInteraction() {
 				e.subject.node.fy = null;
 			})
 	);
-	sel.call(
-		zoom()
-			.scaleExtent([0.1, 8])
-			// A press on a node belongs to drag; empty space (and wheel/pinch) to zoom.
-			.filter((e) => {
-				if (e.type === "mousedown" || e.type === "touchstart") {
-					const rect = canvas.value.getBoundingClientRect();
-					const t = e.touches?.[0] || e;
-					return !findNode(t.clientX - rect.left, t.clientY - rect.top);
-				}
-				return !e.button;
-			})
-			.on("zoom", (e) => {
-				transform = e.transform;
-				scheduleDraw();
-			})
-	);
-	// Start centered: world origin at the canvas middle.
+	zoomBehavior = zoom()
+		.scaleExtent([0.1, 8])
+		// A press on a node belongs to drag; empty space (and wheel/pinch) to zoom.
+		.filter((e) => {
+			if (e.type === "mousedown" || e.type === "touchstart") {
+				const rect = canvas.value.getBoundingClientRect();
+				const t = e.touches?.[0] || e;
+				return !findNode(t.clientX - rect.left, t.clientY - rect.top);
+			}
+			return !e.button;
+		})
+		.on("zoom", (e) => {
+			if (e.sourceEvent) userInteracted = true;
+			transform = e.transform;
+			scheduleDraw();
+		});
+	sel.call(zoomBehavior);
+	// Start centered: world origin at the canvas middle (auto-fit refines on settle).
 	const { clientWidth: w, clientHeight: h } = wrapper.value;
-	const initial = zoomIdentity.translate(w / 2, h / 2);
-	sel.call(zoom().transform, initial);
-	transform = initial;
+	sel.call(zoomBehavior.transform, zoomIdentity.translate(w / 2, h / 2));
 }
 
 function resize() {
@@ -362,6 +415,59 @@ onBeforeUnmount(() => {
 <template>
 	<div ref="wrapper" class="relative h-full w-full overflow-hidden bg-surface-base">
 		<canvas ref="canvas" class="block" />
+
+		<!-- Lens toolbar: filters dim, never remove, so the layout stays put. -->
+		<div
+			class="absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2"
+		>
+			<FormControl
+				v-model="search"
+				type="text"
+				size="sm"
+				placeholder="Search…"
+				class="w-44"
+			/>
+			<Button
+				size="sm"
+				:variant="showHierarchy ? 'subtle' : 'ghost'"
+				:class="showHierarchy ? '' : 'text-ink-gray-4'"
+				label="Hierarchy"
+				@click="showHierarchy = !showHierarchy"
+			/>
+			<Button
+				size="sm"
+				:variant="showRefs ? 'subtle' : 'ghost'"
+				:class="showRefs ? '' : 'text-ink-gray-4'"
+				label="References"
+				@click="showRefs = !showRefs"
+			/>
+			<Button
+				size="sm"
+				variant="ghost"
+				:label="sizeMode === 'pages' ? 'Size: pages' : 'Size: links'"
+				@click="sizeMode = sizeMode === 'pages' ? 'links' : 'pages'"
+			/>
+			<div v-if="showDocFilter" class="w-52">
+				<FormControl v-model="focusDoc" type="select" size="sm" :options="docOptions" />
+			</div>
+		</div>
+
+		<!-- Legend doubles as the type filter (click a chip to dim that type). -->
+		<div
+			v-if="meta.types.length"
+			class="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5"
+		>
+			<TypeChip
+				v-for="t in meta.types"
+				:key="t.name"
+				:label="t.label || t.name"
+				:color="typeColor[t.name]"
+				:count="t.count"
+				:active="!hiddenTypes.has(t.name)"
+				:class="hiddenTypes.has(t.name) ? 'opacity-45' : ''"
+				@click="toggleType(t.name)"
+			/>
+		</div>
 
 		<div
 			v-if="tooltip"

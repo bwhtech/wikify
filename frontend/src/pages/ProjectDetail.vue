@@ -54,6 +54,12 @@ const showNewImport = ref(false);
 
 			<div class="flex items-center gap-2">
 				<Button
+					variant="subtle"
+					label="Graph"
+					icon-left="lucide-waypoints"
+					:route="{ name: 'ProjectGraph', params: { name } }"
+				/>
+				<Button
 					variant="ghost"
 					icon="lucide-settings"
 					:route="{ name: 'ProjectSettings', params: { name } }"

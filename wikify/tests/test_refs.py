@@ -157,6 +157,34 @@ class TestRefs(FrappeTestCase):
 		self.assertEqual(by_id[self.by_title["Alpha"]]["span"], 2)
 		self.assertEqual(g["meta"]["documents"], [{"id": self.sd.name, "label": "Refs Test"}])
 
+	def test_project_graph_payload(self):
+		from wikify.api.graph import get_project_graph
+
+		project = frappe.get_doc({"doctype": "Wikify Project", "project_name": "Graph Test"}).insert(
+			ignore_permissions=True
+		)
+		frappe.db.set_value("Source Document", self.sd.name, "project", project.name)
+		sd2 = frappe.get_doc(
+			{"doctype": "Source Document", "title": "Second Doc", "project": project.name}
+		).insert(ignore_permissions=True)
+		store.replace_sections(sd2.name, [_sec("Solo", 1, ["Solo"], 1, 2)])
+
+		g = get_project_graph(project.name)
+		# Union of both documents: (1 doc + 4 sections) + (1 doc + 1 section).
+		self.assertEqual(len(g["nodes"]), 7)
+		self.assertEqual([d["id"] for d in g["meta"]["documents"]], [self.sd.name, sd2.name])
+		# No cross-document edges: every edge's endpoints live in one document.
+		doc_of = {n["id"]: n.get("doc") or n["id"] for n in g["nodes"]}
+		self.assertTrue(all(doc_of[e["src"]] == doc_of[e["dst"]] for e in g["edges"]))
+
+		empty = frappe.get_doc({"doctype": "Wikify Project", "project_name": "Empty Graph"}).insert(
+			ignore_permissions=True
+		)
+		self.assertEqual(
+			get_project_graph(empty.name),
+			{"nodes": [], "edges": [], "meta": {"types": [], "documents": []}},
+		)
+
 	def test_smallest_covering(self):
 		spans = [
 			{"name": "wide", "page_start": 1, "page_end": 10},

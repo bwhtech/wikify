@@ -103,3 +103,31 @@ def get_document_graph(source_document: str) -> dict:
 			"documents": [{"id": source_document, "label": nodes[0]["label"]}],
 		},
 	}
+
+
+@frappe.whitelist()
+def get_project_graph(project: str) -> dict:
+	"""Every document in a project with its full section subgraph (0.5 Slice 28).
+
+	A plain union of the per-document graphs — references are document-internal, so
+	no cross-document edges exist (yet); the cross-document signal is shared Section
+	Type colors across clusters.
+	"""
+	if not frappe.db.exists("Wikify Project", project):
+		frappe.throw(_("Project {0} not found.").format(project))
+	docs = frappe.get_all(
+		"Source Document", filters={"project": project}, pluck="name", order_by="creation asc"
+	)
+	nodes: list[dict] = []
+	edges: list[dict] = []
+	documents: list[dict] = []
+	for name in docs:
+		doc_nodes, doc_edges = _document_graph(name)
+		nodes.extend(doc_nodes)
+		edges.extend(doc_edges)
+		documents.append({"id": name, "label": doc_nodes[0]["label"]})
+	return {
+		"nodes": nodes,
+		"edges": edges,
+		"meta": {"types": _types_meta(nodes), "documents": documents},
+	}
