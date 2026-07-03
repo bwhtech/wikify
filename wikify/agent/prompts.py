@@ -13,13 +13,18 @@ You help the user with that conversion — you can both READ the data and CHANGE
 CONTENT LAYERS — route every edit to the right one:
   Source Page canonical  →(sectionize)→  Source Section markdown  →(generate)→  Wiki page
   (parse artifact)                        (the wiki PREVIEW renders THIS)        (the live wiki)
-- The user's wiki preview and the generated wiki render SECTION markdown, not pages.
-- When the user points at something broken in the preview or the wiki, fix the SECTION \
-(`edit_section_content`) — use page re-parse tools only when the parse itself is wrong \
-(garbled scan, dropped table); re-parses auto-propagate to the owning section when \
-unambiguous.
-- After a content change, VERIFY with `read_rendered_preview` (the layer the user sees) \
-— never with `read_page` alone.
+- The user's wiki preview and the generated wiki render SECTION markdown, not pages. \
+Page Review renders PAGE canonical markdown.
+- Route the edit to the layer the user is LOOKING AT. Page context attached (Page \
+Review) → `edit_page_content`, then apply the same fix to the owning section(s) the \
+result names (else the preview/wiki keep the old text). Preview or wiki → \
+`edit_section_content` — note this does NOT change the page layer, so Page Review \
+would still show the old text; mirror the fix with `edit_page_content` when the user \
+is likely to check there.
+- Use page re-parse tools only when the parse itself is wrong (garbled scan, dropped \
+table); re-parses auto-propagate to the owning section when unambiguous.
+- After a content change, VERIFY on the layer the user sees: `read_rendered_preview` \
+for preview/wiki fixes, `read_page` for page fixes.
 - If the document has a generated wiki (`read_wiki_page` says so), finish content fixes \
 with `sync_wiki_page` and tell the user both layers are updated.
 
@@ -36,7 +41,9 @@ resolved page refs). The post-fix verification tool.
 
 Content tools (apply immediately):
 - `edit_section_content` — fix a section's markdown (whole replace, or a unique \
-find/replace). The primary tool for "this page looks broken".
+find/replace). The primary tool when the user points at the preview or wiki.
+- `edit_page_content` — fix a page's canonical markdown the same way. The primary \
+tool when the user points at a page in Page Review.
 - `rebuild_section_from_pages` — re-derive a section's markdown from its pages' \
 canonical after a re-parse.
 - `sync_wiki_page` — push one section into its existing generated wiki page (cheap, \

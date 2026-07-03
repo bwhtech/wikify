@@ -19,11 +19,12 @@ from wikify.agent.tools.reparse import _propagate_page
 from wikify.engine import generate_wiki, store
 from wikify.engine.generate import sync_section
 from wikify.engine.loader.sectionizer import Section
-from wikify.tests import _cleanup
 from wikify.engine.sectionize import (
 	rebuild_section_markdown,
 	sections_covering_page,
 )
+from wikify.tests import _cleanup
+
 
 def _add_page(source_document: str, page_no: int, canonical: str) -> str:
 	"""A Source Page row without the rendered-PNG File (File inserts trip the test-mode
@@ -74,7 +75,12 @@ class TestAgentContent(FrappeTestCase):
 			if root:
 				names = frappe.get_all(
 					"Wiki Document",
-					filters={"name": ["in", [root, *get_descendants_of("Wiki Document", root, ignore_permissions=True)]]},
+					filters={
+						"name": [
+							"in",
+							[root, *get_descendants_of("Wiki Document", root, ignore_permissions=True)],
+						]
+					},
 					order_by="lft desc",
 					pluck="name",
 				)
@@ -92,7 +98,16 @@ class TestAgentContent(FrappeTestCase):
 			for r in frappe.get_all(
 				"Source Section",
 				filters={"source_document": self.sd.name},
-				fields=["name", "title", "markdown", "lft", "rgt", "level", "parent_source_section", "wiki_document"],
+				fields=[
+					"name",
+					"title",
+					"markdown",
+					"lft",
+					"rgt",
+					"level",
+					"parent_source_section",
+					"wiki_document",
+				],
 			)
 		}
 
@@ -103,7 +118,8 @@ class TestAgentContent(FrappeTestCase):
 
 	def test_edit_replace_mode(self):
 		out = ct._edit_section_content(
-			self.ctx, {"name": self._name("1. Alpha"), "mode": "replace", "content": "# Fixed\n\n| a | b |\n|---|---|"}
+			self.ctx,
+			{"name": self._name("1. Alpha"), "mode": "replace", "content": "# Fixed\n\n| a | b |\n|---|---|"},
 		)
 		self.assertIn("Updated '1. Alpha'", out)
 		self.assertIn("no wiki generated yet", out)
@@ -136,6 +152,39 @@ class TestAgentContent(FrappeTestCase):
 			self.ctx, {"name": self._name("1. Alpha"), "mode": "replace", "content": "new"}
 		)
 		self.assertIn("sync_wiki_page", out)
+
+	# --- edit_page_content: the Page Review layer -----------------------------------------
+
+	def test_edit_page_find_replace_updates_canonical_and_names_owners(self):
+		out = ct._edit_page_content(
+			self.ctx, {"page_no": 1, "mode": "find_replace", "find": "page 1", "replace": "page ONE"}
+		)
+		self.assertIn("Updated page 1 canonical markdown", out)
+		self.assertIn("'1. Alpha'", out)  # stale downstream named for propagation
+		self.assertIn("edit_section_content", out)
+		self.assertEqual(
+			frappe.db.get_value("Source Page", self.pages[1], "canonical_markdown"),
+			"canonical page ONE",
+		)
+		# Section layer untouched — the result must not claim otherwise.
+		self.assertEqual(self._rows()["1. Alpha"].markdown, "old alpha | broken | table")
+
+	def test_edit_page_boundary_page_names_both_owners(self):
+		out = ct._edit_page_content(self.ctx, {"page_no": 3, "mode": "replace", "content": "new page 3"})
+		self.assertIn("'2. Beta'", out)
+		self.assertIn("'3. Gamma'", out)
+
+	def test_edit_page_rejects_non_unique_find(self):
+		store.set_canonical(self.pages[2], "dup dup", 0.9, "cleanup")
+		out = ct._edit_page_content(
+			self.ctx, {"page_no": 2, "mode": "find_replace", "find": "dup", "replace": "x"}
+		)
+		self.assertIn("found 2", out)
+		self.assertEqual(frappe.db.get_value("Source Page", self.pages[2], "canonical_markdown"), "dup dup")
+
+	def test_edit_page_missing_page(self):
+		out = ct._edit_page_content(self.ctx, {"page_no": 99, "mode": "replace", "content": "x"})
+		self.assertIn("not found", out)
 
 	# --- Slice 18: propagation ----------------------------------------------------------
 
@@ -191,15 +240,19 @@ class TestAgentContent(FrappeTestCase):
 		self._generate()
 		row = self._rows()["1. Alpha"]
 		wd_before = frappe.db.get_value(
-			"Wiki Document", row.wiki_document,
-			["title", "route", "parent_wiki_document", "sort_order"], as_dict=True,
+			"Wiki Document",
+			row.wiki_document,
+			["title", "route", "parent_wiki_document", "sort_order"],
+			as_dict=True,
 		)
 		frappe.db.set_value("Source Section", row.name, "markdown", "## Freshly fixed", update_modified=False)
 		res = sync_section(row.name)
 		self.assertTrue(res["synced"])
 		wd_after = frappe.db.get_value(
-			"Wiki Document", row.wiki_document,
-			["title", "route", "parent_wiki_document", "sort_order", "content"], as_dict=True,
+			"Wiki Document",
+			row.wiki_document,
+			["title", "route", "parent_wiki_document", "sort_order", "content"],
+			as_dict=True,
 		)
 		self.assertEqual(wd_after.content, "## Freshly fixed")
 		for f in ("title", "route", "parent_wiki_document", "sort_order"):

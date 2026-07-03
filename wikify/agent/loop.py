@@ -25,6 +25,7 @@ MAX_ROUNDS = 25
 # changed layers so open views refetch only what they show (0.4 slice 25).
 _TOOL_LAYERS = {
 	"edit_section_content": ["section"],
+	"edit_page_content": ["page"],
 	"rebuild_section_from_pages": ["section"],
 	"sync_wiki_page": ["wiki"],
 	"read_wiki_page": [],
@@ -327,9 +328,7 @@ class AgentRunner:
 		is deferred (0.4 slice 25), not the write.
 		"""
 		frappe.db.commit()
-		self._pending_mutations.append(
-			{"tool": tool_name, "source_document": self.ctx.source_document}
-		)
+		self._pending_mutations.append({"tool": tool_name, "source_document": self.ctx.source_document})
 
 	def _flush_mutations(self) -> None:
 		"""Emit ONE aggregated `wikify_agent_mutation` for everything queued this turn.

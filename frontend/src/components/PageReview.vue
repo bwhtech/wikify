@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Badge, Button, Popover, useList } from "frappe-ui";
+import { Badge, Button, Dropdown, Popover, useList } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
@@ -162,33 +162,31 @@ watch(selected, () => (zoomed.value = false));
 
 const verdictTheme = { pass: "green", escalate: "orange", review: "red" };
 
-// Markdown sub-view: Baseline vs Remediation vs Canonical. Remediation/Canonical
-// options only appear once a remediation pass has produced them for the page.
-const mdView = ref("baseline");
-const mdViews = computed(() => {
+// One content view: the resultant markdown (canonical, else baseline) — what
+// sectionize consumes and what edits change. Baseline / remediation are pipeline
+// internals, reachable from the ⋯ menu for diagnosis; reset per page.
+const mdView = ref("result");
+watch(selected, () => (mdView.value = "result"));
+const mdSources = computed(() => {
 	const p = selected.value;
-	const views = [{ label: "Baseline", key: "baseline" }];
-	if (p?.remediation_method) views.push({ label: "Remediation", key: "remediation" });
-	if (p?.canonical_source) views.push({ label: "Canonical", key: "canonical" });
-	return views;
+	const sources = [{ label: "Result", key: "result" }];
+	if (p?.remediation_method) sources.push({ label: "Remediation", key: "remediation" });
+	if (p?.canonical_source) sources.push({ label: "Baseline", key: "baseline" });
+	return sources;
 });
-// Keep the chosen view valid as the selection changes; prefer canonical when present.
-watch(
-	selected,
-	(p) => {
-		const keys = mdViews.value.map((v) => v.key);
-		if (!keys.includes(mdView.value)) {
-			mdView.value = p?.canonical_source ? "canonical" : "baseline";
-		}
-	},
-	{ immediate: true }
+const sourceMenu = computed(() =>
+	mdSources.value.map((s) => ({
+		label: s.label,
+		icon: mdView.value === s.key ? "lucide-check" : undefined,
+		onClick: () => (mdView.value = s.key),
+	}))
 );
 const mdContent = computed(() => {
 	const p = selected.value;
 	if (!p) return "";
 	if (mdView.value === "remediation") return p.remediation_markdown || "";
-	if (mdView.value === "canonical") return p.canonical_markdown || "";
-	return p.baseline_markdown || "";
+	if (mdView.value === "baseline") return p.baseline_markdown || "";
+	return p.canonical_markdown || p.baseline_markdown || "";
 });
 
 // 0.0 reads as "n/a" for table/judge (no table on the page / not judged). A genuine
@@ -378,7 +376,12 @@ function fmtDelta(v) {
 							</div>
 							<Popover placement="bottom-end">
 								<template #target="{ togglePopover }">
-									<Button label="Details" size="sm" variant="ghost" @click="togglePopover()" />
+									<Button
+										label="Details"
+										size="sm"
+										variant="ghost"
+										@click="togglePopover()"
+									/>
 								</template>
 								<template #body-main>
 									<div class="w-80 p-3">
@@ -424,7 +427,9 @@ function fmtDelta(v) {
 											/>
 											<Badge
 												:label="
-													remediation.adopted ? 'adopted' : 'kept baseline'
+													remediation.adopted
+														? 'adopted'
+														: 'kept baseline'
 												"
 												:theme="remediation.adopted ? 'green' : 'gray'"
 												variant="subtle"
@@ -466,7 +471,9 @@ function fmtDelta(v) {
 					<div v-if="isWide" class="min-h-0 flex-1">
 						<Splitpanes class="h-full" @resized="onSplitResized">
 							<Pane :size="imgPaneSize" :min-size="20">
-								<div class="h-full overflow-auto border-r border-outline-gray-1 p-4">
+								<div
+									class="h-full overflow-auto border-r border-outline-gray-1 p-4"
+								>
 									<img
 										v-if="selected.image"
 										:src="selected.image"
@@ -498,17 +505,27 @@ function fmtDelta(v) {
 										:variant="activeTab === t.key ? 'subtle' : 'ghost'"
 										@click="activeTab = t.key"
 									/>
-									<template v-if="mdViews.length > 1">
-										<span class="mx-1 h-4 w-px bg-outline-gray-2" />
-										<Button
-											v-for="v in mdViews"
-											:key="v.key"
-											:label="v.label"
+									<div class="ml-auto flex items-center gap-1">
+										<Badge
+											v-if="mdView !== 'result'"
+											:label="mdView"
+											theme="orange"
+											variant="subtle"
 											size="sm"
-											:variant="mdView === v.key ? 'subtle' : 'ghost'"
-											@click="mdView = v.key"
 										/>
-									</template>
+										<Dropdown
+											v-if="sourceMenu.length > 1"
+											:options="sourceMenu"
+											placement="bottom-end"
+										>
+											<Button
+												icon="lucide-more-horizontal"
+												size="sm"
+												variant="ghost"
+												aria-label="Markdown source"
+											/>
+										</Dropdown>
+									</div>
 								</div>
 								<div class="min-h-0 flex-1 overflow-auto">
 									<MarkdownPreview
@@ -545,25 +562,30 @@ function fmtDelta(v) {
 								:variant="activeTab === t.key ? 'subtle' : 'ghost'"
 								@click="activeTab = t.key"
 							/>
-						</div>
-
-						<!-- Markdown source toggle (Baseline / Remediation / Canonical) — applies
-						     to both the formatted Preview and the raw Markdown tabs. -->
-						<div
-							v-if="
-								(activeTab === 'preview' || activeTab === 'markdown') &&
-								mdViews.length > 1
-							"
-							class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-1.5"
-						>
-							<Button
-								v-for="v in mdViews"
-								:key="v.key"
-								:label="v.label"
-								size="sm"
-								:variant="mdView === v.key ? 'subtle' : 'ghost'"
-								@click="mdView = v.key"
-							/>
+							<div
+								v-if="activeTab !== 'page'"
+								class="ml-auto flex items-center gap-1"
+							>
+								<Badge
+									v-if="mdView !== 'result'"
+									:label="mdView"
+									theme="orange"
+									variant="subtle"
+									size="sm"
+								/>
+								<Dropdown
+									v-if="sourceMenu.length > 1"
+									:options="sourceMenu"
+									placement="bottom-end"
+								>
+									<Button
+										icon="lucide-more-horizontal"
+										size="sm"
+										variant="ghost"
+										aria-label="Markdown source"
+									/>
+								</Dropdown>
+							</div>
 						</div>
 
 						<div class="min-h-0 flex-1 overflow-auto">
