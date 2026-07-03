@@ -20,6 +20,13 @@ const routes = [
 		props: true,
 	},
 	{
+		// Static segment outranks the :tab? param below, so /graph never lands there.
+		path: "/import/:name/graph",
+		name: "ImportGraph",
+		component: () => import("@/pages/ImportGraph.vue"),
+		props: true,
+	},
+	{
 		path: "/import/:name/:tab?",
 		name: "ImportDetail",
 		component: () => import("@/pages/ImportDetail.vue"),

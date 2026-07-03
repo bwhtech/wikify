@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { Badge, Button, Dropdown, Tree, dialog, useCall, useList, toast } from "frappe-ui";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
@@ -11,6 +11,8 @@ const props = defineProps({
 	docTitle: { type: String, default: "Document" },
 	importName: { type: String, default: null },
 	status: { type: String, default: null },
+	// Deep-link target (0.5 graph view click-through): selected + scrolled to on load.
+	initialSection: { type: String, default: null },
 });
 const emit = defineEmits(["graphed"]);
 
@@ -88,7 +90,16 @@ watch(
 			else roots.push(nodes[r.name]);
 		}
 		tree.value = roots;
-		if (roots.length && !byName.value[selectedName.value]) selectedName.value = roots[0].name;
+		if (roots.length && !byName.value[selectedName.value]) {
+			const wanted = props.initialSection && nodes[props.initialSection] ? props.initialSection : null;
+			selectedName.value = wanted || roots[0].name;
+			if (wanted)
+				nextTick(() =>
+					document
+						.querySelector(`[data-section-row="${wanted}"]`)
+						?.scrollIntoView({ block: "center" })
+				);
+		}
 	},
 	{ immediate: true, deep: false }
 );
@@ -284,6 +295,7 @@ async function buildGraph() {
 							<div
 								class="group flex min-w-0 flex-1 items-center gap-1.5 rounded py-0.5 pr-1"
 								:class="selectedName === node.name ? 'bg-surface-gray-3' : ''"
+								:data-section-row="node.name"
 							>
 								<button
 									v-if="hasChildren"

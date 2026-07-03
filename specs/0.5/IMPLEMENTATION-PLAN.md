@@ -11,7 +11,7 @@ Each slice cuts through every layer it touches and ends demoable on its own.
 | # | Slice | Type | Blocked by | Status |
 |---|---|---|---|---|
 | 26 | Reference spine — `Section Reference` DocType, `engine/refs.py` extraction, shared span-resolver on the store seam, content-mutation triggers, backfill patch | AFK | — | ✅ |
-| 27 | Document graph — `api/graph.get_document_graph` + `GraphView.vue` (d3-force canvas: physics, hover fade, click-nav, zoom/pan/drag, theming) + `/imports/:id/graph` route & entry button | HITL | 26 | ⬜ |
+| 27 | Document graph — `api/graph.get_document_graph` + `GraphView.vue` (d3-force canvas: physics, hover fade, click-nav, zoom/pan/drag, theming) + `/import/:name/graph` route & entry button | HITL | 26 | ✅ |
 | 28 | Project graph + lenses — `get_project_graph`, `/projects/:id/graph` route & entry button, search, type filter, edge toggles, size-by, document filter, legend, perf pass | HITL | 27 | ⬜ |
 
 **Spine:** 26 → 27 → 28, strictly sequential — 27 renders what 26 persists; 28 scales

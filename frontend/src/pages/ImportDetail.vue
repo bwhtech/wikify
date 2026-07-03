@@ -205,21 +205,30 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 				}}</span>
 			</div>
 
-			<Dropdown
-				v-if="canRemediate"
-				:options="[
-					{ label: 'Remediate flagged', onClick: () => runRemediation('flagged') },
-					{ label: 'Remediate all pages', onClick: () => runRemediation('all') },
-				]"
-			>
+			<div class="flex items-center gap-2">
 				<Button
-					variant="solid"
-					theme="gray"
-					label="Remediate"
-					icon-right="lucide-chevron-down"
-					:loading="remediate.loading"
+					v-if="imp.doc?.source_document"
+					variant="subtle"
+					label="Graph"
+					icon-left="lucide-waypoints"
+					:route="{ name: 'ImportGraph', params: { name: props.name } }"
 				/>
-			</Dropdown>
+				<Dropdown
+					v-if="canRemediate"
+					:options="[
+						{ label: 'Remediate flagged', onClick: () => runRemediation('flagged') },
+						{ label: 'Remediate all pages', onClick: () => runRemediation('all') },
+					]"
+				>
+					<Button
+						variant="solid"
+						theme="gray"
+						label="Remediate"
+						icon-right="lucide-chevron-down"
+						:loading="remediate.loading"
+					/>
+				</Dropdown>
+			</div>
 		</header>
 
 		<Tabs v-model="activeTab" :tabs="tabs">
@@ -307,6 +316,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:doc-title="imp.doc?.import_title || name"
 						:import-name="name"
 						:status="status"
+						:initial-section="route.query.section"
 						@graphed="imp.reload()"
 					/>
 				</div>
