@@ -7,6 +7,7 @@ import {
 	Dialog,
 	ErrorMessage,
 	FormControl,
+	PageHeader,
 	Skeleton,
 	useCall,
 	useList,
@@ -31,10 +32,10 @@ const projects = useList({
 // default is never archivable, so it always shows).
 const showArchived = ref(false);
 const visibleProjects = computed(() =>
-	(projects.data || []).filter((p) => showArchived.value || p.status !== "Archived")
+	(projects.data || []).filter((p) => showArchived.value || p.status !== "Archived"),
 );
 const archivedCount = computed(
-	() => (projects.data || []).filter((p) => p.status === "Archived").length
+	() => (projects.data || []).filter((p) => p.status === "Archived").length,
 );
 
 const showNew = ref(false);
@@ -69,10 +70,8 @@ function openProject(name) {
 </script>
 
 <template>
-	<div class="flex h-full flex-col">
-		<header
-			class="sticky top-0 z-10 flex min-h-12 items-center justify-between border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
-		>
+	<div>
+		<PageHeader>
 			<h1 class="text-md text-ink-gray-9">Projects</h1>
 			<div class="flex items-center gap-2">
 				<Button
@@ -90,7 +89,7 @@ function openProject(name) {
 					@click="showNew = true"
 				/>
 			</div>
-		</header>
+		</PageHeader>
 
 		<div class="body-container pt-5 pb-40">
 			<!-- Loading skeleton (first load only — reloads keep the cards) -->

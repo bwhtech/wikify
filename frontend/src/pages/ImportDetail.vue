@@ -1,7 +1,17 @@
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Badge, Button, Dropdown, Progress, Tabs, useCall, useDoc, useList } from "frappe-ui";
+import {
+	Badge,
+	Button,
+	Dropdown,
+	PageHeader,
+	Progress,
+	Tabs,
+	useCall,
+	useDoc,
+	useList,
+} from "frappe-ui";
 import { useSocket } from "@/socket";
 import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
@@ -52,7 +62,7 @@ watch(
 	(key) => {
 		const i = tabKeys.indexOf(key);
 		if (i >= 0 && i !== activeTab.value) activeTab.value = i;
-	}
+	},
 );
 
 // Streaming log
@@ -78,7 +88,7 @@ watch(
 		if (sd) setDocument({ name: sd, label: imp.doc?.import_title || props.name }, projectChip);
 		else if (projectChip) setProject(projectChip);
 	},
-	{ immediate: true }
+	{ immediate: true },
 );
 
 const pageReview = ref(null);
@@ -93,7 +103,9 @@ const sdStats = useList({
 	auto: true,
 });
 const sourceStats = computed(() => sdStats.data?.[0] || null);
-const docAudit = computed(() => sourceStats.value?.canonical_mean ?? sourceStats.value?.mean_score);
+const docAudit = computed(
+	() => sourceStats.value?.canonical_mean ?? sourceStats.value?.mean_score,
+);
 function fmtCost(v) {
 	return v ? `$${Number(v).toFixed(4)}` : "—";
 }
@@ -164,10 +176,8 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 </script>
 
 <template>
-	<div class="flex h-full flex-col">
-		<header
-			class="sticky top-0 z-10 flex min-h-12 items-center justify-between gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
-		>
+	<div>
+		<PageHeader>
 			<div class="flex min-w-0 items-center gap-3">
 				<Button
 					variant="ghost"
@@ -229,7 +239,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					/>
 				</Dropdown>
 			</div>
-		</header>
+		</PageHeader>
 
 		<Tabs v-model="activeTab" :tabs="tabs">
 			<template #tab-panel="{ tab }">

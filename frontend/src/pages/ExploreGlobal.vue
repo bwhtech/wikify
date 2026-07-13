@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, FormControl, useCall, useList } from "frappe-ui";
+import { Badge, FormControl, PageHeader, useCall, useList } from "frappe-ui";
 
 const router = useRouter();
 
@@ -35,7 +35,7 @@ const matchCount = computed(() => (groups.data || []).reduce((n, g) => n + g.sec
 
 const selectedType = ref(null);
 const selected = computed(
-	() => types.value.find((t) => t.type_name === selectedType.value) || null
+	() => types.value.find((t) => t.type_name === selectedType.value) || null,
 );
 
 // Re-pull the type summary whenever the project scope changes; the selected-type watcher
@@ -63,18 +63,20 @@ function pageRange(s) {
 
 <template>
 	<div class="flex h-full flex-col">
-		<header
-			class="sticky top-0 z-10 flex min-h-12 items-center gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
-		>
-			<h1 class="text-md text-ink-gray-9">Explore</h1>
-			<span class="text-sm text-ink-gray-5">Sections by type across documents</span>
+		<PageHeader>
+			<div class="flex min-w-0 items-center gap-3">
+				<h1 class="text-md text-ink-gray-9">Explore</h1>
+				<span class="truncate text-sm text-ink-gray-5"
+					>Sections by type across documents</span
+				>
+			</div>
 			<FormControl
 				v-model="selectedProject"
 				type="select"
 				:options="projectOptions"
-				class="ml-auto w-48"
+				class="w-48"
 			/>
-		</header>
+		</PageHeader>
 
 		<!-- Empty state: nothing classified anywhere yet -->
 		<div

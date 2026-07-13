@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Button, ErrorMessage, FormControl, toast, useCall, useDoc } from "frappe-ui";
+import { Button, ErrorMessage, FormControl, PageHeader, toast, useCall, useDoc } from "frappe-ui";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -40,7 +40,7 @@ watch(
 			archived: doc.status === "Archived",
 		};
 	},
-	{ immediate: true }
+	{ immediate: true },
 );
 
 const save = useCall({
@@ -67,10 +67,8 @@ function submit() {
 </script>
 
 <template>
-	<div class="flex h-full flex-col">
-		<header
-			class="sticky top-0 z-10 flex min-h-12 items-center justify-between gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
-		>
+	<div>
+		<PageHeader>
 			<div class="flex min-w-0 items-center gap-2">
 				<Button
 					variant="ghost"
@@ -93,7 +91,7 @@ function submit() {
 					<span class="truncate text-ink-gray-9">Settings</span>
 				</nav>
 			</div>
-		</header>
+		</PageHeader>
 
 		<div class="body-container pt-5 pb-40">
 			<div class="flex max-w-2xl flex-col gap-5">

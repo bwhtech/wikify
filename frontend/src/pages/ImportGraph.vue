@@ -5,7 +5,7 @@
  * import's Tree tab with that section selected (`?section=` deep link).
  */
 import { useRouter } from "vue-router";
-import { Button, useDoc } from "frappe-ui";
+import { Button, PageHeader, useDoc } from "frappe-ui";
 import GraphView from "@/components/GraphView.vue";
 
 const props = defineProps({
@@ -29,30 +29,30 @@ function onSelect(node) {
 </script>
 
 <template>
-	<div class="flex h-screen flex-col">
-		<header
-			class="sticky top-0 z-10 flex min-h-12 items-center gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
-		>
-			<Button
-				variant="ghost"
-				icon="lucide-arrow-left"
-				:route="{ name: 'ImportDetail', params: { name: props.name } }"
-			/>
-			<RouterLink
-				v-if="imp.doc?.project"
-				:to="{ name: 'ProjectDetail', params: { name: imp.doc.project } }"
-				class="shrink-0 text-base text-ink-gray-5 hover:text-ink-gray-7"
-				>{{ imp.doc.project_name || "Project" }}
-				<span class="text-ink-gray-4" aria-hidden="true">/</span></RouterLink
-			>
-			<RouterLink
-				:to="{ name: 'ImportDetail', params: { name: props.name } }"
-				class="truncate text-base text-ink-gray-5 hover:text-ink-gray-7"
-				>{{ imp.doc?.import_title || props.name }}
-				<span class="text-ink-gray-4" aria-hidden="true">/</span></RouterLink
-			>
-			<h1 class="text-md text-ink-gray-9">Graph</h1>
-		</header>
+	<div class="flex h-full flex-col">
+		<PageHeader>
+			<div class="flex min-w-0 items-center gap-3">
+				<Button
+					variant="ghost"
+					icon="lucide-arrow-left"
+					:route="{ name: 'ImportDetail', params: { name: props.name } }"
+				/>
+				<RouterLink
+					v-if="imp.doc?.project"
+					:to="{ name: 'ProjectDetail', params: { name: imp.doc.project } }"
+					class="shrink-0 text-base text-ink-gray-5 hover:text-ink-gray-7"
+					>{{ imp.doc.project_name || "Project" }}
+					<span class="text-ink-gray-4" aria-hidden="true">/</span></RouterLink
+				>
+				<RouterLink
+					:to="{ name: 'ImportDetail', params: { name: props.name } }"
+					class="truncate text-base text-ink-gray-5 hover:text-ink-gray-7"
+					>{{ imp.doc?.import_title || props.name }}
+					<span class="text-ink-gray-4" aria-hidden="true">/</span></RouterLink
+				>
+				<h1 class="text-md text-ink-gray-9">Graph</h1>
+			</div>
+		</PageHeader>
 
 		<div class="min-h-0 flex-1">
 			<GraphView

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from "vue";
-import { Badge, Button, useDoc } from "frappe-ui";
+import { Badge, Button, PageHeader, useDoc } from "frappe-ui";
 import ImportList from "@/pages/ImportList.vue";
 import NewImportDialog from "@/components/NewImportDialog.vue";
 import { setProject } from "@/data/agentContext";
@@ -15,21 +15,19 @@ const project = useDoc({ doctype: "Wikify Project", name: props.name });
 watch(
 	() => props.name,
 	(name) => name && setProject({ name, label: project.doc?.project_name || name }),
-	{ immediate: true }
+	{ immediate: true },
 );
 watch(
 	() => project.doc?.project_name,
-	(label) => label && setProject({ name: props.name, label })
+	(label) => label && setProject({ name: props.name, label }),
 );
 
 const showNewImport = ref(false);
 </script>
 
 <template>
-	<div class="flex h-full flex-col">
-		<header
-			class="sticky top-0 z-10 flex min-h-12 items-center justify-between gap-3 border-b border-outline-gray-1 bg-surface-base px-3 sm:px-5"
-		>
+	<div>
+		<PageHeader>
 			<div class="flex min-w-0 items-center gap-2">
 				<Button variant="ghost" icon="lucide-arrow-left" :route="{ name: 'Projects' }" />
 				<nav class="flex min-w-0 items-center gap-1.5 text-base">
@@ -72,7 +70,7 @@ const showNewImport = ref(false);
 					@click="showNewImport = true"
 				/>
 			</div>
-		</header>
+		</PageHeader>
 
 		<ImportList :project="name" @new-import="showNewImport = true" />
 
