@@ -12,6 +12,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Badge, Button, FormControl, useCall } from "frappe-ui";
+import { useSocket } from "@/socket";
 import TypeChip from "@/components/TypeChip.vue";
 import { useIsNarrow } from "@/composables/useMediaQuery";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
@@ -111,6 +112,25 @@ watch(
 	{ immediate: true, deep: true }
 );
 
+// The agent's end-of-turn mutation batch (0.4 slice 25) retags/moves/merges/splits the
+// very sections drawn here. The batch names source documents, not sections, so match it
+// against the documents this graph already draws — `meta.documents` is the document scope's
+// single document and the project scope's whole set, which keeps one listener correct for
+// both routes. Layers not affecting structure (a wiki sync, a page edit) leave the graph
+// alone, so they don't pay for a full refetch.
+const socket = useSocket();
+async function onAgentMutation(payload) {
+	const mutatedDocuments =
+		payload.source_documents || (payload.source_document ? [payload.source_document] : []);
+	const drawnDocuments = (meta.value.documents || []).map((document) => document.id);
+	if (!mutatedDocuments.some((name) => drawnDocuments.includes(name))) return;
+	const layers = payload.layers;
+	if (layers && !["tree", "section", "taxonomy"].some((layer) => layers.includes(layer))) return;
+	await graph.submit(props.params);
+}
+onMounted(() => socket?.on("wikify_agent_mutation", onAgentMutation));
+onBeforeUnmount(() => socket?.off("wikify_agent_mutation", onAgentMutation));
+
 // --- non-reactive render state (perf: the tick loop must not touch Vue proxies) ---
 let ctx = null;
 let nodes = [];
@@ -172,7 +192,14 @@ function nodeColor(n) {
 
 function setGraph(data) {
 	const ids = new Set(data.nodes.map((n) => n.id));
-	nodes = data.nodes.map((n) => ({ ...n }));
+	// A refetch (agent edit) re-solves a layout the reader has already read. Seed the
+	// surviving nodes at the coordinates they hold now so the graph settles in place
+	// instead of scattering and flying back.
+	const settled = new Map(nodes.map((n) => [n.id, n]));
+	nodes = data.nodes.map((n) => {
+		const previous = settled.get(n.id);
+		return previous ? { ...n, x: previous.x, y: previous.y, vx: 0, vy: 0 } : { ...n };
+	});
 	links = data.edges
 		.filter((e) => ids.has(e.src) && ids.has(e.dst))
 		.map((e) => ({ ...e, source: e.src, target: e.dst }));
@@ -194,7 +221,9 @@ function setGraph(data) {
 
 	sim?.stop();
 	sim = null;
-	userInteracted = false;
+	// Only a first layout earns the settle-time auto-fit; refetching under a reader who
+	// has panned or zoomed must not yank the viewport back to a fit.
+	if (!settled.size) userInteracted = false;
 	// Narrow screens render the list, so there is no layout to solve — don't spend a
 	// phone's battery on a force simulation nobody sees.
 	if (isNarrow.value) return;
@@ -490,6 +519,8 @@ watch(isNarrow, async (narrow) => {
 	}
 	await nextTick();
 	addCanvas();
+	// A rebuilt canvas starts on a fresh transform, so this layout has to be re-fitted.
+	userInteracted = false;
 	if (graph.data) setGraph(graph.data);
 });
 
