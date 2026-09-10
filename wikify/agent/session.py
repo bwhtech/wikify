@@ -86,8 +86,6 @@ def history_messages(session: str) -> list[dict]:
 		limit=HISTORY_LIMIT,
 	)
 	rows.reverse()
-	# The window cuts through the middle of a turn, so leading tool results whose
-	# assistant tool_calls parent fell outside it are orphans the provider rejects.
 	while rows and rows[0].role == "tool":
 		rows.pop(0)
 	messages: list[dict] = []

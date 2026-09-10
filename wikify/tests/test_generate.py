@@ -2,8 +2,6 @@
 # For license information, please see license.txt
 from itertools import pairwise
 
-from unittest.mock import patch
-
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.nestedset import get_descendants_of
@@ -207,7 +205,6 @@ class TestWikiGenerate(FrappeTestCase):
 		self.assertEqual(DATA_MAX_LENGTH, frappe.db.VARCHAR_LEN)
 
 	def test_deep_tree_with_long_titles_stays_within_route_limit(self):
-		# Nine nested 120-char titles: the old ancestor-chain route ran past 500 chars.
 		titles = [f"{i + 1}. " + f"Requirements and responsibilities {i + 1} " * 3 for i in range(9)]
 		store.replace_sections(
 			self.sd.name, [_sec(title, i + 1, titles[: i + 1], 1, 5) for i, title in enumerate(titles)]
@@ -226,8 +223,6 @@ class TestWikiGenerate(FrappeTestCase):
 			self.assertEqual(child.route.rsplit("/", 1)[0], docs[res["root_group"]].route)
 
 	def test_title_longer_than_the_column_width_is_truncated(self):
-		# Wiki Revision Item.title stays Data even where Wiki Document.title was widened,
-		# so the trim has to happen regardless of how this install is customised.
 		long_title = "1. " + "Transplant coordinator responsibilities " * 5
 		store.replace_sections(self.sd.name, [_sec(long_title, 1, [long_title], 1, 5)])
 		res = self._generate()

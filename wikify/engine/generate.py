@@ -31,7 +31,7 @@ from wikify.engine import store
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
 from wikify.engine.refs import smallest_covering
 
-DATA_MAX_LENGTH = 140  # Frappe's Data column width — `Wiki Document.route` and `.title` are both Data
+DATA_MAX_LENGTH = 140
 
 
 def _upsert_wiki_document(
@@ -54,9 +54,6 @@ def _upsert_wiki_document(
 		doc = frappe.get_doc("Wiki Document", existing)
 	else:
 		doc = frappe.new_doc("Wiki Document")
-	# Source Section.title is Small Text, so a long PDF heading overflows Data on the way in.
-	# Widening Wiki Document.title alone does not help: the wiki app mirrors the title into
-	# Wiki Revision Item.title, which stays Data, so the narrower column is what binds.
 	doc.title = title[:DATA_MAX_LENGTH]
 	doc.is_group = 1 if is_group else 0
 	doc.is_published = 1
@@ -89,15 +86,7 @@ def _resolve_or_create_space(wiki_space: str | None, new_space: dict | None):
 
 
 def bounded_route(prefix: str, title: str, identifier: str) -> tuple[str, str]:
-	"""(route, slug) for `<prefix>/<title-slug>-<identifier>`.
-
-	The identifier carries identity (so the slug never has to be sibling-unique) and the
-	slug is decorative: it is truncated to whatever the route field leaves after
-	the prefix and the identifier, which makes overflow structurally impossible rather
-	than merely unlikely. Deep trees used to accumulate one segment per ancestor and blow
-	the field, aborting the whole generation.
-	"""
-	budget = DATA_MAX_LENGTH - len(prefix) - len(identifier) - 2  # the "/" and the "-"
+	budget = DATA_MAX_LENGTH - len(prefix) - len(identifier) - 2
 	slug = slugify(title)[:budget].strip("-") if budget > 0 else ""
 	slug = f"{slug}-{identifier}" if slug else identifier
 	return f"{prefix}/{slug}", slug
@@ -145,9 +134,6 @@ class _WikiGenerator:
 			self.stage_cb(label)
 
 	def _ensure_root_group(self) -> None:
-		# Per-document root group — namespaces routes (<space>/<doc>/…) so a space can hold
-		# many imports tidily, and gives the cross-document corpus a stable home. The
-		# document name keeps two same-titled imports in one space from colliding.
 		route, slug = bounded_route(self.space.route, self.sd.title, self.sd.name)
 		self.root_group = _upsert_wiki_document(
 			self.sd.wiki_root_group,
@@ -187,7 +173,6 @@ class _WikiGenerator:
 		self.deleted = len(stale)
 
 	def _parent_for(self, section: dict) -> str:
-		"""Wiki name of the nearest already-built ancestor, else the root group."""
 		parent = section["parent_source_section"]
 		anc = self.by_name.get(parent) if parent else None
 		while anc is not None:
@@ -204,11 +189,6 @@ class _WikiGenerator:
 		return "" if section["is_group"] else f"# {section['title']}\n"
 
 	def _build_structure(self) -> None:
-		"""Pass 1: walk included sections (parents precede children by lft) into pages.
-
-		Hierarchy lives in `parent_wiki_document`; routes stay flat under the root group so
-		they cannot grow with tree depth.
-		"""
 		sort_counter: dict[str, int] = {}  # parent wiki name → next sort_order
 		total = len(self.included)
 		for i, s in enumerate(self.included):

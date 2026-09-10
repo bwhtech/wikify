@@ -266,13 +266,6 @@ def set_section_type(name: str, section_type: str | None) -> None:
 
 
 def resolve_parent_indexes(sections) -> list[int | None]:
-	"""Map each section to its parent's index by position and depth.
-
-	Titles are not unique inside a document — a manual can carry 35 root sections all
-	called "NEPHROLOGY MANUAL" — so the hierarchy_path cannot key the tree. The sections
-	arrive in document order and their depth is the sectionizer's own heading stack, so
-	the parent is the open section one level up.
-	"""
 	open_sections: list[tuple[int, int]] = []
 	parent_indexes: list[int | None] = []
 	for index, section in enumerate(sections):

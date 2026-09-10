@@ -273,7 +273,6 @@ def _tree_section(title, path):
 
 
 def _parents_by_hierarchy_path(sections):
-	"""The pre-fix keying: parent looked up by the section's title path."""
 	path_to_index = {}
 	parents = []
 	for index, section in enumerate(sections):

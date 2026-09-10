@@ -112,12 +112,6 @@ watch(
 	{ immediate: true, deep: true }
 );
 
-// The agent's end-of-turn mutation batch (0.4 slice 25) retags/moves/merges/splits the
-// very sections drawn here. The batch names source documents, not sections, so match it
-// against the documents this graph already draws — `meta.documents` is the document scope's
-// single document and the project scope's whole set, which keeps one listener correct for
-// both routes. Layers not affecting structure (a wiki sync, a page edit) leave the graph
-// alone, so they don't pay for a full refetch.
 const socket = useSocket();
 async function onAgentMutation(payload) {
 	const mutatedDocuments =
@@ -192,9 +186,6 @@ function nodeColor(n) {
 
 function setGraph(data) {
 	const ids = new Set(data.nodes.map((n) => n.id));
-	// A refetch (agent edit) re-solves a layout the reader has already read. Seed the
-	// surviving nodes at the coordinates they hold now so the graph settles in place
-	// instead of scattering and flying back.
 	const settled = new Map(nodes.map((n) => [n.id, n]));
 	nodes = data.nodes.map((n) => {
 		const previous = settled.get(n.id);
@@ -221,8 +212,6 @@ function setGraph(data) {
 
 	sim?.stop();
 	sim = null;
-	// Only a first layout earns the settle-time auto-fit; refetching under a reader who
-	// has panned or zoomed must not yank the viewport back to a fit.
 	if (!settled.size) userInteracted = false;
 	// Narrow screens render the list, so there is no layout to solve — don't spend a
 	// phone's battery on a force simulation nobody sees.
@@ -519,7 +508,6 @@ watch(isNarrow, async (narrow) => {
 	}
 	await nextTick();
 	addCanvas();
-	// A rebuilt canvas starts on a fresh transform, so this layout has to be re-fitted.
 	userInteracted = false;
 	if (graph.data) setGraph(graph.data);
 });
