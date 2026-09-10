@@ -390,3 +390,38 @@ class TestSearchSectionsRecall(FrappeTestCase):
 		)[0]
 		self.assertIn("3 of 3 section(s)", tool_result)
 		self.assertIn("Ward Sister", tool_result)
+
+
+class TestAgentHistoryWindow(FrappeTestCase):
+	def setUp(self):
+		_cleanup.register_session_sweep(self)
+		self.session = session.get_or_create(None, user="Administrator").name
+
+	def test_window_keeps_the_newest_messages(self):
+		for i in range(session.HISTORY_LIMIT + 5):
+			session.append_message(self.session, "user", f"turn {i}")
+
+		messages = session.history_messages(self.session)
+
+		self.assertEqual(len(messages), session.HISTORY_LIMIT)
+		self.assertEqual(messages[-1]["content"], f"turn {session.HISTORY_LIMIT + 4}")
+		self.assertEqual(messages[0]["content"], "turn 5")
+
+	def test_window_drops_tool_results_orphaned_by_the_cut(self):
+		session.append_message(self.session, "user", "retag everything")
+		session.append_message(
+			self.session,
+			"assistant",
+			"",
+			tool_calls=[{"id": f"call_{i}", "name": "set_section_type", "args": {}} for i in range(39)],
+		)
+		for i in range(39):
+			session.append_message(
+				self.session, "tool", "tagged", tool_name="set_section_type", tool_call_id=f"call_{i}"
+			)
+		session.append_message(self.session, "user", "now fix the redundant types")
+
+		messages = session.history_messages(self.session)
+
+		self.assertNotEqual(messages[0]["role"], "tool")
+		self.assertEqual(messages[-1]["content"], "now fix the redundant types")

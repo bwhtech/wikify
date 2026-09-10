@@ -82,9 +82,14 @@ def history_messages(session: str) -> list[dict]:
 		"Wikify Agent Message",
 		filters={"session": session},
 		fields=["role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
-		order_by="creation asc",
+		order_by="creation desc",
 		limit=HISTORY_LIMIT,
 	)
+	rows.reverse()
+	# The window cuts through the middle of a turn, so leading tool results whose
+	# assistant tool_calls parent fell outside it are orphans the provider rejects.
+	while rows and rows[0].role == "tool":
+		rows.pop(0)
 	messages: list[dict] = []
 	for r in rows:
 		if r.status in ("error", "clarification"):
