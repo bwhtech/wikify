@@ -265,11 +265,32 @@ def set_section_type(name: str, section_type: str | None) -> None:
 	frappe.db.set_value("Source Section", name, "section_type", section_type, update_modified=False)
 
 
+def resolve_parent_indexes(sections) -> list[int | None]:
+	"""Map each section to its parent's index by position and depth.
+
+	Titles are not unique inside a document — a manual can carry 35 root sections all
+	called "NEPHROLOGY MANUAL" — so the hierarchy_path cannot key the tree. The sections
+	arrive in document order and their depth is the sectionizer's own heading stack, so
+	the parent is the open section one level up.
+	"""
+	open_sections: list[tuple[int, int]] = []
+	parent_indexes: list[int | None] = []
+	for index, section in enumerate(sections):
+		depth = len(section.hierarchy_path)
+		while open_sections and open_sections[-1][0] >= depth:
+			open_sections.pop()
+		parent = open_sections[-1] if open_sections else None
+		parent_indexes.append(parent[1] if parent and parent[0] == depth - 1 else None)
+		open_sections.append((depth, index))
+	return parent_indexes
+
+
 def replace_sections(source_document: str, sections) -> int:
 	from wikify.rag import events
 
-	parent_paths = {tuple(s.hierarchy_path[:-1]) for s in sections if len(s.hierarchy_path) > 1}
-	path_to_name: dict[tuple[str, ...], str] = {}
+	parent_indexes = resolve_parent_indexes(sections)
+	group_indexes = {index for index in parent_indexes if index is not None}
+	names: list[str] = []
 	suspended_by_caller = events.indexing_suspended()
 	save_point = f"wikify_replace_sections_{frappe.generate_hash(length=8)}"
 	frappe.db.savepoint(save_point)
@@ -277,10 +298,11 @@ def replace_sections(source_document: str, sections) -> int:
 		try:
 			frappe.db.delete("Source Section", {"source_document": source_document})
 			for idx, sec in enumerate(sections):
+				parent_index = parent_indexes[idx]
 				doc = frappe.new_doc("Source Section")
 				doc.source_document = source_document
-				doc.parent_source_section = path_to_name.get(tuple(sec.hierarchy_path[:-1]))
-				doc.is_group = 1 if tuple(sec.hierarchy_path) in parent_paths else 0
+				doc.parent_source_section = None if parent_index is None else names[parent_index]
+				doc.is_group = 1 if idx in group_indexes else 0
 				doc.title = sec.title
 				doc.section_type = sec.section_type
 				doc.level = sec.level
@@ -290,7 +312,7 @@ def replace_sections(source_document: str, sections) -> int:
 				doc.sort_order = idx
 				doc.markdown = sec.markdown
 				doc.insert(ignore_permissions=True)
-				path_to_name[tuple(sec.hierarchy_path)] = doc.name
+				names.append(doc.name)
 		except Exception:
 			frappe.db.rollback(save_point=save_point)
 			raise
