@@ -50,6 +50,9 @@ export function useAgentChat() {
 	function rebind() {
 		unbind?.();
 		unbind = bindAgentRealtime(sessionId.value, {
+			onReconnect: () => {
+				if (isRunning.value && sessionId.value) loadSession(sessionId.value);
+			},
 			onStream: ({ message_id, chunk }) => {
 				const m = adoptStreaming(message_id);
 				m.content += chunk;

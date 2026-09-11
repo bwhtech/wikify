@@ -24,5 +24,9 @@ export function bindAgentRealtime(sessionId, handlers) {
 		bound.push([event, fn]);
 	}
 
+	const resync = () => handlers.onReconnect?.();
+	socket.on("connect", resync);
+	bound.push(["connect", resync]);
+
 	return () => bound.forEach(([event, fn]) => socket.off(event, fn));
 }
