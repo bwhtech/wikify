@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { Badge, Button, useCall, toast } from "frappe-ui";
 import { useSocket } from "@/socket";
 import TypeChip from "@/components/TypeChip.vue";
+import SectionRoute from "@/components/SectionRoute.vue";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
 
@@ -155,12 +156,7 @@ function pageRange(s) {
 				:key="s.name"
 				class="flex items-start gap-3 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0"
 			>
-				<div class="min-w-0 flex-1">
-					<p class="text-base break-words text-ink-gray-8">
-						{{ s.hierarchy_path || s.title }}
-					</p>
-					<p class="truncate text-xs text-ink-gray-5">{{ s.title }}</p>
-				</div>
+				<SectionRoute :section="s" />
 				<!-- The badge sizes to its text inside a fixed column, so it reads as a chip
 				     rather than an 80px pill with the range shoved to one end. -->
 				<span class="flex w-20 shrink-0 justify-end">

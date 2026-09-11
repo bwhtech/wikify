@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Badge, FormControl, PageHeader, useCall, useList } from "frappe-ui";
+import SectionRoute from "@/components/SectionRoute.vue";
 
 const router = useRouter();
 
@@ -165,12 +166,7 @@ function pageRange(s) {
 								:key="s.name"
 								class="flex items-start gap-3 border-b border-outline-gray-1 px-4 py-2 last:border-b-0"
 							>
-								<div class="min-w-0 flex-1">
-									<p class="text-base break-words text-ink-gray-8">
-										{{ s.hierarchy_path || s.title }}
-									</p>
-									<p class="truncate text-xs text-ink-gray-5">{{ s.title }}</p>
-								</div>
+								<SectionRoute :section="s" />
 								<Badge
 									v-if="pageRange(s)"
 									:label="pageRange(s)"
