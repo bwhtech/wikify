@@ -54,7 +54,7 @@ def _upsert_wiki_document(
 		doc = frappe.get_doc("Wiki Document", existing)
 	else:
 		doc = frappe.new_doc("Wiki Document")
-	doc.title = title[:DATA_MAX_LENGTH]
+	doc.title = title
 	doc.is_group = 1 if is_group else 0
 	doc.is_published = 1
 	doc.parent_wiki_document = parent

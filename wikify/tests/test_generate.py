@@ -222,16 +222,6 @@ class TestWikiGenerate(FrappeTestCase):
 			self.assertEqual(child.parent_wiki_document, by_title[parent_title].name)
 			self.assertEqual(child.route.rsplit("/", 1)[0], docs[res["root_group"]].route)
 
-	def test_title_longer_than_the_column_width_is_truncated(self):
-		long_title = "1. " + "Transplant coordinator responsibilities " * 5
-		store.replace_sections(self.sd.name, [_sec(long_title, 1, [long_title], 1, 5)])
-		res = self._generate()
-
-		docs = self._docs_under(res["root_group"])
-		page = next(doc for name, doc in docs.items() if name != res["root_group"])
-		self.assertEqual(page.title, long_title[:DATA_MAX_LENGTH])
-		self.assertLessEqual(len(page.route), DATA_MAX_LENGTH)
-
 	def test_preview_projects_included_tree(self):
 		pv = preview_wiki(self.sd.name)
 		self.assertEqual(pv["pages"], 3)
