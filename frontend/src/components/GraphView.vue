@@ -12,6 +12,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Badge, Button, FormControl, useCall } from "frappe-ui";
+import { useSocket } from "@/socket";
 import TypeChip from "@/components/TypeChip.vue";
 import { useIsNarrow } from "@/composables/useMediaQuery";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
@@ -111,6 +112,19 @@ watch(
 	{ immediate: true, deep: true }
 );
 
+const socket = useSocket();
+async function onAgentMutation(payload) {
+	const mutatedDocuments =
+		payload.source_documents || (payload.source_document ? [payload.source_document] : []);
+	const drawnDocuments = (meta.value.documents || []).map((document) => document.id);
+	if (!mutatedDocuments.some((name) => drawnDocuments.includes(name))) return;
+	const layers = payload.layers;
+	if (layers && !["tree", "section", "taxonomy"].some((layer) => layers.includes(layer))) return;
+	await graph.submit(props.params);
+}
+onMounted(() => socket?.on("wikify_agent_mutation", onAgentMutation));
+onBeforeUnmount(() => socket?.off("wikify_agent_mutation", onAgentMutation));
+
 // --- non-reactive render state (perf: the tick loop must not touch Vue proxies) ---
 let ctx = null;
 let nodes = [];
@@ -172,7 +186,11 @@ function nodeColor(n) {
 
 function setGraph(data) {
 	const ids = new Set(data.nodes.map((n) => n.id));
-	nodes = data.nodes.map((n) => ({ ...n }));
+	const settled = new Map(nodes.map((n) => [n.id, n]));
+	nodes = data.nodes.map((n) => {
+		const previous = settled.get(n.id);
+		return previous ? { ...n, x: previous.x, y: previous.y, vx: 0, vy: 0 } : { ...n };
+	});
 	links = data.edges
 		.filter((e) => ids.has(e.src) && ids.has(e.dst))
 		.map((e) => ({ ...e, source: e.src, target: e.dst }));
@@ -194,7 +212,7 @@ function setGraph(data) {
 
 	sim?.stop();
 	sim = null;
-	userInteracted = false;
+	if (!settled.size) userInteracted = false;
 	// Narrow screens render the list, so there is no layout to solve — don't spend a
 	// phone's battery on a force simulation nobody sees.
 	if (isNarrow.value) return;
@@ -490,6 +508,7 @@ watch(isNarrow, async (narrow) => {
 	}
 	await nextTick();
 	addCanvas();
+	userInteracted = false;
 	if (graph.data) setGraph(graph.data);
 });
 

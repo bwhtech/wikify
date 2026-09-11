@@ -7,10 +7,16 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from wikify.engine import parse_pdf, remediate_pdf
+from wikify.engine import parse_pdf, remediate_pdf, store
 from wikify.engine.loader.cleanup import clean_pages, strip_outer_markdown_fence
-from wikify.engine.loader.sectionizer import MAX_TITLE_LENGTH, running_header_titles, sectionize
+from wikify.engine.loader.sectionizer import (
+	MAX_TITLE_LENGTH,
+	Section,
+	running_header_titles,
+	sectionize,
+)
 from wikify.rag.chunk import build_chunks
+from wikify.tests import _cleanup
 from wikify.tests.test_parse_pipeline import _make_sample_pdf
 from wikify.tests.test_remediate_pipeline import _MERMAID, _fake_chat
 
@@ -253,3 +259,123 @@ class TestSectionizeIntegration(FrappeTestCase):
 		self.assertEqual(result["sections"], len(after))
 		self.assertFalse(before & {s.name for s in after}, "old section rows not replaced")
 		self.assertTrue(any("Procedures" in s.title for s in after))
+
+
+def _tree_section(title, path):
+	return Section(
+		title=title,
+		level=len(path),
+		hierarchy_path=path,
+		page_start=1,
+		page_end=1,
+		markdown=f"body of {title}",
+	)
+
+
+def _parents_by_hierarchy_path(sections):
+	path_to_index = {}
+	parents = []
+	for index, section in enumerate(sections):
+		parents.append(path_to_index.get(tuple(section.hierarchy_path[:-1])))
+		path_to_index[tuple(section.hierarchy_path)] = index
+	return parents
+
+
+class TestSectionTreeKeying(FrappeTestCase):
+	def setUp(self):
+		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Tree Keying Test"}).insert(
+			ignore_permissions=True
+		)
+		self.addCleanup(_cleanup.delete_document, self.sd.name)
+
+	def _rows(self):
+		return frappe.get_all(
+			"Source Section",
+			filters={"source_document": self.sd.name},
+			fields=["name", "title", "parent_source_section", "is_group", "sort_order"],
+			order_by="sort_order asc",
+		)
+
+	def _children_of(self, rows, name):
+		return [row.title for row in rows if row.parent_source_section == name]
+
+	def test_duplicate_sibling_titles_keep_their_own_children(self):
+		store.replace_sections(
+			self.sd.name,
+			[
+				_tree_section("Chapter", ["Chapter"]),
+				_tree_section("Procedure", ["Chapter", "Procedure"]),
+				_tree_section("First steps", ["Chapter", "Procedure", "First steps"]),
+				_tree_section("Procedure", ["Chapter", "Procedure"]),
+				_tree_section("Second steps", ["Chapter", "Procedure", "Second steps"]),
+			],
+		)
+		rows = self._rows()
+		first, second = rows[1], rows[3]
+		self.assertNotEqual(first.name, second.name)
+		self.assertEqual(self._children_of(rows, first.name), ["First steps"])
+		self.assertEqual(self._children_of(rows, second.name), ["Second steps"])
+		self.assertEqual([first.is_group, second.is_group], [1, 1])
+
+	def test_repeated_root_titles_do_not_collapse(self):
+		sections = []
+		for index in range(35):
+			sections.append(_tree_section("NEPHROLOGY MANUAL", ["NEPHROLOGY MANUAL"]))
+			sections.append(_tree_section(f"Policy {index}", ["NEPHROLOGY MANUAL", f"Policy {index}"]))
+		store.replace_sections(self.sd.name, sections)
+
+		rows = self._rows()
+		roots = [row for row in rows if not row.parent_source_section]
+		self.assertEqual(len(roots), 35)
+		self.assertEqual(len({row.name for row in roots}), 35)
+		for index, root in enumerate(roots):
+			self.assertEqual(self._children_of(rows, root.name), [f"Policy {index}"])
+			self.assertEqual(root.is_group, 1)
+
+	def test_childless_section_sharing_a_title_is_not_a_group(self):
+		store.replace_sections(
+			self.sd.name,
+			[
+				_tree_section("Definition", ["Definition"]),
+				_tree_section("Scope", ["Definition", "Scope"]),
+				_tree_section("Definition", ["Definition"]),
+			],
+		)
+		rows = self._rows()
+		self.assertEqual([row.is_group for row in rows], [1, 0, 0])
+
+	def test_unambiguous_tree_matches_the_hierarchy_path_keying(self):
+		sections = [
+			_tree_section("1. Alpha", ["1. Alpha"]),
+			_tree_section("1.1 Alpha-One", ["1. Alpha", "1.1 Alpha-One"]),
+			_tree_section("1.1.1 Alpha-Deep", ["1. Alpha", "1.1 Alpha-One", "1.1.1 Alpha-Deep"]),
+			_tree_section("1.2 Alpha-Two", ["1. Alpha", "1.2 Alpha-Two"]),
+			_tree_section("2. Beta", ["2. Beta"]),
+			_tree_section("2.1 Beta-One", ["2. Beta", "2.1 Beta-One"]),
+		]
+		self.assertEqual(
+			store.resolve_parent_indexes(sections),
+			_parents_by_hierarchy_path(sections),
+		)
+
+		store.replace_sections(self.sd.name, sections)
+		rows = self._rows()
+		by_title = {row.title: row for row in rows}
+		self.assertEqual(
+			[row.parent_source_section for row in rows],
+			[
+				None,
+				by_title["1. Alpha"].name,
+				by_title["1.1 Alpha-One"].name,
+				by_title["1. Alpha"].name,
+				None,
+				by_title["2. Beta"].name,
+			],
+		)
+		self.assertEqual([row.is_group for row in rows], [1, 1, 0, 0, 1, 0])
+
+	def test_orphan_depth_without_a_parent_stays_a_root(self):
+		sections = [_tree_section("Deep", ["Missing", "Deep"])]
+		self.assertEqual(store.resolve_parent_indexes(sections), [None])
+		store.replace_sections(self.sd.name, sections)
+		self.assertEqual([row.parent_source_section for row in self._rows()], [None])

@@ -31,6 +31,8 @@ from wikify.engine import store
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
 from wikify.engine.refs import smallest_covering
 
+DATA_MAX_LENGTH = 140
+
 
 def _upsert_wiki_document(
 	existing: str | None,
@@ -83,13 +85,11 @@ def _resolve_or_create_space(wiki_space: str | None, new_space: dict | None):
 	return space
 
 
-def _unique_slug(base: str, taken: set[str]) -> str:
-	"""Sibling-unique slug → globally-unique leaf route (paths diverge at the parent)."""
-	slug, k = base, 2
-	while slug in taken:
-		slug, k = f"{base}-{k}", k + 1
-	taken.add(slug)
-	return slug
+def bounded_route(prefix: str, title: str, identifier: str) -> tuple[str, str]:
+	budget = DATA_MAX_LENGTH - len(prefix) - len(identifier) - 2
+	slug = slugify(title)[:budget].strip("-") if budget > 0 else ""
+	slug = f"{slug}-{identifier}" if slug else identifier
+	return f"{prefix}/{slug}", slug
 
 
 class _WikiGenerator:
@@ -134,17 +134,15 @@ class _WikiGenerator:
 			self.stage_cb(label)
 
 	def _ensure_root_group(self) -> None:
-		# Per-document root group — namespaces routes (<space>/<doc>/…) so a space can hold
-		# many imports tidily, and gives the cross-document corpus a stable home.
-		doc_slug = slugify(self.sd.title)
+		route, slug = bounded_route(self.space.route, self.sd.title, self.sd.name)
 		self.root_group = _upsert_wiki_document(
 			self.sd.wiki_root_group,
 			title=self.sd.title,
 			content="",
 			is_group=True,
 			parent=self.space.root_group,
-			route=f"{self.space.route}/{doc_slug}",
-			slug=doc_slug,
+			route=route,
+			slug=slug,
 		)
 
 	def _sweep_stale(self) -> None:
@@ -174,15 +172,14 @@ class _WikiGenerator:
 				store.set_section_wiki_document(s["name"], None)
 		self.deleted = len(stale)
 
-	def _parent_for(self, section: dict) -> tuple[str, str]:
-		"""(wiki name, route) of the nearest already-built ancestor, else the root group."""
+	def _parent_for(self, section: dict) -> str:
 		parent = section["parent_source_section"]
 		anc = self.by_name.get(parent) if parent else None
 		while anc is not None:
 			if anc["name"] in self.wiki_name:
-				return self.wiki_name[anc["name"]], self.wiki_route[anc["name"]]
+				return self.wiki_name[anc["name"]]
 			anc = self.by_name.get(anc["parent_source_section"]) if anc["parent_source_section"] else None
-		return self.root_group.name, self.root_group.route
+		return self.root_group.name
 
 	@staticmethod
 	def _content_for(section: dict) -> str:
@@ -192,13 +189,11 @@ class _WikiGenerator:
 		return "" if section["is_group"] else f"# {section['title']}\n"
 
 	def _build_structure(self) -> None:
-		"""Pass 1: walk included sections (parents precede children by lft) into pages."""
-		used_slugs: dict[str, set[str]] = {}  # parent wiki name → slugs taken
 		sort_counter: dict[str, int] = {}  # parent wiki name → next sort_order
 		total = len(self.included)
 		for i, s in enumerate(self.included):
-			parent_name, parent_route = self._parent_for(s)
-			slug = _unique_slug(slugify(s["title"]), used_slugs.setdefault(parent_name, set()))
+			parent_name = self._parent_for(s)
+			route, slug = bounded_route(self.root_group.route, s["title"], s["name"])
 			order = sort_counter.get(parent_name, 0)
 			sort_counter[parent_name] = order + 1
 			content = self._content_for(s)
@@ -208,7 +203,7 @@ class _WikiGenerator:
 				content=content,
 				is_group=bool(s["is_group"]),
 				parent=parent_name,
-				route=f"{parent_route}/{slug}",
+				route=route,
 				slug=slug,
 				sort_order=order,
 			)

@@ -1,10 +1,13 @@
 # Copyright (c) 2026, BWH and contributors
 # For license information, please see license.txt
+from itertools import pairwise
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.nestedset import get_descendants_of
 
 from wikify.engine import generate_wiki, preview_wiki, store
+from wikify.engine.generate import DATA_MAX_LENGTH
 from wikify.engine.loader.sectionizer import Section
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
 from wikify.tests import _cleanup
@@ -105,7 +108,7 @@ class TestWikiGenerate(FrappeTestCase):
 		docs = self._by_title(res["root_group"])
 		root = docs["Gen Test"]
 		self.assertEqual(root.is_group, 1)
-		self.assertEqual(root.route, f"{self._space_route}/{slugify('Gen Test')}")
+		self.assertEqual(root.route, f"{self._space_route}/{slugify('Gen Test')}-{self.sd.name}")
 
 		intro = docs["1. Intro"]
 		self.assertEqual(intro.is_group, 1)
@@ -115,7 +118,10 @@ class TestWikiGenerate(FrappeTestCase):
 		self.assertEqual(purpose.is_group, 0)
 		self.assertEqual(purpose.parent_wiki_document, intro.name)
 		self.assertLess(purpose.sort_order, scope.sort_order)
-		self.assertEqual(scope.route, f"{intro.route}/{slugify('1.2 Scope')}")
+		scope_section = frappe.db.get_value(
+			"Source Section", {"title": "1.2 Scope", "source_document": self.sd.name}, "name"
+		)
+		self.assertEqual(scope.route, f"{root.route}/{slugify('1.2 Scope')}-{scope_section}")
 		self.assertEqual(docs["2. Appendix"].parent_wiki_document, root.name)
 		self.assertTrue(all(d.is_published for d in docs.values()))
 
@@ -193,7 +199,28 @@ class TestWikiGenerate(FrappeTestCase):
 		res2 = generate_wiki(self.sd.name, wiki_space=res1["space"])
 		docs = self._by_title(res2["root_group"])
 		self.assertIn("1.1 Goals", docs)
-		self.assertTrue(docs["1.1 Goals"].route.endswith(slugify("1.1 Goals")))
+		self.assertTrue(docs["1.1 Goals"].route.endswith(f"{slugify('1.1 Goals')}-{purpose}"))
+
+	def test_data_max_length_matches_the_column_width(self):
+		self.assertEqual(DATA_MAX_LENGTH, frappe.db.VARCHAR_LEN)
+
+	def test_deep_tree_with_long_titles_stays_within_route_limit(self):
+		titles = [f"{i + 1}. " + f"Requirements and responsibilities {i + 1} " * 3 for i in range(9)]
+		store.replace_sections(
+			self.sd.name, [_sec(title, i + 1, titles[: i + 1], 1, 5) for i, title in enumerate(titles)]
+		)
+		res = self._generate()
+
+		docs = self._docs_under(res["root_group"])
+		self.assertEqual(len(docs), len(titles) + 1)
+		self.assertTrue(all(len(doc.route) <= DATA_MAX_LENGTH for doc in docs.values()))
+		self.assertEqual(len({doc.route for doc in docs.values()}), len(docs))
+
+		by_title = self._by_title(res["root_group"])
+		for parent_title, child_title in pairwise(titles):
+			child = by_title[child_title]
+			self.assertEqual(child.parent_wiki_document, by_title[parent_title].name)
+			self.assertEqual(child.route.rsplit("/", 1)[0], docs[res["root_group"]].route)
 
 	def test_preview_projects_included_tree(self):
 		pv = preview_wiki(self.sd.name)
