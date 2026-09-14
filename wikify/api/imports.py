@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
+from frappe.utils.background_jobs import is_job_enqueued
 
 from wikify.engine import preview_wiki as _preview_wiki
+from wikify.jobs import generate as generate_job
+from wikify.jobs._util import log, publish_progress
 from wikify.seed import seed_uncategorized_project
 
 MAX_BATCH = 25
@@ -113,23 +116,40 @@ def generate_wiki(
 	imp = frappe.get_doc("Wikify Import", import_name)
 	if not imp.source_document:
 		frappe.throw(_("Nothing to generate — parse hasn't produced a document yet."))
-	if imp.status not in ("Graphed", "Completed"):
+	if imp.status not in ("Graphed", "Completed", "Stopped"):
 		frappe.throw(
-			f"Approve the section tree first — can only generate from Graphed or Completed "
+			f"Approve the section tree first — can only generate from Graphed, Completed or Stopped "
 			f"(current status: {imp.status})."
 		)
+	if is_job_enqueued(generate_job.job_id(import_name)):
+		frappe.throw(_("The previous wiki generation is still stopping. Try again in a moment."))
 	if isinstance(new_space, str):
 		new_space = frappe.parse_json(new_space)
 	if not wiki_space and not new_space:
 		frappe.throw(_("Choose an existing Wiki Space or provide a new one."))
 
-	imp.db_set("status", "Generating Wiki")
+	frappe.cache().delete_value(generate_job.stop_key(import_name))
+	publish_progress(import_name, 0, "Queued for wiki generation", status="Generating Wiki")
 	frappe.enqueue(
 		"wikify.jobs.generate.run",
 		queue="long",
 		timeout=3600,
+		job_id=generate_job.job_id(import_name),
 		import_name=import_name,
 		wiki_space=wiki_space,
 		new_space=new_space,
 	)
+	return import_name
+
+
+@frappe.whitelist(methods=["POST"])
+def stop_wiki_generation(import_name: str) -> str:
+	imp = frappe.get_doc("Wikify Import", import_name)
+	imp.check_permission("write")
+	if imp.status != "Generating Wiki":
+		frappe.throw(_("Wiki generation isn't running (current status: {0}).").format(imp.status))
+
+	frappe.cache().set_value(generate_job.stop_key(import_name), "1", expires_in_sec=3600)
+	publish_progress(import_name, imp.stage_progress, "Wiki generation stopped", status="Stopped")
+	log(import_name, "info", "generate", "Wiki generation stopped")
 	return import_name

@@ -6,6 +6,7 @@ import {
 	Dialog,
 	FormControl,
 	TabButtons,
+	dialog,
 	useCall,
 	useList,
 	toast,
@@ -24,7 +25,9 @@ const emit = defineEmits(["generated"]);
 
 // Generation is gated on an approved tree (Graphed) — or a prior run (Completed → it
 // regenerates in place). Once generated, the space link + Regenerate stay available.
-const graphed = computed(() => ["Graphed", "Completed", "Generating Wiki"].includes(props.status));
+const graphed = computed(() =>
+	["Graphed", "Completed", "Generating Wiki", "Stopped"].includes(props.status)
+);
 const generating = computed(() => props.status === "Generating Wiki");
 const alreadyGenerated = computed(() => props.status === "Completed" || !!props.wikiSpace);
 
@@ -112,6 +115,27 @@ async function runGenerate() {
 		return;
 	}
 	emit("generated");
+}
+
+const stop = useCall({
+	url: "/api/v2/method/wikify.api.imports.stop_wiki_generation",
+	method: "POST",
+	immediate: false,
+});
+function stopGenerate() {
+	dialog.danger({
+		title: "Stop wiki generation",
+		message:
+			"Pages written so far stay in the wiki. Generating again starts over from the first page.",
+		confirmLabel: "Stop",
+		async onConfirm() {
+			await stop.submit({ import_name: props.importName });
+			if (stop.error) {
+				throw new Error(stop.error?.messages?.[0] || "Could not stop wiki generation");
+			}
+			emit("generated");
+		},
+	});
 }
 
 // Realtime — the job emits wikify_wiki_done on completion.
@@ -267,9 +291,17 @@ onUnmounted(() => {
 					:disabled="!canGenerate || generating"
 					@click="runGenerate"
 				/>
-				<p v-if="generating" class="text-xs text-ink-gray-5">
-					Generating… watch progress in the header.
-				</p>
+				<template v-if="generating">
+					<Button
+						variant="ghost"
+						label="Stop generating"
+						icon-left="lucide-circle-stop"
+						@click="stopGenerate"
+					/>
+					<p class="text-xs text-ink-gray-5">
+						Generating… watch progress in the header.
+					</p>
+				</template>
 			</div>
 
 			<!-- Right: preview of what will be generated -->

@@ -244,7 +244,7 @@ function onRemove(node) {
 }
 
 // --- Approve & build graph -----------------------------------------------------------
-const isGraphed = computed(() => props.status === "Graphed");
+const isGraphed = computed(() => ["Graphed", "Stopped"].includes(props.status));
 // "Approve & Build Graph" pushes the toolbar past a phone's width; the shorter label
 // says the same thing next to the section count it sits beside.
 const graphLabel = computed(() => {

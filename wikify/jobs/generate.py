@@ -10,6 +10,17 @@ from wikify.jobs._util import log, publish_progress
 PERSIST_PROGRESS_EVERY = 50
 
 
+class GenerationStopped(Exception):
+	pass
+
+
+def job_id(import_name: str) -> str:
+	return f"wikify_generate_wiki:{import_name}"
+
+
+def stop_key(import_name: str) -> str:
+	return f"wikify_generate_stop:{import_name}"
+
 
 def run(
 	import_name: str,
@@ -23,6 +34,8 @@ def run(
 		log(import_name, "info", "generate", f"Generating wiki for {imp.import_title}")
 
 		def progress_cb(done: int, total: int) -> None:
+			if frappe.cache().get_value(stop_key(import_name)):
+				raise GenerationStopped
 			percent = (done / total * 100) if total else 100
 			publish_progress(
 				import_name,
@@ -60,6 +73,9 @@ def run(
 			"wikify_wiki_done",
 			{"import": import_name, "space": result["space"], "space_route": result["space_route"]},
 		)
+	except GenerationStopped:
+		frappe.cache().delete_value(stop_key(import_name))
+		publish_progress(import_name, imp.stage_progress, "Wiki generation stopped", status="Stopped")
 	except Exception:
 		error = frappe.get_traceback()
 		imp.db_set("status", "Graphed")
