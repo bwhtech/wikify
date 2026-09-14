@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { Badge, Button, useCall, toast } from "frappe-ui";
 import { useSocket } from "@/socket";
 import TypeChip from "@/components/TypeChip.vue";
+import SectionRoute from "@/components/SectionRoute.vue";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
 
@@ -147,18 +148,15 @@ function pageRange(s) {
 				v-if="sections.length"
 				class="flex items-center gap-3 border-b border-outline-gray-1 px-4 py-2 text-sm text-ink-gray-5"
 			>
-				<span class="flex-1">Section ({{ sections.length }})</span>
+				<span class="flex-1">Route ({{ sections.length }})</span>
 				<span class="w-20 shrink-0 text-right">Pages</span>
 			</div>
 			<div
 				v-for="s in sections"
 				:key="s.name"
-				class="flex items-center gap-3 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0"
+				class="flex items-start gap-3 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0"
 			>
-				<div class="min-w-0 flex-1">
-					<p class="truncate text-base text-ink-gray-8">{{ s.title }}</p>
-					<p class="truncate text-xs text-ink-gray-5">{{ s.hierarchy_path }}</p>
-				</div>
+				<SectionRoute :section="s" />
 				<!-- The badge sizes to its text inside a fixed column, so it reads as a chip
 				     rather than an 80px pill with the range shoved to one end. -->
 				<span class="flex w-20 shrink-0 justify-end">
