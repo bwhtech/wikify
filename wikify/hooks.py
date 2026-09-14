@@ -25,10 +25,11 @@ add_to_apps_screen = [
 ]
 
 after_install = "wikify.install.after_install"
+after_app_install = "wikify.install.after_app_install"
 
 # Fetch the retrieval models on deploy rather than inside the first question — see
 # `rag.warm` for what that costs on the web worker.
-after_migrate = ["wikify.rag.warm.warm_models"]
+after_migrate = ["wikify.rag.warm.warm_models", "wikify.install.add_wiki_title_customizations"]
 
 # Only the ORM writes to Source Section reach these. The writes that go through
 # `engine.store` use `frappe.db.set_value`, which fires no doc_event, so that path
