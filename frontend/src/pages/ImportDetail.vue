@@ -7,7 +7,9 @@ import {
 	Dropdown,
 	PageHeader,
 	Progress,
+	TabButtons,
 	Tabs,
+	dayjs,
 	useCall,
 	useDoc,
 	useList,
@@ -73,9 +75,15 @@ const logs = useList({
 	doctype: "Import Log Entry",
 	fields: ["name", "idx_seq", "level", "stage", "message", "creation"],
 	filters: { import: props.name },
-	orderBy: "idx_seq asc",
+	orderBy: "creation desc",
 	limit: 500,
 });
+const logOrder = ref("desc");
+const sortedLogs = computed(() =>
+	[...(logs.data || [])].sort((a, b) =>
+		logOrder.value === "desc" ? b.idx_seq - a.idx_seq : a.idx_seq - b.idx_seq
+	)
+);
 
 const status = computed(() => imp.doc?.status);
 const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
@@ -150,6 +158,7 @@ function onLog(payload) {
 			level: payload.level,
 			stage: payload.stage,
 			message: payload.message,
+			creation: payload.creation,
 		});
 	}
 }
@@ -298,7 +307,16 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					</div>
 
 					<div class="mt-6">
-						<p class="mb-2 text-sm text-ink-gray-5">Log</p>
+						<div class="mb-2 flex items-center justify-between gap-2">
+							<p class="text-sm text-ink-gray-5">Log</p>
+							<TabButtons
+								v-model="logOrder"
+								:options="[
+									{ label: 'Newest first', value: 'desc' },
+									{ label: 'Oldest first', value: 'asc' },
+								]"
+							/>
+						</div>
 						<div
 							class="rounded-md border border-outline-gray-1 bg-surface-gray-1 p-3 font-mono text-xs"
 						>
@@ -306,11 +324,14 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 								No log entries yet.
 							</p>
 							<div
-								v-for="entry in logs.data"
+								v-for="entry in sortedLogs"
 								:key="entry.name"
 								class="flex gap-2 py-0.5"
 								:class="levelColor[entry.level] || 'text-ink-gray-7'"
 							>
+								<span class="shrink-0 tabular-nums text-ink-gray-4">{{
+									dayjs(entry.creation).format("D MMM, HH:mm:ss")
+								}}</span>
 								<span class="shrink-0 text-ink-gray-4">[{{ entry.stage }}]</span>
 								<span class="min-w-0 break-words">{{ entry.message }}</span>
 							</div>
