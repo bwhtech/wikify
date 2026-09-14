@@ -6,6 +6,10 @@ from frappe.utils import now_datetime
 from wikify.engine import generate_wiki
 from wikify.jobs._util import log, publish_progress
 
+# Every commit makes the wiki app snapshot the whole space, so committing per page is quadratic.
+PERSIST_PROGRESS_EVERY = 50
+
+
 
 def run(
 	import_name: str,
@@ -20,7 +24,12 @@ def run(
 
 		def progress_cb(done: int, total: int) -> None:
 			percent = (done / total * 100) if total else 100
-			publish_progress(import_name, percent, f"Writing wiki page {done}/{total}")
+			publish_progress(
+				import_name,
+				percent,
+				f"Writing wiki page {done}/{total}",
+				persist=done % PERSIST_PROGRESS_EVERY == 0 or done == total,
+			)
 
 		def stage_cb(label: str) -> None:
 			publish_progress(import_name, 100, label)
