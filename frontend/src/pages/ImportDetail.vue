@@ -131,7 +131,7 @@ function onProgress(payload) {
 	imp.doc.stage_progress = payload.percent;
 	if (payload.status) imp.doc.status = payload.status;
 	// Terminal transitions carry fields set server-side (source_document, wiki_space, error).
-	if (["Review", "Failed", "Completed", "Graphed"].includes(payload.status)) {
+	if (["Review", "Failed", "Completed", "Graphed", "Stopped"].includes(payload.status)) {
 		imp.reload();
 		// A finished remediation rewrote canonical scores + rebuilt the tree — refetch both.
 		if (wasRemediating && payload.status === "Review") {

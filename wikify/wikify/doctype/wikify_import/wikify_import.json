@@ -59,7 +59,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nQueued\nParsing\nReview\nRemediating\nTree Review\nGraphed\nGenerating Wiki\nCompleted\nFailed",
+   "options": "Draft\nQueued\nParsing\nReview\nRemediating\nTree Review\nGraphed\nGenerating Wiki\nStopped\nCompleted\nFailed",
    "read_only": 1
   },
   {

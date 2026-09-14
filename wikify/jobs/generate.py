@@ -6,6 +6,21 @@ from frappe.utils import now_datetime
 from wikify.engine import generate_wiki
 from wikify.jobs._util import log, publish_progress
 
+# Every commit makes the wiki app snapshot the whole space, so committing per page is quadratic.
+PERSIST_PROGRESS_EVERY = 50
+
+
+class GenerationStopped(Exception):
+	pass
+
+
+def job_id(import_name: str) -> str:
+	return f"wikify_generate_wiki:{import_name}"
+
+
+def stop_key(import_name: str) -> str:
+	return f"wikify_generate_stop:{import_name}"
+
 
 def run(
 	import_name: str,
@@ -18,11 +33,22 @@ def run(
 		publish_progress(import_name, 0, "Generating wiki", status="Generating Wiki")
 		log(import_name, "info", "generate", f"Generating wiki for {imp.import_title}")
 
+		def raise_if_stopped() -> None:
+			if frappe.cache().get_value(stop_key(import_name)):
+				raise GenerationStopped
+
 		def progress_cb(done: int, total: int) -> None:
+			raise_if_stopped()
 			percent = (done / total * 100) if total else 100
-			publish_progress(import_name, percent, f"Writing wiki page {done}/{total}")
+			publish_progress(
+				import_name,
+				percent,
+				f"Writing wiki page {done}/{total}",
+				persist=done % PERSIST_PROGRESS_EVERY == 0 or done == total,
+			)
 
 		def stage_cb(label: str) -> None:
+			raise_if_stopped()
 			publish_progress(import_name, 100, label)
 
 		result = generate_wiki(
@@ -33,7 +59,9 @@ def run(
 			stage_cb=stage_cb,
 		)
 
+		raise_if_stopped()
 		imp.db_set("wiki_space", result["space"])
+		imp.db_set("error", None)
 		imp.db_set("status", "Completed")
 		imp.db_set("completed_at", now_datetime())
 		publish_progress(import_name, 100, "Wiki generated", status="Completed")
@@ -51,6 +79,10 @@ def run(
 			"wikify_wiki_done",
 			{"import": import_name, "space": result["space"], "space_route": result["space_route"]},
 		)
+	except GenerationStopped:
+		frappe.cache().delete_value(stop_key(import_name))
+		progress = frappe.db.get_value("Wikify Import", import_name, "stage_progress")
+		publish_progress(import_name, progress, "Wiki generation stopped", status="Stopped")
 	except Exception:
 		error = frappe.get_traceback()
 		imp.db_set("status", "Graphed")

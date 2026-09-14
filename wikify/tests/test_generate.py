@@ -1,15 +1,19 @@
 # Copyright (c) 2026, BWH and contributors
 # For license information, please see license.txt
 from itertools import pairwise
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.nestedset import get_descendants_of
 
+from wikify.api import imports as imports_api
 from wikify.engine import generate_wiki, preview_wiki, store
 from wikify.engine.generate import DATA_MAX_LENGTH
 from wikify.engine.loader.sectionizer import Section
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
+from wikify.jobs import generate as generate_job
+from wikify.seed import seed_uncategorized_project
 from wikify.tests import _cleanup
 
 
@@ -231,3 +235,107 @@ class TestWikiGenerate(FrappeTestCase):
 		self.assertEqual(titles, ["1. Intro", "2. Appendix"])
 		intro = pv["tree"][0]
 		self.assertEqual(len(intro["children"]), 2)
+
+	def _import(self, status):
+		return frappe.get_doc(
+			{
+				"doctype": "Wikify Import",
+				"import_title": "Stop Test Import",
+				"project": seed_uncategorized_project(),
+				"pdf": "/private/files/x.pdf",
+				"source_document": self.sd.name,
+				"status": status,
+			}
+		).insert(ignore_permissions=True)
+
+	def test_stop_marks_a_stuck_generation_stopped(self):
+		imp = self._import("Generating Wiki")
+		self.addCleanup(frappe.cache().delete_value, generate_job.stop_key(imp.name))
+
+		imports_api.stop_wiki_generation(imp.name)
+
+		self.assertEqual(frappe.db.get_value("Wikify Import", imp.name, "status"), "Stopped")
+		self.assertTrue(frappe.cache().get_value(generate_job.stop_key(imp.name)))
+
+	def test_stop_rejects_an_import_that_is_not_generating(self):
+		imp = self._import("Graphed")
+		with self.assertRaises(frappe.ValidationError):
+			imports_api.stop_wiki_generation(imp.name)
+
+	def test_generate_restarts_a_stopped_import(self):
+		imp = self._import("Stopped")
+		frappe.cache().set_value(generate_job.stop_key(imp.name), "1")
+
+		with (
+			patch.object(imports_api, "is_job_enqueued", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+		):
+			imports_api.generate_wiki(imp.name, new_space={"space_name": "x", "route": "x"})
+
+		self.assertEqual(frappe.db.get_value("Wikify Import", imp.name, "status"), "Generating Wiki")
+		self.assertFalse(frappe.cache().get_value(generate_job.stop_key(imp.name)))
+		self.assertEqual(enqueue.call_args.kwargs["job_id"], generate_job.job_id(imp.name))
+
+	def test_generate_refuses_while_the_stopped_job_is_still_running(self):
+		imp = self._import("Stopped")
+
+		with (
+			patch.object(imports_api, "is_job_enqueued", return_value=True),
+			patch.object(frappe, "enqueue") as enqueue,
+			self.assertRaises(frappe.ValidationError),
+		):
+			imports_api.generate_wiki(imp.name, new_space={"space_name": "x", "route": "x"})
+
+		enqueue.assert_not_called()
+
+	def test_job_ends_early_when_stop_is_requested(self):
+		space = self._generate()["space"]
+		imp = self._import("Generating Wiki")
+		frappe.cache().set_value(generate_job.stop_key(imp.name), "1")
+
+		generate_job.run(imp.name, wiki_space=space)
+
+		imp.reload()
+		self.assertEqual(imp.status, "Stopped")
+		self.assertFalse(imp.error)
+		self.assertFalse(frappe.cache().get_value(generate_job.stop_key(imp.name)))
+
+	def test_successful_run_clears_a_previous_error(self):
+		space = self._generate()["space"]
+		imp = self._import("Graphed")
+		imp.db_set("error", "an earlier failure")
+
+		generate_job.run(imp.name, wiki_space=space)
+
+		imp.reload()
+		self.assertEqual(imp.status, "Completed")
+		self.assertFalse(imp.error)
+
+	def test_stop_during_the_final_stages_ends_stopped(self):
+		imp = self._import("Generating Wiki")
+
+		def finish_while_stop_is_requested(*args, **kwargs):
+			frappe.cache().set_value(generate_job.stop_key(imp.name), "1")
+			return {"space": None}
+
+		with patch.object(generate_job, "generate_wiki", finish_while_stop_is_requested):
+			generate_job.run(imp.name, wiki_space="any")
+
+		imp.reload()
+		self.assertEqual(imp.status, "Stopped")
+		self.assertFalse(imp.wiki_space)
+
+	def test_stop_keeps_the_persisted_progress(self):
+		imp = self._import("Generating Wiki")
+
+		def stop_after_fifty_pages(*args, progress_cb, **kwargs):
+			progress_cb(50, 100)
+			frappe.cache().set_value(generate_job.stop_key(imp.name), "1")
+			progress_cb(51, 100)
+
+		with patch.object(generate_job, "generate_wiki", stop_after_fifty_pages):
+			generate_job.run(imp.name, wiki_space="any")
+
+		imp.reload()
+		self.assertEqual(imp.status, "Stopped")
+		self.assertEqual(imp.stage_progress, 50)

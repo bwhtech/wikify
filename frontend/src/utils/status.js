@@ -8,6 +8,7 @@ const THEMES = {
 	"Tree Review": "green",
 	Graphed: "green",
 	"Generating Wiki": "blue",
+	Stopped: "orange",
 	Completed: "green",
 	Failed: "red",
 };

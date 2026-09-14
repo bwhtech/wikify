@@ -29,13 +29,16 @@ def publish_progress(
 	percent: float,
 	label: str,
 	status: str | None = None,
+	persist: bool = True,
 ) -> None:
 	"""Persist + broadcast progress so both live listeners and refetches agree."""
-	values = {"stage_progress": percent, "stage_label": label}
-	if status:
-		values["status"] = status
-	frappe.db.set_value("Wikify Import", import_name, values)
-	frappe.db.commit()
+	if persist:
+		values = {"stage_progress": percent, "stage_label": label}
+		if status:
+			values["status"] = status
+		frappe.db.set_value("Wikify Import", import_name, values)
+		# nosemgrep
+		frappe.db.commit()
 
 	payload = {"import": import_name, "percent": percent, "stage_label": label}
 	if status:
