@@ -300,3 +300,13 @@ class TestWikiGenerate(FrappeTestCase):
 		self.assertFalse(imp.error)
 		self.assertFalse(frappe.cache().get_value(generate_job.stop_key(imp.name)))
 
+	def test_successful_run_clears_a_previous_error(self):
+		space = self._generate()["space"]
+		imp = self._import("Graphed")
+		imp.db_set("error", "an earlier failure")
+
+		generate_job.run(imp.name, wiki_space=space)
+
+		imp.reload()
+		self.assertEqual(imp.status, "Completed")
+		self.assertFalse(imp.error)

@@ -56,6 +56,7 @@ def run(
 		)
 
 		imp.db_set("wiki_space", result["space"])
+		imp.db_set("error", None)
 		imp.db_set("status", "Completed")
 		imp.db_set("completed_at", now_datetime())
 		publish_progress(import_name, 100, "Wiki generated", status="Completed")
