@@ -1,11 +1,13 @@
 # Copyright (c) 2026, BWH and contributors
 # For license information, please see license.txt
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.engine import generate_wiki, store
 from wikify.engine.loader.sectionizer import Section
-from wikify.install import WIKI_TITLE_DOCTYPES, add_wiki_title_customizations
+from wikify.install import WIKI_TITLE_DOCTYPES, add_wiki_title_customizations, after_app_install
 from wikify.tests import _cleanup
 
 
@@ -53,5 +55,17 @@ class TestWikiTitleCustomizations(FrappeTestCase):
 			},
 		)
 
+		self.addCleanup(_cleanup.delete_wiki_space, result["space"])
+
 		self.assertTrue(frappe.db.exists("Wiki Document", {"title": title, "is_group": 0}))
 		self.assertTrue(result["pages"])
+
+	def test_installing_wiki_later_runs_the_customization(self):
+		self.assertIn("wikify.install.after_app_install", frappe.get_hooks("after_app_install"))
+
+		with patch("wikify.install.add_wiki_title_customizations") as add_customizations:
+			after_app_install("erpnext")
+			add_customizations.assert_not_called()
+
+			after_app_install("wiki")
+			add_customizations.assert_called_once_with()
