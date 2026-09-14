@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import frappe
+from frappe.utils.nestedset import get_descendants_of
 
 
 def _finalized(delete_fn) -> None:
@@ -31,6 +32,27 @@ def _delete_document_rows(sd_name: str) -> None:
 	frappe.db.delete("Section Reference", {"source_document": sd_name})
 	frappe.db.delete("Source Section", {"source_document": sd_name})
 	frappe.db.delete("Source Document", {"name": sd_name})
+
+
+def delete_wiki_space(space_name: str) -> None:
+	_finalized(lambda: _delete_wiki_space_rows(space_name))
+
+
+def _delete_wiki_space_rows(space_name: str) -> None:
+	root = frappe.db.get_value("Wiki Space", space_name, "root_group")
+	if root:
+		names = frappe.get_all(
+			"Wiki Document",
+			filters={
+				"name": ["in", [root, *get_descendants_of("Wiki Document", root, ignore_permissions=True)]]
+			},
+			order_by="lft desc",
+			pluck="name",
+		)
+		for name in names:
+			frappe.delete_doc("Wiki Document", name, ignore_permissions=True, force=True)
+	if frappe.db.exists("Wiki Space", space_name):
+		frappe.delete_doc("Wiki Space", space_name, ignore_permissions=True, force=True)
 
 
 def _delete_session_rows(session_name: str) -> None:
