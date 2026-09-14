@@ -66,11 +66,13 @@ def log(
 	entry.insert(ignore_permissions=True)
 	frappe.db.commit()
 
+	# nosemgrep
 	frappe.publish_realtime(
 		"wikify_import_log",
 		{
 			"import": import_name,
 			"idx_seq": seq,
+			"creation": str(entry.creation),
 			"level": level,
 			"stage": stage,
 			"message": message,

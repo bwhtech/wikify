@@ -158,7 +158,7 @@ function onLog(payload) {
 			level: payload.level,
 			stage: payload.stage,
 			message: payload.message,
-			creation: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+			creation: payload.creation,
 		});
 	}
 }
