@@ -33,9 +33,12 @@ def run(
 		publish_progress(import_name, 0, "Generating wiki", status="Generating Wiki")
 		log(import_name, "info", "generate", f"Generating wiki for {imp.import_title}")
 
-		def progress_cb(done: int, total: int) -> None:
+		def raise_if_stopped() -> None:
 			if frappe.cache().get_value(stop_key(import_name)):
 				raise GenerationStopped
+
+		def progress_cb(done: int, total: int) -> None:
+			raise_if_stopped()
 			percent = (done / total * 100) if total else 100
 			publish_progress(
 				import_name,
@@ -45,6 +48,7 @@ def run(
 			)
 
 		def stage_cb(label: str) -> None:
+			raise_if_stopped()
 			publish_progress(import_name, 100, label)
 
 		result = generate_wiki(
@@ -55,6 +59,7 @@ def run(
 			stage_cb=stage_cb,
 		)
 
+		raise_if_stopped()
 		imp.db_set("wiki_space", result["space"])
 		imp.db_set("error", None)
 		imp.db_set("status", "Completed")
@@ -76,7 +81,8 @@ def run(
 		)
 	except GenerationStopped:
 		frappe.cache().delete_value(stop_key(import_name))
-		publish_progress(import_name, imp.stage_progress, "Wiki generation stopped", status="Stopped")
+		progress = frappe.db.get_value("Wikify Import", import_name, "stage_progress")
+		publish_progress(import_name, progress, "Wiki generation stopped", status="Stopped")
 	except Exception:
 		error = frappe.get_traceback()
 		imp.db_set("status", "Graphed")

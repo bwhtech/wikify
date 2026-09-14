@@ -149,7 +149,7 @@ def stop_wiki_generation(import_name: str) -> str:
 	if imp.status != "Generating Wiki":
 		frappe.throw(_("Wiki generation isn't running (current status: {0}).").format(imp.status))
 
-	frappe.cache().set_value(generate_job.stop_key(import_name), "1", expires_in_sec=3600)
+	frappe.cache().set_value(generate_job.stop_key(import_name), "1")
 	publish_progress(import_name, imp.stage_progress, "Wiki generation stopped", status="Stopped")
 	log(import_name, "info", "generate", "Wiki generation stopped")
 	return import_name

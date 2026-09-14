@@ -310,3 +310,32 @@ class TestWikiGenerate(FrappeTestCase):
 		imp.reload()
 		self.assertEqual(imp.status, "Completed")
 		self.assertFalse(imp.error)
+
+	def test_stop_during_the_final_stages_ends_stopped(self):
+		imp = self._import("Generating Wiki")
+
+		def finish_while_stop_is_requested(*args, **kwargs):
+			frappe.cache().set_value(generate_job.stop_key(imp.name), "1")
+			return {"space": None}
+
+		with patch.object(generate_job, "generate_wiki", finish_while_stop_is_requested):
+			generate_job.run(imp.name, wiki_space="any")
+
+		imp.reload()
+		self.assertEqual(imp.status, "Stopped")
+		self.assertFalse(imp.wiki_space)
+
+	def test_stop_keeps_the_persisted_progress(self):
+		imp = self._import("Generating Wiki")
+
+		def stop_after_fifty_pages(*args, progress_cb, **kwargs):
+			progress_cb(50, 100)
+			frappe.cache().set_value(generate_job.stop_key(imp.name), "1")
+			progress_cb(51, 100)
+
+		with patch.object(generate_job, "generate_wiki", stop_after_fifty_pages):
+			generate_job.run(imp.name, wiki_space="any")
+
+		imp.reload()
+		self.assertEqual(imp.status, "Stopped")
+		self.assertEqual(imp.stage_progress, 50)
