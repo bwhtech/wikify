@@ -20,6 +20,12 @@
   "judge_score",
   "llm_cost",
   "notes",
+  "jev_section",
+  "jev_status",
+  "jev_score",
+  "column_break_jev",
+  "jev_confidence",
+  "jev_detail",
   "baseline_section",
   "baseline_markdown",
   "remediation_section",
@@ -134,6 +140,43 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "fieldname": "jev_section",
+   "fieldtype": "Section Break",
+   "label": "Jev"
+  },
+  {
+   "fieldname": "jev_status",
+   "fieldtype": "Select",
+   "label": "Jev Status",
+   "options": "\nscored\nskipped\nerror",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jev_score",
+   "fieldtype": "Float",
+   "label": "Jev Score",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_jev",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "jev_confidence",
+   "fieldtype": "Float",
+   "label": "Jev Confidence",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jev_detail",
+   "fieldtype": "JSON",
+   "label": "Jev Detail",
+   "read_only": 1
+  },
+  {
    "fieldname": "baseline_section",
    "fieldtype": "Section Break",
    "label": "Baseline"
@@ -217,7 +260,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-19 00:00:00",
+ "modified": "2026-09-29 00:00:00",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Source Page",

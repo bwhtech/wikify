@@ -16,6 +16,10 @@
   "mean_score",
   "canonical_mean",
   "llm_cost",
+  "jev_score",
+  "jev_pages_scored",
+  "jev_low_pages",
+  "jev_scored_at",
   "status",
   "wiki_section",
   "wiki_space",
@@ -94,6 +98,32 @@
    "read_only": 1
   },
   {
+   "description": "Parse-fidelity score (0-1) from TypeSafe Jev: text-length-weighted mean over scored pages.",
+   "fieldname": "jev_score",
+   "fieldtype": "Float",
+   "label": "Jev Score",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jev_pages_scored",
+   "fieldtype": "Int",
+   "label": "Jev Pages Scored",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jev_low_pages",
+   "fieldtype": "Int",
+   "label": "Jev Low Pages",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jev_scored_at",
+   "fieldtype": "Datetime",
+   "label": "Jev Scored At",
+   "read_only": 1
+  },
+  {
    "default": "Parsed",
    "fieldname": "status",
    "fieldtype": "Select",
@@ -126,7 +156,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-19 00:00:00",
+ "modified": "2026-09-29 00:00:00",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Source Document",

@@ -8,6 +8,7 @@ import "splitpanes/dist/splitpanes.css";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useIsNarrow, useMediaQuery } from "@/composables/useMediaQuery";
 import { setPage } from "@/data/agentContext";
+import { JEV_LOW_CONFIDENCE, jevDetail, jevPercent, jevTheme } from "@/utils/jev";
 
 const props = defineProps({
 	sourceDocument: { type: String, default: null },
@@ -40,6 +41,10 @@ const pages = useList({
 		"canonical_composite",
 		"canonical_markdown",
 		"llm_cost",
+		"jev_status",
+		"jev_score",
+		"jev_confidence",
+		"jev_detail",
 	],
 	filters: computed(() => ({ source_document: props.sourceDocument || "__none__" })),
 	orderBy: "page_no asc",
@@ -248,6 +253,22 @@ const scoreCells = computed(() => {
 
 // Before↔after summary once a page has been remediated: which method ran, whether
 // it was adopted as canonical, and the baseline→remediation composite delta.
+const jevRows = computed(() => {
+	const p = selected.value;
+	if (p?.jev_status !== "scored") return [];
+	const detail = jevDetail(p);
+	return ["completeness", "structure", "accuracy"]
+		.filter((key) => detail[key])
+		.map((key) => ({
+			label: key,
+			value: jevPercent(detail[key].score),
+			confidence: detail[key].confidence,
+		}));
+});
+function jevLowConfidence(p) {
+	return p.jev_status === "scored" && Number(p.jev_confidence) < JEV_LOW_CONFIDENCE;
+}
+
 const remediation = computed(() => {
 	const p = selected.value;
 	if (!p?.remediation_method) return null;
@@ -346,6 +367,20 @@ function fmtDelta(v) {
 									fmt(pageAudit(page))
 								}}</span>
 								<Badge
+									v-if="page.jev_status === 'scored'"
+									:label="`Jev ${jevPercent(page.jev_score)}${
+										jevLowConfidence(page) ? '?' : ''
+									}`"
+									:theme="jevTheme(page.jev_score)"
+									:title="
+										jevLowConfidence(page)
+											? 'Jev is unsure about this page'
+											: undefined
+									"
+									variant="outline"
+									size="sm"
+								/>
+								<Badge
 									v-if="page.remediation_adopted"
 									label="remediated"
 									theme="blue"
@@ -407,6 +442,17 @@ function fmtDelta(v) {
 									fmt(auditScore)
 								}}</span>
 							</div>
+							<div
+								v-if="selected.jev_status === 'scored'"
+								class="flex items-baseline gap-1.5"
+							>
+								<span class="text-xs uppercase tracking-wide text-ink-gray-5"
+									>Jev</span
+								>
+								<span class="text-sm font-semibold tabular-nums text-ink-gray-9">{{
+									jevPercent(selected.jev_score)
+								}}</span>
+							</div>
 							<div class="flex items-baseline gap-1.5">
 								<span class="text-xs uppercase tracking-wide text-ink-gray-5"
 									>Cost</span
@@ -454,6 +500,47 @@ function fmtDelta(v) {
 											Recall / extra are not meaningful on visual pages —
 											judged on the rendered image.
 										</p>
+
+										<div
+											v-if="selected.jev_status"
+											class="mt-2 border-t border-outline-gray-1 pt-2"
+										>
+											<p
+												v-if="selected.jev_status !== 'scored'"
+												class="text-xs text-ink-gray-5"
+											>
+												Jev: {{ selected.jev_status }}
+												<template v-if="jevDetail(selected).error">
+													— {{ jevDetail(selected).error }}</template
+												>
+											</p>
+											<div v-else class="flex flex-wrap gap-x-5 gap-y-1">
+												<div
+													v-for="r in jevRows"
+													:key="r.label"
+													class="flex items-baseline gap-1.5"
+												>
+													<span
+														class="text-xs uppercase tracking-wide text-ink-gray-5"
+														>{{ r.label }}</span
+													>
+													<span
+														class="text-sm tabular-nums text-ink-gray-7"
+														>{{ r.value }}</span
+													>
+												</div>
+												<div class="flex items-baseline gap-1.5">
+													<span
+														class="text-xs uppercase tracking-wide text-ink-gray-5"
+														>Confidence</span
+													>
+													<span
+														class="text-sm tabular-nums text-ink-gray-7"
+														>{{ fmt(selected.jev_confidence) }}</span
+													>
+												</div>
+											</div>
+										</div>
 
 										<!-- Remediation before↔after -->
 										<div

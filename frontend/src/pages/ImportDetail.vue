@@ -10,6 +10,7 @@ import {
 	TabButtons,
 	Tabs,
 	dayjs,
+	toast,
 	useCall,
 	useDoc,
 	useList,
@@ -17,6 +18,7 @@ import {
 import { useSocket } from "@/socket";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
+import { jevPercent, jevTheme } from "@/utils/jev";
 import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
@@ -111,7 +113,16 @@ const sectionTree = ref(null);
 // Document-level audit score + LLM spend (0.4 slice 23) live on Source Document.
 const sdStats = useList({
 	doctype: "Source Document",
-	fields: ["name", "mean_score", "canonical_mean", "llm_cost"],
+	fields: [
+		"name",
+		"mean_score",
+		"canonical_mean",
+		"llm_cost",
+		"jev_score",
+		"jev_pages_scored",
+		"jev_low_pages",
+		"jev_scored_at",
+	],
 	filters: computed(() => ({ name: imp.doc?.source_document || "__none__" })),
 	limit: 1,
 	auto: true,
@@ -134,6 +145,14 @@ function runRemediation(scope) {
 	remediate.submit({ import_name: props.name, scope });
 }
 
+const jevScored = computed(() => !!sourceStats.value?.jev_pages_scored);
+const rescoreJev = useCall({
+	url: "/api/v2/method/wikify.api.imports.rescore_jev",
+	method: "POST",
+	immediate: false,
+	onSuccess: () => toast.info("Jev scoring queued"),
+});
+
 // Realtime
 const socket = useSocket();
 function onProgress(payload) {
@@ -154,6 +173,10 @@ function onProgress(payload) {
 }
 function onLog(payload) {
 	if (payload.import !== props.name) return;
+	if (payload.stage === "jev" && payload.meta?.total != null) {
+		sdStats.reload();
+		pageReview.value?.reload();
+	}
 	if (Array.isArray(logs.data)) {
 		logs.data.push({
 			name: `live-${payload.idx_seq}`,
@@ -240,6 +263,13 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
 					:route="{ name: 'ImportGraph', params: { name: props.name } }"
 				/>
+				<Button
+					v-if="imp.doc?.source_document"
+					variant="subtle"
+					v-bind="actionButtonProps(isMobile, 'lucide-gauge', 'Re-score with Jev')"
+					:loading="rescoreJev.loading"
+					@click="rescoreJev.submit({ import_name: props.name })"
+				/>
 				<Dropdown
 					v-if="canRemediate"
 					:options="[
@@ -290,6 +320,25 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 							<p class="text-base text-ink-gray-8">
 								{{ docAudit != null ? Number(docAudit).toFixed(2) : "—" }}
 							</p>
+						</div>
+						<div>
+							<p class="text-sm text-ink-gray-5">Jev score</p>
+							<div v-if="jevScored" class="flex items-center gap-2">
+								<Badge
+									:label="`${jevPercent(sourceStats.jev_score)} / 100`"
+									:theme="jevTheme(sourceStats.jev_score)"
+									variant="subtle"
+								/>
+								<span class="text-sm text-ink-gray-5"
+									>{{ sourceStats.jev_pages_scored }}/{{
+										imp.doc?.page_count
+									}}
+									pages<template v-if="sourceStats.jev_low_pages"
+										>, {{ sourceStats.jev_low_pages }} low</template
+									></span
+								>
+							</div>
+							<p v-else class="text-base text-ink-gray-8">—</p>
 						</div>
 						<div>
 							<p class="text-sm text-ink-gray-5">LLM cost</p>

@@ -40,6 +40,8 @@ const save = useCall({
 // exists, and only write the key when the user actually types a new one.
 const keyIsSet = computed(() => !!settings.doc?.openrouter_api_key);
 const newKey = ref("");
+const typesafeKeyIsSet = computed(() => !!settings.doc?.typesafe_api_key);
+const newTypesafeKey = ref("");
 
 const MODEL_FIELDS = [
 	{ key: "agent_model", label: "Agent model", hint: "Assistant model (projects can override)." },
@@ -87,8 +89,10 @@ watch(
 		for (const f of FLOAT_FIELDS) next[f.key] = doc[f.key] ?? "";
 		for (const f of INT_FIELDS) next[f.key] = doc[f.key] ?? "";
 		next.judge_all_pages = !!doc.judge_all_pages;
+		next.jev_model = doc.jev_model ?? "";
 		form.value = next;
 		newKey.value = "";
+		newTypesafeKey.value = "";
 	},
 	{ immediate: true }
 );
@@ -98,6 +102,7 @@ async function submit() {
 	// the user typed one, so an empty save never clobbers the stored secret.
 	const fields = { ...form.value, judge_all_pages: form.value.judge_all_pages ? 1 : 0 };
 	if (newKey.value.trim()) fields.openrouter_api_key = newKey.value.trim();
+	if (newTypesafeKey.value.trim()) fields.typesafe_api_key = newTypesafeKey.value.trim();
 	// submit() resolves (it doesn't throw) on a server error — it sets save.error.
 	await save.submit(fields);
 	if (save.error) return;
@@ -107,6 +112,7 @@ async function submit() {
 
 const TABS = [
 	{ value: "openrouter", label: "OpenRouter", icon: "lucide-key-round" },
+	{ value: "typesafe", label: "TypeSafe (Jev)", icon: "lucide-gauge" },
 	{ value: "models", label: "Models", icon: "lucide-cpu" },
 	{ value: "scoring", label: "Scoring", icon: "lucide-gauge" },
 ];
@@ -156,6 +162,44 @@ const activeTab = ref(TABS[0].value);
 						Used for all AI steps. Stored encrypted. Leave blank to keep the current
 						key; falls back to site config / the app .env when never set.
 					</p>
+				</SettingsBody>
+			</SettingsPanel>
+
+			<SettingsPanel value="typesafe">
+				<SettingsHeader
+					title="TypeSafe (Jev)"
+					description="Scores how faithfully each PDF page was converted."
+				>
+					<template #actions>
+						<Button
+							variant="solid"
+							theme="gray"
+							label="Save"
+							:loading="save.loading"
+							:disabled="!settings.doc"
+							@click="submit"
+						/>
+					</template>
+				</SettingsHeader>
+				<SettingsBody>
+					<ErrorMessage class="mb-4" :message="save.error?.message" />
+					<div class="flex flex-col gap-4">
+						<FormControl
+							v-model="newTypesafeKey"
+							label="TypeSafe API key"
+							type="password"
+							:placeholder="
+								typesafeKeyIsSet ? '•••• key saved — type to replace' : 'ts-…'
+							"
+							description="Optional — Jev runs through your OpenRouter key when this is blank. Stored encrypted."
+						/>
+						<FormControl
+							v-model="form.jev_model"
+							label="Jev model"
+							type="text"
+							placeholder="jev-latest"
+						/>
+					</div>
 				</SettingsBody>
 			</SettingsPanel>
 

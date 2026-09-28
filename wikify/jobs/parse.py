@@ -12,6 +12,7 @@ from frappe.utils import now_datetime
 
 from wikify.engine import llm, parse_pdf, remediate_pdf
 from wikify.engine.sectionize import rebuild_and_classify
+from wikify.jobs import jev_score
 from wikify.jobs._util import log, project_context, publish_progress
 
 
@@ -118,6 +119,8 @@ def run(import_name: str) -> None:
 				"VLM pass skipped: no OPENROUTER_KEY — pages are baseline-only",
 			)
 			rebuild_and_classify(source_document, pdf_path, stage_cb, project_context=context)
+
+		jev_score.run(import_name)
 
 		mean_score, page_count = frappe.db.get_value(
 			"Source Document", source_document, ["mean_score", "page_count"]

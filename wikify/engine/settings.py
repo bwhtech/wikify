@@ -34,6 +34,7 @@ DEFAULTS = {
 	"remediation_workers": 6,
 	"classify_workers": 8,
 	"judge_all_pages": 0,
+	"jev_model": "jev-latest",
 }
 
 
@@ -53,15 +54,15 @@ def get(field: str):
 	return value
 
 
-@lru_cache(maxsize=1)
-def _dotenv_key() -> str:
-	"""Last-resort: read OPENROUTER_KEY from the app's .env without python-dotenv."""
+@lru_cache(maxsize=4)
+def _dotenv_key(names: tuple[str, ...] = ("OPENROUTER_KEY", "OPENROUTER_API_KEY")) -> str:
+	"""Last-resort: read a key from the app's .env without python-dotenv."""
 	env_path = Path(frappe.get_app_path("wikify")).parent / ".env"
 	if not env_path.exists():
 		return ""
 	for line in env_path.read_text(encoding="utf-8").splitlines():
 		line = line.strip()
-		if line.startswith(("OPENROUTER_KEY", "OPENROUTER_API_KEY")) and "=" in line:
+		if line.startswith(names) and "=" in line:
 			return line.split("=", 1)[1].strip().strip("\"'")
 	return ""
 
@@ -78,5 +79,20 @@ def openrouter_key() -> str:
 		or os.environ.get("OPENROUTER_KEY")
 		or os.environ.get("OPENROUTER_API_KEY")
 		or _dotenv_key()
+	)
+	return (key or "").strip()
+
+
+def typesafe_key() -> str:
+	"""Resolve the TypeSafe (Jev) API key (Settings → site config → env → .env)."""
+	try:
+		key = get_settings().get_password("typesafe_api_key", raise_exception=False)
+	except Exception:
+		key = None
+	key = (
+		key
+		or frappe.conf.get("typesafe_api_key")
+		or os.environ.get("TYPESAFE_API_KEY")
+		or _dotenv_key(("TYPESAFE_API_KEY",))
 	)
 	return (key or "").strip()

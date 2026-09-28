@@ -12,6 +12,8 @@
   "agent_model",
   "column_break_models",
   "openrouter_api_key",
+  "typesafe_api_key",
+  "jev_model",
   "thresholds_section",
   "pass_threshold",
   "escalate_threshold",
@@ -72,6 +74,18 @@
    "fieldname": "openrouter_api_key",
    "fieldtype": "Password",
    "label": "OpenRouter API Key"
+  },
+  {
+   "description": "Optional TypeSafe API key for Jev conversion scoring. When blank, Jev is called through OpenRouter with the OpenRouter key.",
+   "fieldname": "typesafe_api_key",
+   "fieldtype": "Password",
+   "label": "TypeSafe API Key"
+  },
+  {
+   "default": "jev-latest",
+   "fieldname": "jev_model",
+   "fieldtype": "Data",
+   "label": "Jev Model"
   },
   {
    "fieldname": "thresholds_section",
@@ -147,7 +161,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-20 00:00:00",
+ "modified": "2026-09-29 00:00:00",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Wikify Settings",

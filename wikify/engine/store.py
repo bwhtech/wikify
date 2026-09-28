@@ -77,6 +77,46 @@ def set_mean_score(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "mean_score", mean)
 
 
+def get_jev_pages(source_document: str) -> list[dict]:
+	pages = frappe.get_all(
+		"Source Page",
+		filters={"source_document": source_document},
+		fields=["name", "page_no", "kind", "canonical_markdown", "baseline_markdown"],
+		order_by="page_no asc",
+	)
+	for p in pages:
+		p["markdown"] = p["canonical_markdown"] or p["baseline_markdown"] or ""
+	return pages
+
+
+def set_page_jev(page_name: str, result) -> None:
+	frappe.db.set_value(
+		"Source Page",
+		page_name,
+		{
+			"jev_status": result.status,
+			"jev_score": result.score or 0,
+			"jev_confidence": result.confidence or 0,
+			"jev_detail": frappe.as_json(result.detail) if result.detail else None,
+		},
+		update_modified=False,
+	)
+
+
+def set_document_jev(source_document: str, summary: dict, scored_at) -> None:
+	frappe.db.set_value(
+		"Source Document",
+		source_document,
+		{
+			"jev_score": summary["score"] or 0,
+			"jev_pages_scored": summary["scored"],
+			"jev_low_pages": summary["low"],
+			"jev_scored_at": scored_at,
+		},
+		update_modified=False,
+	)
+
+
 def cost_of(metrics: list[dict]) -> float:
 	return sum(m["cost"] for m in metrics if m.get("cost"))
 

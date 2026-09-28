@@ -34,3 +34,13 @@ VISUAL_WEIGHTS = {
 	"judge_score": 0.85,
 	"table_score": 0.15,
 }
+
+JEV_WEIGHTS = {
+	"completeness": 0.5,
+	"structure": 0.2,
+	"accuracy": 0.3,
+}
+JEV_PLACEHOLDER_CAP = 0.2
+JEV_LOW_THRESHOLD = 0.7
+JEV_MIN_TEXT_CHARS = 50
+JEV_MAX_FIELD_CHARS = 40_000
