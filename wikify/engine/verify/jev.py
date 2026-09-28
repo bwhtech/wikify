@@ -10,9 +10,9 @@ import fitz
 from frappe.utils import now_datetime
 
 from wikify.engine import config, jev_client, settings, store
-from wikify.engine.verify import deterministic as det
 
 _IGNORE = "Ignore page numbers and running headers or footers."
+_PLAIN = "`pdf_text` is plain text extracted from the PDF, so its tables and headings appear as plain lines."
 
 QUESTIONS = {
 	"completeness": {
@@ -30,7 +30,7 @@ QUESTIONS = {
 		"type": "score",
 		"instructions": (
 			"How well does `markdown` preserve the headings, lists, tables and reading order "
-			f"of `pdf_text`? {_IGNORE}"
+			f"of `pdf_text`? {_PLAIN} {_IGNORE}"
 		),
 		"criteria": [
 			"Structure is lost: headings, lists and tables are flattened into plain text or the order is jumbled",
@@ -152,8 +152,6 @@ def score_document(
 
 	with fitz.open(pdf_path) as doc:
 		texts = {p["page_no"]: doc[p["page_no"] - 1].get_text("text") for p in pages}
-	furniture = det.find_furniture_lines(list(texts.values()))
-	texts = {no: det.strip_furniture(text, furniture) for no, text in texts.items()}
 
 	results: list[JevPageScore] = []
 	jobs = []
