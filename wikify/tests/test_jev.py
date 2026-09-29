@@ -121,6 +121,7 @@ class TestJevClient(FrappeTestCase):
 		self.assertEqual(post.call_count, 2)
 		self.assertEqual(data["model"], "jev-1.13.0")
 		sent = post.call_args.kwargs
+		self.assertEqual(post.call_args.args[0], jev_client.SYSTEM_ONE_URL)
 		self.assertEqual(sent["headers"]["Authorization"], "Bearer k")
 		self.assertEqual(sent["json"]["model"], "jev-latest")
 
@@ -129,18 +130,6 @@ class TestJevClient(FrappeTestCase):
 			with self.assertRaises(requests.HTTPError):
 				jev_client.system_one("state", {}, model="jev-latest", api_key="k")
 		self.assertEqual(post.call_count, jev_client.MAX_ATTEMPTS)
-
-	def test_typesafe_key_wins_then_openrouter(self):
-		with (
-			patch("wikify.engine.settings.typesafe_key", return_value="ts"),
-			patch("wikify.engine.settings.openrouter_key", return_value="or"),
-		):
-			self.assertEqual(jev_client.credentials(), (jev_client.TYPESAFE_URL, "ts"))
-		with (
-			patch("wikify.engine.settings.typesafe_key", return_value=""),
-			patch("wikify.engine.settings.openrouter_key", return_value="or"),
-		):
-			self.assertEqual(jev_client.credentials(), (jev_client.OPENROUTER_URL, "or"))
 
 	def test_missing_key_raises(self):
 		with self.assertRaises(RuntimeError):
@@ -187,22 +176,22 @@ class TestJevJob(FrappeTestCase):
 		)
 
 	def test_no_key_logs_a_warning_and_writes_nothing(self):
-		with patch.object(jev_client, "has_jev", return_value=False):
+		with patch("wikify.engine.llm.has_openrouter", return_value=False):
 			self.assertIsNone(jev_score_job.run(self.imp.name))
 		self.assertIsNone(frappe.db.get_value("Source Document", self.source_document.name, "jev_scored_at"))
 		messages = frappe.get_all("Import Log Entry", filters={"import": self.imp.name}, pluck="message")
-		self.assertTrue(any("no TypeSafe or OpenRouter key" in m for m in messages))
+		self.assertTrue(any("no OPENROUTER_KEY" in m for m in messages))
 
 	def test_scores_pages_and_rolls_up_the_document(self):
 		with (
-			patch.object(jev_client, "has_jev", return_value=True),
-			patch.object(jev_client, "credentials", return_value=(jev_client.OPENROUTER_URL, "k")),
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.settings.openrouter_key", return_value="k"),
 			patch.object(jev_client, "system_one", return_value=_response(completeness=3.0)) as call,
 		):
 			summary = jev_score_job.run(self.imp.name)
 
 		self.assertEqual(call.call_count, 1)
-		self.assertEqual(call.call_args.kwargs["url"], jev_client.OPENROUTER_URL)
+		self.assertEqual(call.call_args.kwargs["api_key"], "k")
 		self.assertEqual(summary["scored"], 2)
 		self.assertEqual(summary["skipped"], 1)
 

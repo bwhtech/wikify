@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import frappe
 
-from wikify.engine import jev_client
+from wikify.engine import llm
 from wikify.engine.verify import jev
 from wikify.jobs._util import log, publish_progress
 
@@ -15,8 +15,8 @@ def run(import_name: str) -> dict | None:
 	imp = frappe.get_doc("Wikify Import", import_name)
 	if not imp.source_document:
 		return None
-	if not jev_client.has_jev():
-		log(import_name, "warn", "jev", "Jev scoring skipped: no TypeSafe or OpenRouter key")
+	if not llm.has_openrouter():
+		log(import_name, "warn", "jev", "Jev scoring skipped: no OPENROUTER_KEY")
 		return None
 
 	try:

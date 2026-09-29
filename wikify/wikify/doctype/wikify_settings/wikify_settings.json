@@ -10,10 +10,9 @@
   "judge_model",
   "classifier_model",
   "agent_model",
+  "jev_model",
   "column_break_models",
   "openrouter_api_key",
-  "typesafe_api_key",
-  "jev_model",
   "thresholds_section",
   "pass_threshold",
   "escalate_threshold",
@@ -66,6 +65,13 @@
    "label": "Agent Model"
   },
   {
+   "default": "jev-latest",
+   "description": "OpenRouter System One model used to score conversion fidelity.",
+   "fieldname": "jev_model",
+   "fieldtype": "Data",
+   "label": "Jev Model"
+  },
+  {
    "fieldname": "column_break_models",
    "fieldtype": "Column Break"
   },
@@ -74,18 +80,6 @@
    "fieldname": "openrouter_api_key",
    "fieldtype": "Password",
    "label": "OpenRouter API Key"
-  },
-  {
-   "description": "Optional TypeSafe API key for Jev conversion scoring. When blank, Jev is called through OpenRouter with the OpenRouter key.",
-   "fieldname": "typesafe_api_key",
-   "fieldtype": "Password",
-   "label": "TypeSafe API Key"
-  },
-  {
-   "default": "jev-latest",
-   "fieldname": "jev_model",
-   "fieldtype": "Data",
-   "label": "Jev Model"
   },
   {
    "fieldname": "thresholds_section",

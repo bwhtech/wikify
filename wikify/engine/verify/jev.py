@@ -106,22 +106,12 @@ def combine(answers: dict) -> tuple[float, float | None, dict]:
 	return round(score, 3), confidence, detail
 
 
-def score_page(
-	page_no: int,
-	pdf_text: str,
-	markdown: str,
-	*,
-	api_key: str,
-	model: str,
-	url: str = jev_client.TYPESAFE_URL,
-) -> JevPageScore:
+def score_page(page_no: int, pdf_text: str, markdown: str, *, api_key: str, model: str) -> JevPageScore:
 	weight = len("".join(pdf_text.split()))
 	if not markdown.strip():
 		return JevPageScore(page_no, "scored", 0.0, 1.0, weight, {"empty_markdown": True})
 	try:
-		resp = jev_client.system_one(
-			build_state(pdf_text, markdown), QUESTIONS, model=model, api_key=api_key, url=url
-		)
+		resp = jev_client.system_one(build_state(pdf_text, markdown), QUESTIONS, model=model, api_key=api_key)
 		score, confidence, detail = combine(resp["answers"])
 	except Exception as e:
 		return JevPageScore(page_no, "error", detail={"error": str(e)[:500]})
@@ -145,7 +135,7 @@ def score_document(
 	pdf_path: str,
 	progress_cb: Callable[[int, int], None] | None = None,
 ) -> dict:
-	url, api_key = jev_client.credentials()
+	api_key = settings.openrouter_key()
 	model = settings.get("jev_model")
 	workers = max(1, int(settings.get("remediation_workers") or 1))
 	pages = store.get_jev_pages(source_document)
@@ -175,7 +165,6 @@ def score_document(
 				p["markdown"],
 				api_key=api_key,
 				model=model,
-				url=url,
 			)
 			for p in jobs
 		]
