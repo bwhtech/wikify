@@ -271,3 +271,48 @@ class TestAgentWrite(FrappeTestCase):
 		complete = next(e for e in events if e[0].startswith("wikify_agent_complete"))
 		self.assertEqual(complete[1]["mutation_count"], 2)
 		self.assertEqual(complete[1]["mutated_tools"], ["rename_section", "rename_section"])
+
+	def test_round_limit_reports_what_was_done(self):
+		sess = self._make_session()
+		secs = self._sections()
+		fake = FakeLLM(
+			[
+				[
+					_tool_chunk(
+						0,
+						"c1",
+						"move_section",
+						f'{{"name": "{secs[2].name}", "new_parent": "{secs[0].name}"}}',
+					)
+				],
+				[_tool_chunk(0, "c2", "read_tree", "{}")],
+				[_tool_chunk(0, "c3", "move_section", f'{{"name": "{secs[1].name}"}}')],
+				[
+					_tool_chunk(
+						0,
+						"c4",
+						"move_section",
+						f'{{"name": "{secs[0].name}", "new_parent": "{secs[0].name}"}}',
+					)
+				],
+			]
+		)
+		with (
+			patch("wikify.agent.loop.MAX_ROUNDS", 4),
+			patch("wikify.agent.llm.complete_with_tools", fake),
+		):
+			AgentRunner(sess.name, "Administrator").run()
+		final = frappe.get_all(
+			"Wikify Agent Message",
+			filters={"session": sess.name, "role": "assistant"},
+			fields=["content", "status"],
+			order_by="creation desc",
+			limit=1,
+		)[0]
+		self.assertEqual(final.status, "error")
+		self.assertIn("I stopped after 4 steps before finishing.", final.content)
+		self.assertIn("Moved '2. Beta' under 1. Alpha.", final.content)
+		self.assertIn("Moved '1.1 Alpha-One' to the top level.", final.content)
+		self.assertIn("Couldn't move section: Can't move a section into its own subtree.", final.content)
+		self.assertIn("Read-only lookups: 1.", final.content)
+		self.assertIn("Ask me to continue for the rest.", final.content)
