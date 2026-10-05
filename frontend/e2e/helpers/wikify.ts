@@ -175,9 +175,11 @@ export async function propagationPending(api: Api, sourceDocument: string): Prom
 // Specs that parse their own import pick sections by position and figures by search.
 export async function outline(api: Api, sourceDocument: string) {
 	const rows = await sectionRows(api, sourceDocument);
-	const root = rows.find((row) => !row.parent_source_section);
-	const children = root ? rows.filter((row) => row.parent_source_section === root.name) : [];
-	if (!root || children.length < 5) {
+	const topLevel = rows.filter((row) => !row.parent_source_section);
+	// Usually one title section holds the rest; a parse that misses the title heading comes out flat.
+	const root = topLevel.length === 1 ? topLevel[0] : undefined;
+	const children = root ? rows.filter((row) => row.parent_source_section === root.name) : topLevel;
+	if (children.length < 5) {
 		const shape = rows.map((row) => [row.title, row.parent_source_section]);
 		throw new Error(`Unexpected section tree for ${sourceDocument}: ${JSON.stringify(shape)}`);
 	}

@@ -78,6 +78,8 @@ export async function rowOrder(page: Page): Promise<string[]> {
 		.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-section-row")!));
 }
 
-export function childOrder(rows: Row[], parent: string): string[] {
-	return rows.filter((row) => row.parent_source_section === parent).map((row) => row.name);
+export function childOrder(rows: Row[], parent: string | undefined): string[] {
+	return rows
+		.filter((row) => (row.parent_source_section || undefined) === parent)
+		.map((row) => row.name);
 }

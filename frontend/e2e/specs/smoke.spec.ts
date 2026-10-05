@@ -172,13 +172,14 @@ test.describe("smoke", () => {
 			await expect(
 				sectionRow(page, excluded.name).getByText(excluded.title, { exact: true }),
 			).toHaveCSS("text-decoration-line", "line-through");
-			expect(await rowOrder(page)).toEqual([root.name, moved, ...children.slice(0, -1)]);
+			const heading = root ? [root.name] : [];
+			expect(await rowOrder(page)).toEqual([...heading, moved, ...children.slice(0, -1)]);
 
 			const after = await sectionRows(api, run.sourceDocument);
 			const byName = Object.fromEntries(after.map((row) => [row.name, row]));
 			expect(byName[renamed.name].title).toBe(newTitle);
 			expect(byName[excluded.name].include_in_wiki).toBe(0);
-			expect(childOrder(after, root.name)).toEqual([moved, ...children.slice(0, -1)]);
+			expect(childOrder(after, root?.name)).toEqual([moved, ...children.slice(0, -1)]);
 			run.renamed = renamed.name;
 			run.renamedTitle = newTitle;
 			run.excluded = excluded.name;

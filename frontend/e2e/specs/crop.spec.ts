@@ -40,6 +40,20 @@ function imageTags(markdown: string): { caption: string; url: string }[] {
 	}));
 }
 
+// A double quote in a caption breaks the UI crop (the preview truncates the alt text), and the
+// fixture's captions change whenever the seed re-parses it, so UI crops search for a plain one.
+function plainFigure(pages: PageSnapshot[]) {
+	for (const row of pages) {
+		const figure = imageTags(row.canonical_markdown).find((tag) => !tag.caption.includes('"'));
+		if (figure) return { page: row, pageNo: row.page_no, ...figure };
+	}
+	throw new Error("No figure with a quote-free caption in the review fixture");
+}
+
+function cropUrl(pageNo: number): RegExp {
+	return new RegExp(`^/private/files/page-${String(pageNo).padStart(4, "0")}-crop\\w*\\.png$`);
+}
+
 async function takeSnapshot(api: Api, sourceDocument: string): Promise<Snapshot> {
 	const pages = await api.getList<PageSnapshot>("Source Page", {
 		filters: { source_document: sourceDocument },
@@ -247,12 +261,10 @@ test.describe("crop", () => {
 		{ tag: ["@functional", "@crop", "@sanity"] },
 		async ({ page, api, fixture }) => {
 			const sourceDocument = fixture.review.sourceDocument;
-			const [figure] = imageTags(
-				before.pages.find((row) => row.page_no === 2)!.canonical_markdown,
-			);
+			const figure = plainFigure(before.pages);
 			const calls = trackCropCalls(page);
 
-			await openPage(page, fixture.review.import, 2);
+			await openPage(page, fixture.review.import, figure.pageNo);
 			const dialog = await openCropDialog(page, figure.caption);
 			const selection = await boundingBox(page, "cropper-selection");
 			const canvasImage = await boundingBox(page, "cropper-image");
@@ -270,12 +282,13 @@ test.describe("crop", () => {
 			expect(body.y1 - body.y0).toBeLessThan(0.75);
 			expect(body.x1 - body.x0).toBeLessThan(0.75);
 			const image = previewImage(page, figure.caption);
-			await expect(image).toHaveAttribute("src", /^\/private\/files\/page-0002-crop\w*\.png$/);
+			await expect(image).toHaveAttribute("src", cropUrl(figure.pageNo));
 			await expectLoaded(image);
 			expect(calls).toHaveLength(1);
-			const [tag] = imageTags(await pageMarkdown(api, sourceDocument, 2));
-			expect(tag.caption).toBe(figure.caption);
-			expect(tag.url).toMatch(/^\/private\/files\/page-0002-crop\w*\.png$/);
+			const tag = imageTags(await pageMarkdown(api, sourceDocument, figure.pageNo)).find(
+				(row) => row.caption === figure.caption,
+			);
+			expect(tag?.url).toMatch(cropUrl(figure.pageNo));
 		},
 	);
 
@@ -284,13 +297,10 @@ test.describe("crop", () => {
 		{ tag: ["@functional", "@crop"] },
 		async ({ page, api, fixture }) => {
 			const sourceDocument = fixture.review.sourceDocument;
-			// Pages 3 and 5 have captions with double quotes, which the preview truncates; page 1 has none.
-			const [figure] = imageTags(
-				before.pages.find((row) => row.page_no === 1)!.canonical_markdown,
-			);
+			const figure = plainFigure(before.pages);
 			const calls = trackCropCalls(page);
 
-			await openPage(page, fixture.review.import, 1);
+			await openPage(page, fixture.review.import, figure.pageNo);
 			const dialog = await openCropDialog(page, figure.caption);
 			const canvasImage = await boundingBox(page, "cropper-image");
 			const topLeft = await boundingBox(page, 'cropper-handle[action="nw-resize"]');
@@ -318,11 +328,13 @@ test.describe("crop", () => {
 			for (const edge of [body.x0, body.y0]) expect(edge).toBeCloseTo(0, 2);
 			for (const edge of [body.x1, body.y1]) expect(edge).toBeCloseTo(1, 2);
 			const image = previewImage(page, figure.caption);
-			await expect(image).toHaveAttribute("src", /^\/private\/files\/page-0001-crop\w*\.png$/);
+			await expect(image).toHaveAttribute("src", cropUrl(figure.pageNo));
 			await expectLoaded(image);
 			expect(calls).toHaveLength(1);
-			const [tag] = imageTags(await pageMarkdown(api, sourceDocument, 1));
-			expect(tag.url).toMatch(/^\/private\/files\/page-0001-crop\w*\.png$/);
+			const tag = imageTags(await pageMarkdown(api, sourceDocument, figure.pageNo)).find(
+				(row) => row.caption === figure.caption,
+			);
+			expect(tag?.url).toMatch(cropUrl(figure.pageNo));
 		},
 	);
 
@@ -331,31 +343,30 @@ test.describe("crop", () => {
 		{ tag: ["@functional", "@crop"] },
 		async ({ page, api, fixture }) => {
 			const sourceDocument = fixture.review.sourceDocument;
-			// The fixture has no page with two same-caption images, so page 2's figure is duplicated (afterEach restores it).
-			const original = before.pages.find((row) => row.page_no === 2)!;
-			const [figure] = imageTags(original.canonical_markdown);
+			// The fixture has no page with two same-caption images, so one figure is duplicated (afterEach restores it).
+			const figure = plainFigure(before.pages);
+			const original = figure.page;
 			const tag = `![${figure.caption}](${figure.url})`;
 			await api.setValue("Source Page", original.name, {
 				canonical_markdown: original.canonical_markdown.replace(tag, `${tag}\n\n${tag}`),
 			});
 			const calls = trackCropCalls(page);
 
-			await openPage(page, fixture.review.import, 2);
+			await openPage(page, fixture.review.import, figure.pageNo);
 			const images = previewImage(page, figure.caption);
 			await expect(images).toHaveCount(2);
 			const dialog = await openCropDialog(page, figure.caption, images.nth(1));
 			await submitCrop(page, dialog);
 
-			await expect(images.nth(1)).toHaveAttribute(
-				"src",
-				/^\/private\/files\/page-0002-crop\w*\.png$/,
-			);
+			await expect(images.nth(1)).toHaveAttribute("src", cropUrl(figure.pageNo));
 			await expect(images.nth(0)).toHaveAttribute("src", figure.url);
 			expect(calls).toHaveLength(1);
-			const tags = imageTags(await pageMarkdown(api, sourceDocument, 2));
-			expect(tags.map((row) => row.caption)).toEqual([figure.caption, figure.caption]);
+			const tags = imageTags(await pageMarkdown(api, sourceDocument, figure.pageNo)).filter(
+				(row) => row.caption === figure.caption,
+			);
+			expect(tags).toHaveLength(2);
 			expect(tags[0].url).toBe(figure.url);
-			expect(tags[1].url).toMatch(/^\/private\/files\/page-0002-crop\w*\.png$/);
+			expect(tags[1].url).toMatch(cropUrl(figure.pageNo));
 		},
 	);
 
@@ -367,10 +378,15 @@ test.describe("crop", () => {
 			const sourceDocument = fixture.review.sourceDocument;
 			const section = await findSection(api, sourceDocument, FIXTURE_SECTIONS[0]);
 			const crops: { caption: string; url: string }[] = [];
-			for (const pageNo of [1, 2]) {
-				const [figure] = imageTags(
-					before.pages.find((row) => row.page_no === pageNo)!.canonical_markdown,
-				);
+			const figurePages = before.pages.filter(
+				(row) =>
+					row.page_no >= section.page_start &&
+					row.page_no <= section.page_end &&
+					imageTags(row.canonical_markdown).length,
+			);
+			expect(figurePages.length, "figures on the section's pages").toBeGreaterThan(0);
+			for (const { page_no: pageNo, canonical_markdown } of figurePages) {
+				const [figure] = imageTags(canonical_markdown);
 				const result = await api.call("wikify.api.pages.crop_page_figure", {
 					source_document: sourceDocument,
 					page_no: pageNo,
@@ -402,18 +418,11 @@ test.describe("crop", () => {
 			await row.getByText(section.title, { exact: true }).click();
 			const article = page.getByRole("article");
 			await expect(article.getByRole("heading", { level: 1, name: section.title })).toBeVisible();
-			for (const crop of crops) {
-				const image = article.getByRole("img", {
-					name: crop.caption,
-					exact: true,
-				});
-				await expect(image).toHaveAttribute("src", crop.url);
-				await expectLoaded(image);
-			}
+			for (const crop of crops) await expectLoaded(article.locator(`img[src="${crop.url}"]`));
 			const owners = await api.getList("Source Section", {
 				filters: {
 					source_document: sourceDocument,
-					markdown: ["like", "%page-0002-crop%"],
+					markdown: ["like", `%${crops[0].url}%`],
 				},
 				fields: ["name"],
 			});

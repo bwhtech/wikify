@@ -357,7 +357,7 @@ test.describe("tree after publish", () => {
 				)
 					reorderCalls++;
 			});
-			await openTree(page, importName, root.name);
+			await openTree(page, importName, root?.name ?? children[0]);
 			await expect(
 				page.getByText(
 					"This wiki has been published — click a page below to edit it in the Wiki app.",

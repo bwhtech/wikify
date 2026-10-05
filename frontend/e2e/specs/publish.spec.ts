@@ -197,10 +197,16 @@ test.describe("publish", () => {
 		async ({ page }) => {
 			// known failure: #30. Remove test.fail() when the issue is closed.
 			test.fail();
-			const root = sections.find((row) => !row.parent_source_section)!;
-			const paragraph = ownParagraph(root.markdown);
-			expect(sections.filter((row) => row.markdown?.includes(paragraph))).toEqual([root]);
-			const group = publishedDocuments.find((document) => document.name === root.wiki_document)!;
+			const root = sections.find(
+				(row) =>
+					!row.parent_source_section &&
+					sections.some((child) => child.parent_source_section === row.name),
+			);
+			test.skip(!root, "this parse produced no parent section");
+			const parent = root!;
+			const paragraph = ownParagraph(parent.markdown);
+			expect(sections.filter((row) => row.markdown?.includes(paragraph))).toEqual([parent]);
+			const group = publishedDocuments.find((document) => document.name === parent.wiki_document)!;
 			await page.goto(`/${group.route}`);
 			await expect(page.getByRole("main")).toContainText(paragraph);
 		},
