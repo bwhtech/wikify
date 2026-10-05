@@ -4,10 +4,9 @@
 // repeat on a page) — the rest of the page's markdown is untouched. Companion to the
 // deterministic whole-page-photo fallback (auto-repair + use_page_image) this closes
 // the loop on.
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { Dialog, Button, ErrorMessage, useCall } from "frappe-ui";
-import Cropper from "cropperjs";
-import "cropperjs/dist/cropper.css";
+import "cropperjs";
 
 const props = defineProps({
 	// { sourceDocument, pageName, pageNo, pageImage, caption, occurrence }
@@ -20,40 +19,73 @@ watch(open, (v) => {
 	if (!v) emit("close");
 });
 
-const imageEl = ref(null);
-let cropper = null;
+const canvasElement = ref(null);
+const imageElement = ref(null);
+const selectionElement = ref(null);
 const cropperReady = ref(false);
+let imageBounds = null;
 
-function initCropper() {
-	destroyCropper();
+function fitImageInCanvas(element, image) {
+	const canvasWidth = canvasElement.value.offsetWidth;
+	const canvasHeight = canvasElement.value.offsetHeight;
+	const scale = Math.min(canvasWidth / image.naturalWidth, canvasHeight / image.naturalHeight);
+	// $setTransform is a no-op unless one of the transform flags is on
+	element.scalable = true;
+	element.$setTransform(
+		scale,
+		0,
+		0,
+		scale,
+		(canvasWidth - image.naturalWidth) / 2,
+		(canvasHeight - image.naturalHeight) / 2
+	);
+	element.scalable = false;
+	const width = image.naturalWidth * scale;
+	const height = image.naturalHeight * scale;
+	return { left: (canvasWidth - width) / 2, top: (canvasHeight - height) / 2, width, height };
+}
+
+watch(imageElement, async (element) => {
 	cropperReady.value = false;
-	if (!imageEl.value) return;
-	cropper = new Cropper(imageEl.value, {
-		viewMode: 1,
-		dragMode: "move",
-		autoCropArea: 0.5,
-		background: false,
-		zoomable: false,
-		ready: () => {
-			cropperReady.value = true;
-		},
-	});
-}
-function destroyCropper() {
-	cropper?.destroy();
-	cropper = null;
-}
-onBeforeUnmount(destroyCropper);
+	if (!element) return;
+	const image = await element.$ready();
+	imageBounds = fitImageInCanvas(element, image);
+	selectionElement.value.$change(
+		Math.round(imageBounds.left + imageBounds.width / 4),
+		Math.round(imageBounds.top + imageBounds.height / 4),
+		Math.round(imageBounds.width / 2),
+		Math.round(imageBounds.height / 2)
+	);
+	cropperReady.value = true;
+});
 
-watch(
-	() => props.target.pageImage,
-	async () => {
-		destroyCropper();
-		await nextTick();
-		initCropper();
-	},
-	{ immediate: true }
-);
+function keepSelectionInsideImage(event) {
+	if (!imageBounds) return;
+	const left = Math.ceil(imageBounds.left);
+	const top = Math.ceil(imageBounds.top);
+	const right = Math.floor(imageBounds.left + imageBounds.width);
+	const bottom = Math.floor(imageBounds.top + imageBounds.height);
+	const { x, y, width, height } = event.detail;
+	if (x >= left && y >= top && x + width <= right && y + height <= bottom) return;
+
+	event.preventDefault();
+	const selection = event.target;
+	if (width === selection.width && height === selection.height) {
+		selection.$change(
+			Math.min(Math.max(x, left), right - width),
+			Math.min(Math.max(y, top), bottom - height)
+		);
+		return;
+	}
+	const clampedLeft = Math.max(x, left);
+	const clampedTop = Math.max(y, top);
+	selection.$change(
+		clampedLeft,
+		clampedTop,
+		Math.min(x + width, right) - clampedLeft,
+		Math.min(y + height, bottom) - clampedTop
+	);
+}
 
 const cropFigure = useCall({
 	url: "/api/v2/method/wikify.api.pages.crop_page_figure",
@@ -62,19 +94,19 @@ const cropFigure = useCall({
 });
 const cropError = ref("");
 async function submitCrop() {
-	if (!cropper || !imageEl.value) return;
-	const img = imageEl.value;
-	const data = cropper.getData(true);
+	if (!cropperReady.value) return;
+	const bounds = imageBounds;
+	const selection = selectionElement.value;
 	cropError.value = "";
 	await cropFigure.submit({
 		source_document: props.target.sourceDocument,
 		page_no: props.target.pageNo,
 		caption: props.target.caption,
 		occurrence: props.target.occurrence,
-		x0: data.x / img.naturalWidth,
-		y0: data.y / img.naturalHeight,
-		x1: (data.x + data.width) / img.naturalWidth,
-		y1: (data.y + data.height) / img.naturalHeight,
+		x0: (selection.x - bounds.left) / bounds.width,
+		y0: (selection.y - bounds.top) / bounds.height,
+		x1: (selection.x + selection.width - bounds.left) / bounds.width,
+		y1: (selection.y + selection.height - bounds.top) / bounds.height,
 	});
 	if (cropFigure.error) {
 		cropError.value =
@@ -91,14 +123,35 @@ async function submitCrop() {
 <template>
 	<Dialog v-model:open="open" :title="`Fix '${target.caption}'`" size="xl">
 		<template #body-content>
-			<div class="max-h-[60vh] overflow-hidden rounded border border-outline-gray-1">
-				<img
+			<div class="overflow-hidden rounded border border-outline-gray-1">
+				<cropper-canvas
 					v-if="target.pageImage"
-					ref="imageEl"
-					:src="target.pageImage"
-					alt=""
-					class="block max-w-full"
-				/>
+					ref="canvasElement"
+					background
+					class="block h-[60vh]"
+				>
+					<cropper-image ref="imageElement" :src="target.pageImage" alt="" />
+					<cropper-shade hidden />
+					<cropper-selection
+						ref="selectionElement"
+						movable
+						resizable
+						keyboard
+						outlined
+						@change="keepSelectionInsideImage"
+					>
+						<cropper-grid role="grid" bordered covered />
+						<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.35)" />
+						<cropper-handle action="n-resize" />
+						<cropper-handle action="e-resize" />
+						<cropper-handle action="s-resize" />
+						<cropper-handle action="w-resize" />
+						<cropper-handle action="ne-resize" />
+						<cropper-handle action="nw-resize" />
+						<cropper-handle action="se-resize" />
+						<cropper-handle action="sw-resize" />
+					</cropper-selection>
+				</cropper-canvas>
 				<p v-else class="p-6 text-center text-sm text-ink-gray-5">
 					No page photo available to crop.
 				</p>

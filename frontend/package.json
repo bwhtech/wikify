@@ -8,11 +8,11 @@
     "serve": "vite preview"
   },
   "dependencies": {
+    "cropperjs": "^2.2.0",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
-    "cropperjs": "^1.6.3",
     "frappe-ui": "1.0.0-beta.24",
     "mermaid": "^11.16.1",
     "pdfjs-dist": "^4.7.76",
