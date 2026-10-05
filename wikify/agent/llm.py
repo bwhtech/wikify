@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import litellm
 
-from wikify.engine import settings
+from wikify.engine import claude_cli, settings
 
 litellm.drop_params = True
 
@@ -37,6 +37,9 @@ def _openrouter_model(model: str) -> str:
 def complete_with_tools(
 	model: str, messages: list, tools: list, *, stream: bool = True, include_usage: bool = False
 ):
+	if claude_cli.is_enabled():
+		return claude_cli.complete_with_tools(messages, tools, stream=stream)
+
 	key = settings.openrouter_key()
 	if not key:
 		raise RuntimeError("OPENROUTER key not set; the agent is unavailable.")
