@@ -47,12 +47,15 @@ def get_tree(source_document: str) -> list[dict]:
 	return roots
 
 
+def assert_not_published(status: str | None) -> None:
+	if status == "Completed":
+		frappe.throw(_("This wiki has already been published — edit pages directly in the Wiki app."))
+
+
 def _assert_editable(source_document: str) -> None:
 	"""Block tree edits once the document's import has published a wiki — from that
 	point the Wiki app is the source of truth, not Wikify's own tree."""
-	status = frappe.db.get_value("Wikify Import", {"source_document": source_document}, "status")
-	if status == "Completed":
-		frappe.throw(_("This wiki has already been published — edit pages directly in the Wiki app."))
+	assert_not_published(frappe.db.get_value("Wikify Import", {"source_document": source_document}, "status"))
 
 
 def _rebuild_tree(source_document: str) -> None:
@@ -437,8 +440,7 @@ def merge_sections(names: list | str) -> dict:
 @frappe.whitelist(methods=["POST"])
 def build_graph(import_name: str) -> dict:
 	imp = frappe.get_doc("Wikify Import", import_name)
-	if imp.status == "Completed":
-		frappe.throw(_("This wiki has already been published — edit pages directly in the Wiki app."))
+	assert_not_published(imp.status)
 	if not imp.source_document:
 		frappe.throw(_("Nothing to graph — parse hasn't produced a document yet."))
 	imp.db_set("status", "Graphed")

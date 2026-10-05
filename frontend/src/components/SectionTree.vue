@@ -7,6 +7,7 @@ import WikiPreview from "@/components/WikiPreview.vue";
 import WikiPublish from "@/components/WikiPublish.vue";
 import { useIsNarrow } from "@/composables/useMediaQuery";
 import { setSection } from "@/data/agentContext";
+import { isPublished } from "@/utils/status";
 
 const props = defineProps({
 	sourceDocument: { type: String, default: null },
@@ -122,7 +123,7 @@ const SplitPane = computed(() => (isNarrow.value ? "div" : Pane));
 
 // A completed publish hands editing off to the Wiki app — clicking a page opens its
 // real editor there instead of Wikify's own (now-stale-on-regenerate) preview.
-const published = computed(() => props.status === "Completed");
+const published = computed(() => isPublished(props.status));
 function onSelect(name) {
 	if (published.value) {
 		const wikiDocument = byName.value[name]?.wiki_document;

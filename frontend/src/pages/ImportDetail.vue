@@ -34,8 +34,7 @@ const isMobile = useIsMobile();
 const imp = useDoc({ doctype: "Wikify Import", name: props.name });
 
 // PDF first (the source is the starting point); the metadata + streaming log ("Logs")
-// moves to the end. The `overview` key is kept so its panel/v-ifs don't churn.
-// `key: "tree"` kept as-is (route param) while its label became "Wiki".
+// moves to the end. Keys are route params, so `overview`/`tree` stay as-is under new labels.
 const tabs = [
 	{ label: "PDF", key: "pdf" },
 	{ label: "Pages", key: "pages" },
@@ -47,7 +46,7 @@ const tabKeys = tabs.map((t) => t.key);
 // `/import/:name/wiki` links/bookmarks should land there, not fall through to "pdf".
 const LEGACY_TAB_ALIASES = { wiki: "tree" };
 function resolveTabKey(key) {
-	return tabKeys.includes(key) ? key : LEGACY_TAB_ALIASES[key] ?? key;
+	return LEGACY_TAB_ALIASES[key] ?? key;
 }
 const activeTab = ref(Math.max(0, tabKeys.indexOf(resolveTabKey(props.tab))));
 
@@ -107,12 +106,6 @@ watch(
 
 const pageReview = ref(null);
 const sectionTree = ref(null);
-// A publish just assigned each included section its wiki_document — the mounted tree
-// still holds the pre-publish (empty) values until refetched.
-function onGenerated() {
-	imp.reload();
-	sectionTree.value?.reload();
-}
 
 // Document-level audit score + LLM spend (0.4 slice 23) live on Source Document.
 const sdStats = useList({
@@ -373,7 +366,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:wiki-space="imp.doc?.wiki_space"
 						:initial-section="route.query.section"
 						@graphed="imp.reload()"
-						@generated="onGenerated"
+						@generated="imp.reload()"
 					/>
 				</div>
 

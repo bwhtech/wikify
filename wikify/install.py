@@ -8,7 +8,6 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 from wikify.seed import seed_section_types, seed_uncategorized_project
 
 WIKI_TITLE_DOCTYPES = ("Wiki Document", "Wiki Revision Item")
-WIDE_TEXT_FIELDTYPES = ("Small Text", "Text", "Long Text")
 WIDE_TEXT_COLUMNS = ("text", "mediumtext", "longtext")
 
 

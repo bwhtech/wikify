@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils.background_jobs import is_job_enqueued
 
+from wikify.api.sections import assert_not_published
 from wikify.engine import preview_wiki as _preview_wiki
 from wikify.jobs import generate as generate_job
 from wikify.jobs._util import log, publish_progress
@@ -116,8 +117,7 @@ def generate_wiki(
 	imp = frappe.get_doc("Wikify Import", import_name)
 	if not imp.source_document:
 		frappe.throw(_("Nothing to generate — parse hasn't produced a document yet."))
-	if imp.status == "Completed":
-		frappe.throw(_("This wiki has already been published — edit pages directly in the Wiki app."))
+	assert_not_published(imp.status)
 	if imp.status not in ("Graphed", "Stopped"):
 		frappe.throw(
 			f"Approve the section tree first — can only generate from Graphed or Stopped "

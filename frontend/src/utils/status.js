@@ -21,3 +21,8 @@ export function statusTheme(status) {
 export function isActive(status) {
 	return ["Queued", "Parsing", "Remediating", "Generating Wiki"].includes(status);
 }
+
+// A published wiki is handed off to the Wiki app; Wikify's tree and regenerate are locked.
+export function isPublished(status) {
+	return status === "Completed";
+}
