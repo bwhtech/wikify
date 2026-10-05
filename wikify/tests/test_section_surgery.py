@@ -12,6 +12,7 @@ from wikify.agent.tools import tree as tt
 from wikify.api import sections as api
 from wikify.engine import store
 from wikify.engine.loader.sectionizer import Section
+from wikify.tests import _cleanup
 
 
 def _sec(title, level, path, p_start, p_end, markdown=None):
@@ -222,3 +223,46 @@ class TestReplaceSectionsIsAtomic(FrappeTestCase):
 			[_sec("A. New", 1, ["A. New"], 1, 1), _sec("B. New", 1, ["B. New"], 2, 2)],
 		)
 		self.assertEqual(self.titles(), ["A. New", "B. New"])
+
+
+class TestReplaceSectionsAfterDeadlock(FrappeTestCase):
+	def setUp(self):
+		self.source_document = frappe.get_doc(
+			{"doctype": "Source Document", "title": "Deadlocked Rebuild"}
+		).insert(ignore_permissions=True)
+		store.replace_sections(
+			self.source_document.name,
+			[_sec("1. Alpha", 1, ["1. Alpha"], 1, 1), _sec("2. Beta", 1, ["2. Beta"], 2, 2)],
+		)
+		# nosemgrep
+		frappe.db.commit()
+		self.addCleanup(_cleanup.delete_document, self.source_document.name)
+
+	def test_a_deadlocked_insert_retries_and_replaces_the_tree(self):
+		replacement = [
+			_sec("A. New", 1, ["A. New"], 1, 1),
+			_sec("A.1 Child", 2, ["A. New", "A.1 Child"], 1, 1),
+			_sec("B. New", 1, ["B. New"], 2, 2),
+		]
+		real_insert = frappe.model.document.Document.insert
+		deadlocked_titles = []
+
+		def insert_but_deadlock_once(document, *args, **kwargs):
+			if document.doctype == "Source Section" and document.title == "B. New" and not deadlocked_titles:
+				deadlocked_titles.append(document.title)
+				frappe.db.sql("rollback")
+				raise frappe.QueryDeadlockError("Deadlock found when trying to get lock")
+			return real_insert(document, *args, **kwargs)
+
+		with patch.object(frappe.model.document.Document, "insert", insert_but_deadlock_once):
+			store.replace_sections(self.source_document.name, replacement)
+
+		rows = frappe.get_all(
+			"Source Section",
+			filters={"source_document": self.source_document.name},
+			fields=["name", "title", "parent_source_section"],
+			order_by="lft asc",
+		)
+		self.assertEqual(deadlocked_titles, ["B. New"])
+		self.assertEqual([row.title for row in rows], ["A. New", "A.1 Child", "B. New"])
+		self.assertEqual([row.parent_source_section for row in rows], [None, rows[0].name, None])
