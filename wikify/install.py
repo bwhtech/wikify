@@ -27,11 +27,7 @@ def add_wiki_title_customizations() -> None:
 	if "wiki" not in frappe.get_installed_apps():
 		return
 	for doctype in WIKI_TITLE_DOCTYPES:
-		# frappe.get_meta() is process-cached and can be stale after a rolled-back test transaction.
-		setter_value = frappe.db.get_value(
-			"Property Setter", {"doc_type": doctype, "field_name": "title", "property": "fieldtype"}, "value"
-		)
-		if setter_value not in WIDE_TEXT_FIELDTYPES:
+		if frappe.get_meta(doctype).get_field("title").fieldtype not in WIDE_TEXT_FIELDTYPES:
 			make_property_setter(
 				doctype, "title", "fieldtype", "Small Text", "Select", validate_fields_for_doctype=False
 			)

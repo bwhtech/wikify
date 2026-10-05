@@ -17,7 +17,6 @@ const props = defineProps({
 	status: { type: String, default: null },
 	wikiSpace: { type: String, default: null },
 });
-const emit = defineEmits(["generated"]);
 
 // Generation is gated on an approved tree (Graphed) — or a prior run
 // (Completed → it regenerates in place).
@@ -98,7 +97,6 @@ async function runGenerate() {
 		return;
 	}
 	open.value = false;
-	emit("generated");
 }
 
 const stop = useCall({
@@ -117,34 +115,27 @@ function stopGenerate() {
 			if (stop.error) {
 				throw new Error(stop.error?.messages?.[0] || "Could not stop wiki generation");
 			}
-			emit("generated");
 		},
 	});
 }
 
 // Realtime — the job emits wikify_wiki_done on completion.
-const lastRoute = ref(null);
 const socket = useSocket();
 function onWikiDone(payload) {
 	if (payload.import !== props.importName) return;
-	lastRoute.value = payload.space_route;
 	spaces.reload();
-	emit("generated");
 	toast.success("Wiki generated");
 }
 onMounted(() => socket?.on("wikify_wiki_done", onWikiDone));
 onUnmounted(() => socket?.off("wikify_wiki_done", onWikiDone));
 
-const wikiUrl = computed(() => {
-	const route = lastRoute.value || currentSpace.value?.route;
-	return route ? `/${route}` : null;
-});
+const wikiUrl = computed(() => currentSpace.value && `/${currentSpace.value.route}`);
 </script>
 
 <template>
 	<div class="flex shrink-0 items-center gap-2">
 		<a
-			v-if="alreadyGenerated && wikiUrl"
+			v-if="wikiUrl"
 			:href="wikiUrl"
 			target="_blank"
 			class="inline-flex items-center gap-1 text-sm font-medium text-ink-blue-6 hover:underline"

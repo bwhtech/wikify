@@ -33,9 +33,7 @@ const isMobile = useIsMobile();
 
 const imp = useDoc({ doctype: "Wikify Import", name: props.name });
 
-// PDF first (the source is the starting point); the metadata + streaming log ("Logs")
-// moves to the end. The `overview` key is kept so its panel/v-ifs don't churn.
-// `key: "tree"` kept as-is (route param) while its label became "Wiki".
+// Keys are route params, so they don't always match the labels.
 const tabs = [
 	{ label: "PDF", key: "pdf" },
 	{ label: "Pages", key: "pages" },
@@ -43,13 +41,7 @@ const tabs = [
 	{ label: "Logs", key: "overview" },
 ];
 const tabKeys = tabs.map((t) => t.key);
-// The old generate-only "Wiki" tab folded into "tree" (now labeled Wiki) — old
-// `/import/:name/wiki` links/bookmarks should land there, not fall through to "pdf".
-const LEGACY_TAB_ALIASES = { wiki: "tree" };
-function resolveTabKey(key) {
-	return tabKeys.includes(key) ? key : LEGACY_TAB_ALIASES[key] ?? key;
-}
-const activeTab = ref(Math.max(0, tabKeys.indexOf(resolveTabKey(props.tab))));
+const activeTab = ref(Math.max(0, tabKeys.indexOf(props.tab)));
 
 // Persist the active tab in the route (path param) so a refresh restores it. Use
 // replace so tab-switching doesn't flood browser history; preserve any query (the
@@ -68,7 +60,7 @@ watch(activeTab, (i) => {
 watch(
 	() => props.tab,
 	(key) => {
-		const i = tabKeys.indexOf(resolveTabKey(key));
+		const i = tabKeys.indexOf(key);
 		if (i >= 0 && i !== activeTab.value) activeTab.value = i;
 	}
 );
@@ -364,7 +356,6 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:wiki-space="imp.doc?.wiki_space"
 						:initial-section="route.query.section"
 						@graphed="imp.reload()"
-						@generated="imp.reload()"
 					/>
 				</div>
 
