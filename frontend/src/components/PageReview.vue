@@ -207,16 +207,13 @@ const mdContent = computed(() => {
 	return p.canonical_markdown || p.baseline_markdown || "";
 });
 
-// Click-to-fix: only against the live canonical content (mdView "result"), since that's
-// what edit_page_content and every other page mutation acts on too. Every image tag gets
-// a click affordance opening the crop dialog, scoped to that exact tag by caption +
-// occurrence (handles duplicate captions).
+// Only the "result" view: crops rewrite canonical markdown, which is what that view shows.
 const REAL_FILE_RE = /^\/(private\/)?files\//;
 const EDIT_ICON_SVG =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
 function decorateFigures(html) {
-	const p = selected.value;
-	if (!p || mdView.value !== "result") return html;
+	const page = selected.value;
+	if (!page || mdView.value !== "result") return html;
 	const doc = new DOMParser().parseFromString(html, "text/html");
 	const seen = {};
 	doc.querySelectorAll("img").forEach((img) => {
@@ -225,7 +222,7 @@ function decorateFigures(html) {
 		const occurrence = seen[caption] || 0;
 		seen[caption] = occurrence + 1;
 		const isBroken = !REAL_FILE_RE.test(src);
-		const isWholePagePhoto = !!p.image && src === p.image;
+		const isWholePagePhoto = !!page.image && src === page.image;
 		const needsAttention = isBroken || isWholePagePhoto;
 
 		img.classList.add("wikify-croppable", "cursor-pointer", "rounded");
@@ -262,7 +259,6 @@ function onPreviewClick(event) {
 	if (!img || !selected.value) return;
 	cropTarget.value = {
 		sourceDocument: props.sourceDocument,
-		pageName: selected.value.name,
 		pageNo: selected.value.page_no,
 		pageImage: selected.value.image,
 		caption: img.getAttribute("data-caption") || "",

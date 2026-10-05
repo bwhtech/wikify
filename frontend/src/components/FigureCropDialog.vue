@@ -1,22 +1,17 @@
 <script setup>
-// Manual figure fix for one page: crop a precise region out of the page's photo in
-// place of the one `target` tag (matched by caption + occurrence, since captions can
-// repeat on a page) — the rest of the page's markdown is untouched. Companion to the
-// deterministic whole-page-photo fallback (auto-repair + use_page_image) this closes
-// the loop on.
 import { ref, watch } from "vue";
 import { Dialog, Button, ErrorMessage, useCall } from "frappe-ui";
 import "cropperjs";
 
 const props = defineProps({
-	// { sourceDocument, pageName, pageNo, pageImage, caption, occurrence }
+	// { sourceDocument, pageNo, pageImage, caption, occurrence }
 	target: { type: Object, required: true },
 });
 const emit = defineEmits(["close", "saved"]);
 
 const open = ref(true);
-watch(open, (v) => {
-	if (!v) emit("close");
+watch(open, (isOpen) => {
+	if (!isOpen) emit("close");
 });
 
 const canvasElement = ref(null);
@@ -92,12 +87,10 @@ const cropFigure = useCall({
 	method: "POST",
 	immediate: false,
 });
-const cropError = ref("");
 async function submitCrop() {
 	if (!cropperReady.value) return;
 	const bounds = imageBounds;
 	const selection = selectionElement.value;
-	cropError.value = "";
 	await cropFigure.submit({
 		source_document: props.target.sourceDocument,
 		page_no: props.target.pageNo,
@@ -108,13 +101,7 @@ async function submitCrop() {
 		x1: (selection.x + selection.width - bounds.left) / bounds.width,
 		y1: (selection.y + selection.height - bounds.top) / bounds.height,
 	});
-	if (cropFigure.error) {
-		cropError.value =
-			cropFigure.error?.messages?.[0] ||
-			cropFigure.error?.message ||
-			"Couldn't crop that figure.";
-		return;
-	}
+	if (cropFigure.error) return;
 	emit("saved");
 	open.value = false;
 }
@@ -156,7 +143,7 @@ async function submitCrop() {
 					No page photo available to crop.
 				</p>
 			</div>
-			<ErrorMessage v-if="cropError" :message="cropError" class="mt-2" />
+			<ErrorMessage :message="cropFigure.error" class="mt-2" />
 			<div class="mt-3 flex justify-end gap-2">
 				<Button label="Cancel" variant="ghost" @click="open = false" />
 				<Button

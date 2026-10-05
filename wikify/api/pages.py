@@ -19,9 +19,6 @@ def crop_page_figure(
 	y1: float,
 ) -> dict:
 	assert_readable(None, source_document)
-	# `from __future__ import annotations` (project-wide convention) turns these into
-	# string annotations at runtime, which defeats Frappe's pydantic-based auto-coercion
-	# for whitelisted methods — cast explicitly instead of trusting it.
 	try:
 		return figure.crop_page_figure(
 			source_document,

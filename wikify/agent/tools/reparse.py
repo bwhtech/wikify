@@ -5,14 +5,7 @@ from frappe import _
 
 from wikify.agent.context import Ctx
 from wikify.agent.registry import Tool
-
-
-def _pdf_path(source_document: str) -> str | None:
-	pdf_url = frappe.db.get_value("Wikify Import", {"source_document": source_document}, "pdf")
-	if not pdf_url:
-		return None
-	file_name = frappe.db.get_value("File", {"file_url": pdf_url}, "name")
-	return frappe.get_doc("File", file_name).get_full_path() if file_name else None
+from wikify.engine.store import get_import_pdf_path
 
 
 def _project_context(ctx: Ctx) -> str:
@@ -92,7 +85,7 @@ def _reparse_page(ctx: Ctx, args: dict) -> str:
 		return _("No document specified. Open a document or pass `source_document`.")
 	if page_no is None:
 		return _("Provide the `page_no` to re-parse.")
-	pdf_path = _pdf_path(source_document)
+	pdf_path = get_import_pdf_path(source_document)
 	if not pdf_path:
 		return _("Couldn't locate the source PDF for {0}.").format(source_document)
 	method = args.get("method")

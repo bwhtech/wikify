@@ -1,53 +1,18 @@
 # Copyright (c) 2026, BWH and contributors
 # For license information, please see license.txt
-import fitz
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.engine import figure, store
-from wikify.tests import _cleanup
-
-_PNG = (
-	b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
-	b"\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00"
-	b"\x00\x00IEND\xaeB`\x82"
-)
-
-
-def _make_pdf_file() -> str:
-	document = fitz.open()
-	page = document.new_page(width=612, height=792)
-	page.insert_text((72, 90), "Figure crop test page", fontsize=12)
-	uploaded = frappe.get_doc(
-		{
-			"doctype": "File",
-			"file_name": f"{frappe.generate_hash(length=6)}-figure-test.pdf",
-			"content": document.tobytes(),
-			"is_private": 1,
-		}
-	).insert(ignore_permissions=True)
-	return uploaded.file_url
+from wikify.tests._figures import PNG, add_document_with_pdf
 
 
 class TestFigureCrop(FrappeTestCase):
 	def setUp(self):
-		self.sd = frappe.get_doc({"doctype": "Source Document", "title": "Figure Crop Test"}).insert(
-			ignore_permissions=True
-		)
-		self.addCleanup(_cleanup.delete_document, self.sd.name)
-		project = frappe.db.get_value("Wikify Project", {"is_default": 1}, "name")
-		frappe.get_doc(
-			{
-				"doctype": "Wikify Import",
-				"import_title": "Figure Crop Test Import",
-				"project": project,
-				"pdf": _make_pdf_file(),
-				"source_document": self.sd.name,
-			}
-		).insert(ignore_permissions=True)
+		self.sd = add_document_with_pdf(self, "Figure Crop Test")
 
 	def _add_page(self, markdown: str) -> str:
-		return store.add_page(self.sd.name, 1, "visual", _PNG, markdown)
+		return store.add_page(self.sd.name, 1, "visual", PNG, markdown)
 
 	def test_crops_and_replaces_only_that_tag(self):
 		self._add_page("Intro text.\n\n![Diagram](image1.png)\n\nMore text.")

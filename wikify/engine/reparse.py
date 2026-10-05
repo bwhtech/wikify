@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import fitz
-import frappe
 
 from wikify.engine import diagrams, llm, pdf_utils, regions, remediate, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
 from wikify.engine.parsers import vlm
-from wikify.engine.tags import find_tags
+from wikify.engine.tags import find_tag_spans
 from wikify.engine.verify import score_page
 
 
 def _page_row(source_document: str, page_no: int) -> dict:
-	pages = store.get_pages(source_document)
-	for p in pages:
-		if p["page_no"] == page_no:
-			return p
-	raise ValueError(f"Page {page_no} of {source_document} not found.")
+	page = store.get_page(source_document, page_no)
+	if not page:
+		raise ValueError(f"Page {page_no} of {source_document} not found.")
+	return page
 
 
 def reparse_page(
@@ -87,18 +85,18 @@ def embed_page_image(source_document: str, page_no: int, caption: str | None = N
 		_recompute_canonical_mean(source_document)
 		return {"page_no": page_no, "image_url": image_url}
 
-	canonical_markdown = frappe.db.get_value("Source Page", page["name"], "canonical_markdown")
-	old_md = canonical_markdown or page["baseline_markdown"] or ""
-	tags = find_tags(old_md, caption)
-	if len(tags) == 0:
+	old_markdown = page["canonical_markdown"] or page["baseline_markdown"] or ""
+	spans = find_tag_spans(old_markdown, caption)
+	if len(spans) == 0:
 		raise ValueError(f"No image tag captioned '{caption}' found on page {page_no}.")
-	if len(tags) > 1:
+	if len(spans) > 1:
 		raise ValueError(
-			f"{len(tags)} image tags captioned '{caption}' found on page {page_no} — "
+			f"{len(spans)} image tags captioned '{caption}' found on page {page_no} — "
 			"captions must be unique on the page."
 		)
-	new_md = old_md.replace(tags[0], f"![{caption}]({image_url})", 1)
-	store.set_canonical_markdown(page["name"], new_md)
+	start, end = spans[0]
+	new_markdown = old_markdown[:start] + f"![{caption}]({image_url})" + old_markdown[end:]
+	store.set_canonical_markdown(page["name"], new_markdown)
 	return {"page_no": page_no, "image_url": image_url}
 
 

@@ -155,11 +155,11 @@ def get_import_pdf_path(source_document: str) -> str | None:
 	return frappe.get_doc("File", file_name).get_full_path() if file_name else None
 
 
-def get_page_for_crop(source_document: str, page_no: int) -> dict | None:
+def get_page(source_document: str, page_no: int) -> dict | None:
 	return frappe.db.get_value(
 		"Source Page",
 		{"source_document": source_document, "page_no": page_no},
-		["name", "canonical_markdown", "baseline_markdown"],
+		["name", "kind", "baseline_markdown", "canonical_markdown"],
 		as_dict=True,
 	)
 

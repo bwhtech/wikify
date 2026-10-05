@@ -16,8 +16,7 @@ from wikify.rag import events
 
 ADOPTION_COMPOSITE_RATIO = 0.9
 MIN_CANONICAL_CHARS = 40
-_IMAGE_EMBED_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_IMAGE_TAG_RE = re.compile(r"(!\[[^\]]*\]\()([^)]*)(\))")
+_IMAGE_EMBED_RE = re.compile(r"(!\[[^\]]*\]\()([^)]*)(\))")
 _MARKUP_RE = re.compile(r"[\s#*_>|`~\-]+")
 
 
@@ -29,13 +28,12 @@ def repair_broken_image_tags(markdown: str, page_image: str | None) -> str:
 	if not page_image or not markdown or "![" not in markdown:
 		return markdown
 
-	def _fix(m: re.Match) -> str:
-		src = m.group(2)
-		if src.startswith(("/files/", "/private/files/")):
-			return m.group(0)
-		return f"{m.group(1)}{page_image}{m.group(3)}"
+	def repair_tag(match: re.Match) -> str:
+		if match.group(2).startswith(("/files/", "/private/files/")):
+			return match.group(0)
+		return f"{match.group(1)}{page_image}{match.group(3)}"
 
-	return _IMAGE_TAG_RE.sub(_fix, markdown)
+	return _IMAGE_EMBED_RE.sub(repair_tag, markdown)
 
 
 def with_page_crop(markdown: str, page_image: str | None) -> str:
