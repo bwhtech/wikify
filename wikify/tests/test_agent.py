@@ -445,3 +445,53 @@ class TestAgentHistoryWindow(FrappeTestCase):
 
 		self.assertNotEqual(messages[0]["role"], "tool")
 		self.assertEqual(messages[-1]["content"], "now fix the redundant types")
+
+	def add_tool_heavy_turn(self, prompt, rounds):
+		session.append_message(self.session, "user", prompt)
+		for round_index in range(rounds):
+			call_ids = [f"call_{prompt}_{round_index}_{call_index}" for call_index in range(2)]
+			session.append_message(
+				self.session,
+				"assistant",
+				"",
+				tool_calls=[{"id": call_id, "name": "read_section", "args": {}} for call_id in call_ids],
+			)
+			for call_id in call_ids:
+				session.append_message(
+					self.session, "tool", "section body", tool_name="read_section", tool_call_id=call_id
+				)
+		session.append_message(self.session, "assistant", f"finished {prompt}")
+
+	def assert_tool_results_follow_their_calls(self, messages):
+		requested_ids = set()
+		for message in messages:
+			for call in message.get("tool_calls", []):
+				requested_ids.add(call["id"])
+			if message["role"] == "tool":
+				self.assertIn(message["tool_call_id"], requested_ids)
+
+	def test_window_keeps_the_conversation_before_a_tool_heavy_turn(self):
+		session.append_message(self.session, "user", "re-parse page 18 keeping the table")
+		session.append_message(self.session, "assistant", "Re-parsed page 18.")
+		self.add_tool_heavy_turn("read every section", 25)
+		session.append_message(self.session, "user", "what did I ask before this?")
+
+		messages = session.history_messages(self.session)
+		contents = [message["content"] for message in messages]
+
+		self.assertEqual(messages[0], {"role": "user", "content": "re-parse page 18 keeping the table"})
+		self.assertIn("Re-parsed page 18.", contents)
+		self.assertIn("read every section", contents)
+		self.assertEqual(contents[-1], "what did I ask before this?")
+		self.assert_tool_results_follow_their_calls(messages)
+
+	def test_window_starts_at_a_user_message_when_the_cut_lands_inside_a_turn(self):
+		self.add_tool_heavy_turn("first sweep", 25)
+		self.add_tool_heavy_turn("second sweep", 25)
+		session.append_message(self.session, "user", "summarise")
+
+		messages = session.history_messages(self.session)
+
+		self.assertEqual(messages[0], {"role": "user", "content": "second sweep"})
+		self.assertEqual(messages[-1]["content"], "summarise")
+		self.assert_tool_results_follow_their_calls(messages)

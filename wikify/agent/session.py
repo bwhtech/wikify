@@ -78,14 +78,24 @@ def update_message(name: str, **values) -> None:
 
 
 def history_messages(session: str) -> list[dict]:
-	rows = frappe.get_all(
+	# Tool rows don't count toward the limit (one turn can write hundreds), and the window
+	# opens on a user message so no turn is cut in half.
+	recent = frappe.get_all(
 		"Wikify Agent Message",
-		filters={"session": session},
-		fields=["role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
+		filters={"session": session, "role": ("!=", "tool")},
+		fields=["role", "creation"],
 		order_by="creation desc",
 		limit=HISTORY_LIMIT,
 	)
-	rows.reverse()
+	turn_starts = [row.creation for row in recent if row.role == "user"]
+	if not turn_starts:
+		return []
+	rows = frappe.get_all(
+		"Wikify Agent Message",
+		filters={"session": session, "creation": (">=", turn_starts[-1])},
+		fields=["role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
+		order_by="creation asc",
+	)
 	while rows and rows[0].role == "tool":
 		rows.pop(0)
 	messages: list[dict] = []
