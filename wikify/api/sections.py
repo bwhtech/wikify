@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from itertools import takewhile
 
 import frappe
 from frappe import _
@@ -333,14 +334,35 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 		),
 		None,
 	)
+	default_title = lines[split_at].lstrip().lstrip("#").strip() if split_at is not None else None
 	if split_at is None:
-		frappe.throw(
-			_("No heading matching '{0}' found in '{1}' — nothing was split.").format(at_heading, sec.title)
-		)
+		prefix = at_heading.strip().lower()
+		paragraph_starts = [
+			i
+			for i, line in enumerate(lines)
+			if line.strip()
+			and (i == 0 or not lines[i - 1].strip())
+			and " ".join(part.strip() for part in takewhile(str.strip, lines[i:])).lower().startswith(prefix)
+		]
+		if len(paragraph_starts) > 1:
+			frappe.throw(
+				_(
+					"{0} paragraphs in '{1}' start with '{2}' — pass more of the paragraph's opening text. "
+					"Nothing was split."
+				).format(len(paragraph_starts), sec.title, at_heading)
+			)
+		if not paragraph_starts:
+			frappe.throw(
+				_("No heading or paragraph start matching '{0}' found in '{1}' — nothing was split.").format(
+					at_heading, sec.title
+				)
+			)
+		split_at = paragraph_starts[0]
+		default_title = at_heading.strip()
 
 	head = "\n".join(lines[:split_at]).strip()
 	tail = "\n".join(lines[split_at:]).strip()
-	title = (new_title or "").strip() or lines[split_at].lstrip().lstrip("#").strip()
+	title = (new_title or "").strip() or default_title
 
 	new = frappe.new_doc("Source Section")
 	new.source_document = sec.source_document
