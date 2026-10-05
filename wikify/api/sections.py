@@ -47,6 +47,17 @@ def get_tree(source_document: str) -> list[dict]:
 	return roots
 
 
+def assert_not_published(status: str | None) -> None:
+	if status == "Completed":
+		frappe.throw(_("This wiki has already been published — edit pages directly in the Wiki app."))
+
+
+def _assert_editable(source_document: str) -> None:
+	"""Block tree edits once the document's import has published a wiki — from that
+	point the Wiki app is the source of truth, not Wikify's own tree."""
+	assert_not_published(frappe.db.get_value("Wikify Import", {"source_document": source_document}, "status"))
+
+
 def _rebuild_tree(source_document: str) -> None:
 	table = frappe.qb.DocType("Source Section")
 
@@ -137,6 +148,7 @@ def reorder_section(
 	sec = frappe.db.get_value("Source Section", name, ["source_document", "lft", "rgt"], as_dict=True)
 	if not sec:
 		frappe.throw(_("Section {0} not found.").format(name))
+	_assert_editable(sec.source_document)
 
 	if new_parent:
 		parent = frappe.db.get_value("Source Section", new_parent, ["source_document", "lft"], as_dict=True)
@@ -215,6 +227,7 @@ def rename_section(name: str, title: str) -> dict:
 	if not title:
 		frappe.throw(_("Title can't be empty."))
 	source_document = frappe.db.get_value("Source Section", name, "source_document")
+	_assert_editable(source_document)
 	frappe.db.set_value("Source Section", name, "title", title)
 	_rebuild_tree(source_document)
 	return {"ok": True}
@@ -223,7 +236,8 @@ def rename_section(name: str, title: str) -> dict:
 @frappe.whitelist(methods=["POST"])
 def toggle_include(name: str, include: bool | int | str) -> dict:
 	include = 1 if frappe.parse_json(include) else 0
-	_, names = _subtree_names(name)
+	source_document, names = _subtree_names(name)
+	_assert_editable(source_document)
 	frappe.db.set_value(
 		"Source Section", {"name": ["in", names]}, "include_in_wiki", include, update_modified=False
 	)
@@ -235,6 +249,7 @@ def delete_section(name: str) -> dict:
 	from wikify.engine.refs import extract_references
 
 	source_document, names = _subtree_names(name)
+	_assert_editable(source_document)
 	frappe.db.delete("Source Section", {"name": ["in", names]})
 	_rebuild_tree(source_document)
 	extract_references(source_document)
@@ -425,6 +440,7 @@ def merge_sections(names: list | str) -> dict:
 @frappe.whitelist(methods=["POST"])
 def build_graph(import_name: str) -> dict:
 	imp = frappe.get_doc("Wikify Import", import_name)
+	assert_not_published(imp.status)
 	if not imp.source_document:
 		frappe.throw(_("Nothing to graph — parse hasn't produced a document yet."))
 	imp.db_set("status", "Graphed")
