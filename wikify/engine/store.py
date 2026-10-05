@@ -147,6 +147,27 @@ def get_page_image(page_name: str) -> str | None:
 	return frappe.db.get_value("Source Page", page_name, "image")
 
 
+def get_import_pdf_path(source_document: str) -> str | None:
+	pdf_url = frappe.db.get_value("Wikify Import", {"source_document": source_document}, "pdf")
+	if not pdf_url:
+		return None
+	file_name = frappe.db.get_value("File", {"file_url": pdf_url}, "name")
+	return frappe.get_doc("File", file_name).get_full_path() if file_name else None
+
+
+def get_page(source_document: str, page_no: int) -> dict | None:
+	return frappe.db.get_value(
+		"Source Page",
+		{"source_document": source_document, "page_no": page_no},
+		["name", "kind", "baseline_markdown", "canonical_markdown"],
+		as_dict=True,
+	)
+
+
+def save_crop_file(page_name: str, page_no: int, png_bytes: bytes):
+	return save_file(f"page-{page_no:04d}-crop.png", png_bytes, "Source Page", page_name, is_private=1)
+
+
 def get_canonical_composites(source_document: str) -> list[float | None]:
 	rows = frappe.get_all(
 		"Source Page",

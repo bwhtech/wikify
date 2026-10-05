@@ -21,10 +21,10 @@ def classify_page(
 	return regions.classify_page(page, min_chars, min_drawings)
 
 
-def render_png(page, dpi: int = config.RENDER_DPI) -> bytes:
+def render_png(page, dpi: int = config.RENDER_DPI, clip=None) -> bytes:
 	zoom = dpi / 72.0
 	matrix = fitz.Matrix(zoom, zoom)
-	return page.get_pixmap(matrix=matrix).tobytes("png")
+	return page.get_pixmap(matrix=matrix, clip=clip).tobytes("png")
 
 
 def page_count(pdf_path: str | Path) -> int:

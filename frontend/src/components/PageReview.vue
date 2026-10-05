@@ -5,6 +5,7 @@ import { Badge, Button, Dropdown, Popover, useList } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
+import FigureCropDialog from "@/components/FigureCropDialog.vue";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useIsNarrow, useMediaQuery } from "@/composables/useMediaQuery";
 import { setPage } from "@/data/agentContext";
@@ -205,6 +206,69 @@ const mdContent = computed(() => {
 	if (mdView.value === "baseline") return p.baseline_markdown || "";
 	return p.canonical_markdown || p.baseline_markdown || "";
 });
+
+// Only the "result" view: crops rewrite canonical markdown, which is what that view shows.
+const REAL_FILE_RE = /^\/(private\/)?files\//;
+const EDIT_ICON_SVG =
+	'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+function decorateFigures(html) {
+	const page = selected.value;
+	if (!page || mdView.value !== "result") return html;
+	const doc = new DOMParser().parseFromString(html, "text/html");
+	const seen = {};
+	doc.querySelectorAll("img").forEach((img) => {
+		const caption = img.getAttribute("alt") || "";
+		const src = img.getAttribute("src") || "";
+		const occurrence = seen[caption] || 0;
+		seen[caption] = occurrence + 1;
+		const isBroken = !REAL_FILE_RE.test(src);
+		const isWholePagePhoto = !!page.image && src === page.image;
+		const needsAttention = isBroken || isWholePagePhoto;
+
+		img.classList.add("wikify-croppable", "cursor-pointer", "rounded");
+		img.setAttribute("data-caption", caption);
+		img.setAttribute("data-occurrence", String(occurrence));
+
+		if (needsAttention) {
+			img.classList.add("border-2", "border-dashed", "border-outline-amber-3");
+			img.setAttribute("title", "Click to crop or replace this image");
+			return;
+		}
+
+		img.setAttribute("title", "Click to re-crop or replace this image");
+		const wrapper = doc.createElement("span");
+		wrapper.className = "group relative inline-block";
+		img.parentNode.insertBefore(wrapper, img);
+		wrapper.appendChild(img);
+		const scrim = doc.createElement("span");
+		scrim.className =
+			"pointer-events-none absolute inset-0 flex items-center justify-center rounded bg-surface-gray-7/0 transition-colors group-hover:bg-surface-gray-7/30";
+		const badge = doc.createElement("span");
+		badge.className =
+			"rounded-full bg-surface-gray-7/90 p-2 text-ink-white opacity-0 transition-opacity group-hover:opacity-100";
+		badge.innerHTML = EDIT_ICON_SVG;
+		scrim.appendChild(badge);
+		wrapper.appendChild(scrim);
+	});
+	return doc.body.innerHTML;
+}
+
+const cropTarget = ref(null);
+function onPreviewClick(event) {
+	const img = event.target.closest?.(".wikify-croppable");
+	if (!img || !selected.value) return;
+	cropTarget.value = {
+		sourceDocument: props.sourceDocument,
+		pageNo: selected.value.page_no,
+		pageImage: selected.value.image,
+		caption: img.getAttribute("data-caption") || "",
+		occurrence: Number(img.getAttribute("data-occurrence") || 0),
+	};
+}
+function onFigureSaved() {
+	cropTarget.value = null;
+	pages.reload();
+}
 
 // 0.0 reads as "n/a" for table/judge (no table on the page / not judged). A genuine
 // table miss still surfaces via the harness notes, so hiding the bare 0 is honest.
@@ -572,7 +636,9 @@ function fmtDelta(v) {
 									<MarkdownPreview
 										v-if="activeTab === 'preview'"
 										:content="mdContent"
+										:decorate="decorateFigures"
 										class="p-4"
+										@click="onPreviewClick"
 									/>
 									<div v-else class="flex h-full flex-col p-3">
 										<CodeEditor
@@ -647,7 +713,9 @@ function fmtDelta(v) {
 							<MarkdownPreview
 								v-else-if="activeTab === 'preview'"
 								:content="mdContent"
+								:decorate="decorateFigures"
 								class="p-4"
+								@click="onPreviewClick"
 							/>
 
 							<!-- Markdown (raw source) -->
@@ -671,5 +739,12 @@ function fmtDelta(v) {
 				</p>
 			</component>
 		</component>
+
+		<FigureCropDialog
+			v-if="cropTarget"
+			:target="cropTarget"
+			@close="cropTarget = null"
+			@saved="onFigureSaved"
+		/>
 	</div>
 </template>

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from wikify.engine.remediate import content_chars, pick_winner, with_page_crop
+from wikify.engine.remediate import content_chars, pick_winner, repair_broken_image_tags, with_page_crop
 from wikify.engine.verify import PageScore
 
 
@@ -78,3 +78,29 @@ class TestPageCropFallback(unittest.TestCase):
 
 	def test_no_image_means_no_change(self):
 		self.assertEqual(with_page_crop(OCR_NOISE, ""), OCR_NOISE)
+
+
+class TestRepairBrokenImageTags(unittest.TestCase):
+	def test_a_hallucinated_tag_is_pointed_at_the_page_photo(self):
+		md = "Some text.\n\n![Figure 5.1: New Message](image1.png)\n\nMore text."
+		fixed = repair_broken_image_tags(md, "/private/files/page-0001.png")
+		self.assertIn("![Figure 5.1: New Message](/private/files/page-0001.png)", fixed)
+		self.assertNotIn("image1.png", fixed)
+		self.assertIn("Some text.", fixed)
+		self.assertIn("More text.", fixed)
+
+	def test_duplicate_captions_are_each_fixed_independently(self):
+		md = "![Button](image2.png) and ![Button](image3.png)"
+		fixed = repair_broken_image_tags(md, "/files/p.png")
+		self.assertEqual(fixed, "![Button](/files/p.png) and ![Button](/files/p.png)")
+
+	def test_a_tag_already_pointing_at_a_real_file_is_left_alone(self):
+		md = "![Crop](/private/files/existing-crop.png)"
+		self.assertEqual(repair_broken_image_tags(md, "/files/p.png"), md)
+
+	def test_no_page_image_means_no_change(self):
+		md = "![Figure 1](image1.png)"
+		self.assertEqual(repair_broken_image_tags(md, ""), md)
+
+	def test_no_tags_means_no_change(self):
+		self.assertEqual(repair_broken_image_tags(GOOD_MARKDOWN, "/files/p.png"), GOOD_MARKDOWN)
