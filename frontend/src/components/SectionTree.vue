@@ -18,7 +18,7 @@ const props = defineProps({
 	// Deep-link target (0.5 graph view click-through): selected + scrolled to on load.
 	initialSection: { type: String, default: null },
 });
-const emit = defineEmits(["graphed", "generated"]);
+const emit = defineEmits(["graphed"]);
 
 // Flat sections ordered by tree position (`lft`); the nesting is rebuilt client-side.
 const sections = useList({
@@ -275,7 +275,7 @@ const graphLabel = computed(() => {
 async function buildGraph() {
 	try {
 		await graph.submit({ import_name: props.importName });
-		toast.success("Graph built — Explore & Wiki unlocked");
+		toast.success("Graph built — ready to publish");
 		emit("graphed");
 	} catch (e) {
 		toast.error(e?.messages?.[0] || e?.message || "Could not build graph");
@@ -332,7 +332,6 @@ async function buildGraph() {
 						:import-name="importName"
 						:status="status"
 						:wiki-space="wikiSpace"
-						@generated="emit('generated')"
 					/>
 				</div>
 				<p

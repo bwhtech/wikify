@@ -19,7 +19,6 @@ const props = defineProps({
 	status: { type: String, default: null },
 	wikiSpace: { type: String, default: null },
 });
-const emit = defineEmits(["generated"]);
 
 // Generation is gated on an approved tree (Graphed) or a stopped run.
 const canPublish = computed(() =>
@@ -68,14 +67,29 @@ const spaceOptions = computed(() =>
 
 const open = ref(false);
 
+// Regenerating with nothing included would wipe the space down to its root group.
+const preview = useCall({
+	url: "/api/v2/method/wikify.api.imports.preview_wiki",
+	method: "GET",
+	immediate: false,
+});
+watch(open, (isOpen) => {
+	if (isOpen) preview.submit({ import_name: props.importName });
+});
+const hasSectionsToPublish = computed(
+	() => (preview.data?.pages ?? 0) + (preview.data?.groups ?? 0) > 0
+);
+
 // Generate / regenerate.
 const generate = useCall({
 	url: "/api/v2/method/wikify.api.imports.generate_wiki",
 	method: "POST",
 	immediate: false,
 });
-const canGenerate = computed(() =>
-	mode.value === "existing" ? !!targetSpace.value : !!(newName.value && newRoute.value)
+const canGenerate = computed(
+	() =>
+		hasSectionsToPublish.value &&
+		(mode.value === "existing" ? !!targetSpace.value : !!(newName.value && newRoute.value))
 );
 async function runGenerate() {
 	const params = { import_name: props.importName };
@@ -87,7 +101,6 @@ async function runGenerate() {
 		return;
 	}
 	open.value = false;
-	emit("generated");
 }
 
 const stop = useCall({
@@ -106,34 +119,27 @@ function stopGenerate() {
 			if (stop.error) {
 				throw new Error(stop.error?.messages?.[0] || "Could not stop wiki generation");
 			}
-			emit("generated");
 		},
 	});
 }
 
 // Realtime — the job emits wikify_wiki_done on completion.
-const lastRoute = ref(null);
 const socket = useSocket();
 function onWikiDone(payload) {
 	if (payload.import !== props.importName) return;
-	lastRoute.value = payload.space_route;
 	spaces.reload();
-	emit("generated");
 	toast.success("Wiki generated");
 }
 onMounted(() => socket?.on("wikify_wiki_done", onWikiDone));
 onUnmounted(() => socket?.off("wikify_wiki_done", onWikiDone));
 
-const wikiUrl = computed(() => {
-	const route = lastRoute.value || currentSpace.value?.route;
-	return route ? `/${route}` : null;
-});
+const wikiUrl = computed(() => currentSpace.value && `/${currentSpace.value.route}`);
 </script>
 
 <template>
 	<div class="flex shrink-0 items-center gap-2">
 		<a
-			v-if="alreadyGenerated && wikiUrl"
+			v-if="wikiUrl"
 			:href="wikiUrl"
 			target="_blank"
 			class="inline-flex items-center gap-1 text-sm font-medium text-ink-blue-6 hover:underline"
@@ -212,6 +218,13 @@ const wikiUrl = computed(() => {
 				</div>
 				<p v-if="generating" class="mt-2 text-xs text-ink-gray-5">
 					Generating… watch progress in the header.
+				</p>
+				<p
+					v-else-if="preview.data && !hasSectionsToPublish"
+					class="mt-2 text-xs text-ink-amber-6"
+				>
+					No sections are included in the wiki — nothing to publish. Include sections in
+					the tree first.
 				</p>
 			</template>
 		</Dialog>

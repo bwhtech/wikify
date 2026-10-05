@@ -33,6 +33,15 @@ const routes = [
 		props: true,
 	},
 	{
+		// The Wiki tab used to be its own route; old links land on the merged tab.
+		path: "/import/:name/wiki",
+		redirect: (to) => ({
+			name: "ImportDetail",
+			params: { name: to.params.name, tab: "tree" },
+			query: to.query,
+		}),
+	},
+	{
 		path: "/import/:name/:tab?",
 		name: "ImportDetail",
 		component: () => import("@/pages/ImportDetail.vue"),
