@@ -1,11 +1,13 @@
 <script setup>
 import { ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { Badge, Button, PageHeader, useDoc } from "frappe-ui";
 import ImportList from "@/pages/ImportList.vue";
 import NewImportDialog from "@/components/NewImportDialog.vue";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
 import { setProject } from "@/data/agentContext";
+import { recordRecent } from "@/data/commandPalette";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -23,10 +25,27 @@ watch(
 );
 watch(
 	() => project.doc?.project_name,
-	(label) => label && setProject({ name: props.name, label })
+	(label) => {
+		if (!label) return;
+		setProject({ name: props.name, label });
+		recordRecent({ kind: "project", name: props.name, label });
+	}
 );
 
+const route = useRoute();
+const router = useRouter();
 const showNewImport = ref(false);
+
+watch(
+	() => route.query.upload,
+	(upload) => {
+		if (!upload) return;
+		showNewImport.value = true;
+		const { upload: _, ...query } = route.query;
+		router.replace({ query });
+	},
+	{ immediate: true }
+);
 </script>
 
 <template>

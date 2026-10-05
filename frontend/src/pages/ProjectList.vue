@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
 	Badge,
 	Button,
@@ -42,6 +42,18 @@ const archivedCount = computed(
 );
 
 const showNew = ref(false);
+const route = useRoute();
+
+watch(
+	() => route.query.new,
+	(isNew) => {
+		if (!isNew) return;
+		showNew.value = true;
+		const { new: _, ...query } = route.query;
+		router.replace({ query });
+	},
+	{ immediate: true }
+);
 const newName = ref("");
 const newDescription = ref("");
 

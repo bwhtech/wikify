@@ -21,6 +21,7 @@ import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
 import { setDocument, setProject } from "@/data/agentContext";
+import { recordRecent } from "@/data/commandPalette";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -95,6 +96,19 @@ watch(
 		else if (projectChip) setProject(projectChip);
 	},
 	{ immediate: true }
+);
+
+watch(
+	() => imp.doc?.import_title,
+	(label) =>
+		label &&
+		recordRecent({
+			kind: "import",
+			name: props.name,
+			label,
+			sub: imp.doc.project_name,
+			project: imp.doc.project,
+		})
 );
 
 const pageReview = ref(null);

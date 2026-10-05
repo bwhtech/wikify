@@ -7,6 +7,7 @@ import {
 	MobileNavItem,
 	MobileShell,
 	Sidebar,
+	formatShortcutLabel,
 } from "frappe-ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -16,6 +17,9 @@ import { session } from "@/data/session";
 import AgentChatPanel from "@/components/AgentChatPanel.vue";
 import AppSettingsDialog from "@/components/AppSettingsDialog.vue";
 import { openSettings, visibleRoute } from "@/data/settingsRoute";
+import CommandPalette from "@/components/CommandPalette.vue";
+import { PALETTE_SHORTCUT } from "@/data/commandPalette";
+import { DESTINATIONS } from "@/data/navigation";
 
 const route = useRoute();
 const { resolvedTheme, toggleTheme, initializeTheme } = useTheme();
@@ -23,6 +27,7 @@ const isMobile = useIsMobile();
 
 const BUG_REPORT_URL = "https://github.com/bwhtech/wikify/issues/new";
 
+const paletteOpen = ref(false);
 const mobileMenuOpen = ref(false);
 // The agent panel + its floating button are mounted once here so they're available on
 // every screen (slice 12). On mobile the floating button is replaced by a MobileNav tab.
@@ -51,46 +56,42 @@ const menuItems = computed(() => [
 	},
 ]);
 
+const paletteMenuItems = computed(() =>
+	menuItems.value.filter((item) => item.onClick !== toggleTheme)
+);
+
 const header = computed(() => ({
 	title: "Wikify",
 	subtitle: session.user,
 	menuItems: menuItems.value,
 }));
 
-// Projects owns every project/import screen, so highlight it for the whole subtree.
-const PROJECT_ROUTES = ["Projects", "ProjectDetail", "ProjectSettings", "ImportDetail"];
-const projectsActive = computed(() => PROJECT_ROUTES.includes(route.name));
-
 // One list of destinations drives the desktop sidebar AND the mobile navigation, so a
 // screen can never be reachable on one and unreachable on the other.
-const destinations = computed(() => [
-	{
-		label: "Projects",
-		icon: "lucide-folder",
-		to: { name: "Projects" },
-		isActive: projectsActive.value,
-	},
-	{
-		label: "Explore",
-		icon: "lucide-shapes",
-		to: { name: "Explore" },
-		isActive: route.name === "Explore",
-	},
-	{
-		label: "Ask",
-		icon: "lucide-message-circle-question",
-		to: { name: "AskWiki" },
-		isActive: route.name === "AskWiki",
-	},
-]);
+const destinations = computed(() =>
+	DESTINATIONS.map((d) => ({
+		label: d.label,
+		icon: d.icon,
+		to: { name: d.route },
+		isActive: d.activeOn.includes(route.name),
+	}))
+);
 
-const sections = computed(() => [{ label: "", items: destinations.value }]);
+const searchItem = {
+	label: "Search",
+	icon: "lucide-search",
+	suffix: formatShortcutLabel(PALETTE_SHORTCUT),
+	onClick: () => (paletteOpen.value = true),
+};
+
+const sections = computed(() => [{ label: "", items: [searchItem, ...destinations.value] }]);
 
 // Full-height, multi-pane routes own their own scroll (graph canvas, split review,
 // tabbed import). Everything else scrolls as one page inside the shell's scroll area.
 // Ask owns its scrolling: the transcript scrolls, the composer under it does not.
 const FIXED_HEIGHT_ROUTES = ["Explore", "ProjectGraph", "ImportGraph", "AskWiki"];
 const pageScroll = computed(() => !FIXED_HEIGHT_ROUTES.includes(route.name));
+const pageKey = computed(() => `${String(route.name)}:${route.params.name ?? ""}`);
 const onAskPage = computed(() => route.name === "AskWiki");
 
 const collapsed = ref(localStorage.getItem("sidebar-collapsed") === "true");
@@ -109,27 +110,17 @@ onMounted(initializeTheme);
 		<!-- Mobile: fixed column with a bottom tab bar; the Sidebar's destinations
 		     become tabs and the user menu moves into a bottom sheet. -->
 		<MobileShell v-if="isMobile">
-			<router-view :route="visibleRoute" />
+			<router-view :key="pageKey" :route="visibleRoute" />
 
 			<template #nav>
 				<MobileNav>
 					<MobileNavItem
-						label="Projects"
-						icon="lucide-folder"
-						:to="{ name: 'Projects' }"
-						:active="projectsActive"
-					/>
-					<MobileNavItem
-						label="Explore"
-						icon="lucide-shapes"
-						:to="{ name: 'Explore' }"
-						:active="route.name === 'Explore'"
-					/>
-					<MobileNavItem
-						label="Ask"
-						icon="lucide-message-circle-question"
-						:to="{ name: 'AskWiki' }"
-						:active="route.name === 'AskWiki'"
+						v-for="d in destinations"
+						:key="d.label"
+						:label="d.label"
+						:icon="d.icon"
+						:to="d.to"
+						:active="d.isActive"
 					/>
 					<MobileNavItem
 						label="Assistant"
@@ -165,10 +156,16 @@ onMounted(initializeTheme);
 				</Sidebar>
 			</template>
 
-			<router-view :route="visibleRoute" />
+			<router-view :key="pageKey" :route="visibleRoute" />
 		</DesktopShell>
 
 		<AppSettingsDialog />
+		<CommandPalette
+			v-if="!isMobile"
+			v-model:open="paletteOpen"
+			:menu-items="paletteMenuItems"
+			@open-assistant="agentOpen = true"
+		/>
 
 		<!-- Mobile overflow menu (settings / theme / logout). -->
 		<BottomSheet v-model:open="mobileMenuOpen" title="Wikify">
