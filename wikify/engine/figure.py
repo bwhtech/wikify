@@ -48,5 +48,5 @@ def crop_page_figure(source_document: str, page_no: int, caption: str, occurrenc
 
 	file_doc = store.save_crop_file(page.name, page_no, crop_png)
 	new_markdown = old_markdown[:start] + f"![{caption}]({file_doc.file_url})" + old_markdown[end:]
-	store.set_canonical_markdown(page.name, new_markdown)
+	store.set_canonical_markdown(page.name, new_markdown, keep_audit=True)
 	return {"page_no": page_no, "image_url": file_doc.file_url}

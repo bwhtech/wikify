@@ -53,6 +53,22 @@ class TestFigureCrop(FrappeTestCase):
 			f"![Button](same.png) then ![Button]({result['image_url']})",
 		)
 
+	def test_crop_keeps_the_page_audit_score(self):
+		page_name = self._add_page("Intro text.\n\n![Diagram](image1.png)")
+		store.set_canonical(page_name, "Intro text.\n\n![Diagram](image1.png)", 0.84, "vlm")
+		before = frappe.db.get_value(
+			"Source Page", page_name, ["canonical_composite", "verdict"], as_dict=True
+		)
+
+		figure.crop_page_figure(self.sd.name, 1, "Diagram", 0, {"x0": 0.1, "y0": 0.1, "x1": 0.4, "y1": 0.4})
+
+		after = frappe.db.get_value(
+			"Source Page", page_name, ["canonical_composite", "verdict"], as_dict=True
+		)
+		self.assertAlmostEqual(after.canonical_composite, 0.84, places=3)
+		self.assertEqual(after.verdict, before.verdict)
+		self.assertTrue(after.verdict)
+
 	def test_unknown_caption_raises(self):
 		self._add_page("![Diagram](image1.png)")
 		with self.assertRaises(ValueError):
