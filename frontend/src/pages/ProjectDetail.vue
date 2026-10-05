@@ -1,7 +1,8 @@
 <script setup>
 import { ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Badge, Button, PageHeader, useDoc } from "frappe-ui";
+import { Badge, Button, useDoc } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import ImportList from "@/pages/ImportList.vue";
 import NewImportDialog from "@/components/NewImportDialog.vue";
 import { useIsMobile } from "@/composables/useMediaQuery";
@@ -50,7 +51,7 @@ watch(
 
 <template>
 	<div>
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-2">
 				<Button variant="ghost" icon="lucide-arrow-left" :route="{ name: 'Projects' }" />
 				<nav class="flex min-w-0 items-center gap-1.5 text-base">
@@ -73,27 +74,28 @@ watch(
 					class="shrink-0"
 				/>
 			</div>
-
-			<div class="flex shrink-0 items-center gap-2 pl-2">
-				<Button
-					variant="subtle"
-					v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
-					:route="{ name: 'ProjectGraph', params: { name } }"
-				/>
-				<Button
-					variant="ghost"
-					icon="lucide-settings"
-					aria-label="Project settings"
-					:route="{ name: 'ProjectSettings', params: { name } }"
-				/>
-				<Button
-					variant="solid"
-					theme="gray"
-					v-bind="actionButtonProps(isMobile, 'lucide-plus', 'New Document')"
-					@click="showNewImport = true"
-				/>
-			</div>
-		</PageHeader>
+			<template #actions>
+				<div class="flex shrink-0 items-center gap-2 pl-2">
+					<Button
+						variant="subtle"
+						v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
+						:route="{ name: 'ProjectGraph', params: { name } }"
+					/>
+					<Button
+						variant="ghost"
+						icon="lucide-settings"
+						aria-label="Project settings"
+						:route="{ name: 'ProjectSettings', params: { name } }"
+					/>
+					<Button
+						variant="solid"
+						theme="gray"
+						v-bind="actionButtonProps(isMobile, 'lucide-plus', 'New Document')"
+						@click="showNewImport = true"
+					/>
+				</div>
+			</template>
+		</AppPageHeader>
 
 		<ImportList :project="name" @new-import="showNewImport = true" />
 

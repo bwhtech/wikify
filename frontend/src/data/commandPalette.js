@@ -16,3 +16,5 @@ export function recordRecent(entry) {
 	writeRecents(window.localStorage, sessionUser.value, next);
 	recents.value = next;
 }
+
+export const paletteOpen = ref(false);

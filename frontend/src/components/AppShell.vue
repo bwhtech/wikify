@@ -7,7 +7,6 @@ import {
 	MobileNavItem,
 	MobileShell,
 	Sidebar,
-	formatShortcutLabel,
 } from "frappe-ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -16,10 +15,10 @@ import { useIsMobile } from "@/composables/useMediaQuery";
 import { session } from "@/data/session";
 import AgentChatPanel from "@/components/AgentChatPanel.vue";
 import AppSettingsDialog from "@/components/AppSettingsDialog.vue";
-import { openSettings, visibleRoute } from "@/data/settingsRoute";
 import CommandPalette from "@/components/CommandPalette.vue";
-import { PALETTE_SHORTCUT } from "@/data/commandPalette";
+import { paletteOpen } from "@/data/commandPalette";
 import { DESTINATIONS } from "@/data/navigation";
+import { openSettings, visibleRoute } from "@/data/settingsRoute";
 
 const route = useRoute();
 const { resolvedTheme, toggleTheme, initializeTheme } = useTheme();
@@ -27,7 +26,6 @@ const isMobile = useIsMobile();
 
 const BUG_REPORT_URL = "https://github.com/bwhtech/wikify/issues/new";
 
-const paletteOpen = ref(false);
 const mobileMenuOpen = ref(false);
 // The agent panel + its floating button are mounted once here so they're available on
 // every screen (slice 12). On mobile the floating button is replaced by a MobileNav tab.
@@ -77,14 +75,7 @@ const destinations = computed(() =>
 	}))
 );
 
-const searchItem = {
-	label: "Search",
-	icon: "lucide-search",
-	suffix: formatShortcutLabel(PALETTE_SHORTCUT),
-	onClick: () => (paletteOpen.value = true),
-};
-
-const sections = computed(() => [{ label: "", items: [searchItem, ...destinations.value] }]);
+const sections = computed(() => [{ label: "", items: destinations.value }]);
 
 // Full-height, multi-pane routes own their own scroll (graph canvas, split review,
 // tabbed import). Everything else scrolls as one page inside the shell's scroll area.

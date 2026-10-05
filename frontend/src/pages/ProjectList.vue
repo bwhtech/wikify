@@ -7,11 +7,11 @@ import {
 	Dialog,
 	ErrorMessage,
 	FormControl,
-	PageHeader,
 	Skeleton,
 	useCall,
 	useList,
 } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
 import { clear as clearAgentContext } from "@/data/agentContext";
@@ -86,30 +86,32 @@ function openProject(name) {
 
 <template>
 	<div>
-		<PageHeader>
+		<AppPageHeader>
 			<h1 class="text-md text-ink-gray-9">Projects</h1>
-			<div class="flex shrink-0 items-center gap-2 pl-2">
-				<Button
-					v-if="archivedCount"
-					variant="ghost"
-					theme="gray"
-					v-bind="
-						actionButtonProps(
-							isMobile,
-							'lucide-archive',
-							showArchived ? 'Hide archived' : `Show archived (${archivedCount})`
-						)
-					"
-					@click="showArchived = !showArchived"
-				/>
-				<Button
-					variant="solid"
-					theme="gray"
-					v-bind="actionButtonProps(isMobile, 'lucide-plus', 'New Project')"
-					@click="showNew = true"
-				/>
-			</div>
-		</PageHeader>
+			<template #actions>
+				<div class="flex shrink-0 items-center gap-2 pl-2">
+					<Button
+						v-if="archivedCount"
+						variant="ghost"
+						theme="gray"
+						v-bind="
+							actionButtonProps(
+								isMobile,
+								'lucide-archive',
+								showArchived ? 'Hide archived' : `Show archived (${archivedCount})`
+							)
+						"
+						@click="showArchived = !showArchived"
+					/>
+					<Button
+						variant="solid"
+						theme="gray"
+						v-bind="actionButtonProps(isMobile, 'lucide-plus', 'New Project')"
+						@click="showNew = true"
+					/>
+				</div>
+			</template>
+		</AppPageHeader>
 
 		<div class="body-container pt-5 pb-40">
 			<!-- Loading skeleton (first load only — reloads keep the cards) -->
