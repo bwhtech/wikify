@@ -177,8 +177,11 @@ class TestSectionSurgery(FrappeTestCase):
 		with patch("frappe.model.naming.get_trace_id", return_value="p"):
 			created = tt._create_section(self.ctx, {"title": "5. Epsilon"})
 			split = tt._split_section(self.ctx, {"name": self._name("1. Alpha"), "at_heading": "Part Two"})
-		for out, title in ((created, "5. Epsilon"), (split, "Part Two")):
-			message = session.append_message(agent_session.name, "tool", out, tool_name="create_section")
+		for out, title, tool_name in (
+			(created, "5. Epsilon", "create_section"),
+			(split, "Part Two", "split_section"),
+		):
+			message = session.append_message(agent_session.name, "tool", out, tool_name=tool_name)
 			stored = frappe.db.get_value("Wikify Agent Message", message.name, "content")
 			self.assertIn(self._name(title), stored)
 
