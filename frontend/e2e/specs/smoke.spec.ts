@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import type { Api, Row } from "../helpers/api";
+import { iconButton, waitForTurn } from "../helpers/assistant";
 import { deleteTestProjects } from "../helpers/cleanup";
 import { env, FIXTURE_PDF, PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
@@ -47,27 +48,6 @@ function plainSnippet(markdown: string): string {
 		if (plain.length >= 20) return plain.slice(0, 60);
 	}
 	throw new Error(`No plain paragraph in ${JSON.stringify(markdown.slice(0, 200))}`);
-}
-
-// The panel's icon-only buttons have no accessible name (frappe-ui sets aria-label from `label` only).
-function iconButton(page: Page, icon: string): Locator {
-	return page.getByRole("button").filter({ has: page.locator(`.${icon}`) });
-}
-
-async function waitForTurn(api: Api, sessionId: string, prompt: string): Promise<void> {
-	await waitFor(
-		() => api.call("wikify.api.agent.get_session", { session_id: sessionId }),
-		({ session, messages }) => {
-			const last = messages.at(-1);
-			return (
-				!session.is_running &&
-				last?.role === "assistant" &&
-				last.status !== "streaming" &&
-				messages.some((row: Row) => row.content === prompt)
-			);
-		},
-		{ timeout: QUEUE_TIMEOUT, interval: 3_000, label: `assistant turn in ${sessionId}` },
-	);
 }
 
 test.describe("smoke", () => {
@@ -279,7 +259,7 @@ test.describe("smoke", () => {
 					(rows) => rows.length > 0,
 					{ timeout: 60_000, label: "agent session" },
 				);
-				await waitForTurn(api, session.name, prompt);
+				await waitForTurn(api, session.name, prompt, QUEUE_TIMEOUT);
 				if ((await api.getValue("Source Section", target.name, "title")) === newTitle) break;
 			}
 

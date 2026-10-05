@@ -1,7 +1,12 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import type { Api } from "../helpers/api";
 import { expect, test } from "../helpers/test";
-import { FIXTURE_SECTIONS, findSection, setSectionMarkdown } from "../helpers/wikify";
+import {
+	FIXTURE_SECTIONS,
+	findSection,
+	propagationPending,
+	setSectionMarkdown,
+} from "../helpers/wikify";
 import { waitFor } from "../helpers/wait";
 
 type PageSnapshot = {
@@ -27,7 +32,6 @@ type Snapshot = { pages: PageSnapshot[]; sections: SectionSnapshot[] };
 const IMAGE_TAG = /!\[([^\]]*)\]\(([^)]*)\)/g;
 // The crop job budget: propagation to sections runs on the one worker every agent shares.
 const PROPAGATION_TIMEOUT = 900_000;
-const PROPAGATION_JOB = "wikify.rag.events.propagate_dirty_pages";
 
 function imageTags(markdown: string): { caption: string; url: string }[] {
 	return [...(markdown || "").matchAll(IMAGE_TAG)].map((match) => ({
@@ -58,22 +62,6 @@ function owningSections(sections: SectionSnapshot[], pageNo: number): SectionSna
 	return covering.filter(
 		(row) => !covering.some((other) => other.lft > row.lft && other.rgt < row.rgt),
 	);
-}
-
-async function propagationPending(api: Api, sourceDocument: string): Promise<boolean> {
-	// RQ Job's virtual get_list needs an explicit order_by and a positive page length.
-	const jobs = await api.call<{ arguments: string }[]>("frappe.client.get_list", {
-		doctype: "RQ Job",
-		filters: {
-			queue: "long",
-			status: ["in", ["queued", "started"]],
-			job_name: PROPAGATION_JOB,
-		},
-		fields: ["arguments"],
-		order_by: "creation desc",
-		limit_page_length: 1000,
-	});
-	return jobs.some((job) => JSON.parse(job.arguments).kwargs?.source_document === sourceDocument);
 }
 
 // Waits until the crop's propagation job rebuilt the owning sections, or no such job is left

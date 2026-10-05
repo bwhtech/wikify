@@ -153,3 +153,20 @@ export async function setSectionMarkdown(
 export function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+// Page edits are pushed into their sections by a queued job.
+export async function propagationPending(api: Api, sourceDocument: string): Promise<boolean> {
+	// RQ Job's virtual get_list needs an explicit order_by and a positive page length.
+	const jobs = await api.call<{ arguments: string }[]>("frappe.client.get_list", {
+		doctype: "RQ Job",
+		filters: {
+			queue: "long",
+			status: ["in", ["queued", "started"]],
+			job_name: "wikify.rag.events.propagate_dirty_pages",
+		},
+		fields: ["arguments"],
+		order_by: "creation desc",
+		limit_page_length: 1000,
+	});
+	return jobs.some((job) => JSON.parse(job.arguments).kwargs?.source_document === sourceDocument);
+}
