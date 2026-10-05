@@ -15,10 +15,7 @@ const shortcutLabel = formatShortcutLabel(PALETTE_SHORTCUT);
 			<slot />
 			<slot name="actions" />
 		</template>
-		<div
-			v-else
-			class="flex w-full items-center gap-3"
-		>
+		<div v-else class="flex w-full items-center gap-3">
 			<div class="flex min-w-0 flex-1 basis-0 items-center">
 				<slot />
 			</div>
