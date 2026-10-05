@@ -130,7 +130,7 @@ def _render_document(name: str) -> str:
 	if title is None:
 		return ""
 	outline = _tree_outline(name)
-	return f"## Document: {title or name} <{name}>\n{outline}"
+	return f"## Document: {title or name} `{name}`\n{outline}"
 
 
 def _render_page(name: str) -> tuple[str, str | None]:

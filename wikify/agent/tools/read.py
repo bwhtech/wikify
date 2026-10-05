@@ -34,7 +34,7 @@ def render_tree(source_document: str) -> str:
 		if start:
 			pages = f" [p.{start}]" if not end or end == start else f" [p.{start}-{end}]"
 		stype = f" ({node['section_type']})" if node.get("section_type") else ""
-		lines.append(f"{indent}- {node.get('title') or '(untitled)'}{stype}{pages} <{node['name']}>")
+		lines.append(f"{indent}- {node.get('title') or '(untitled)'}{stype}{pages} `{node['name']}`")
 		for child in node.get("children", []):
 			walk(child, depth + 1)
 
@@ -56,7 +56,7 @@ def _read_tree(ctx: Ctx, args: dict) -> str:
 def _read_section(ctx: Ctx, args: dict) -> str:
 	name = args.get("name")
 	if not name:
-		return _("Provide the section `name` (the id shown in <angle brackets> in the tree).")
+		return _("Provide the section `name` (the id shown in backticks in the tree).")
 	row = frappe.db.get_value(
 		"Source Section",
 		name,
@@ -139,7 +139,7 @@ def format_section_groups(groups: list[dict]) -> str:
 		lines.append(f"# {group['doc_title']} ({group['source_document']})")
 		for section in group["sections"]:
 			pages = f" [p.{section['page_start']}-{section['page_end']}]" if section.get("page_start") else ""
-			lines.append(f"  - {section['hierarchy_path'] or section['title']}{pages} <{section['name']}>")
+			lines.append(f"  - {section['hierarchy_path'] or section['title']}{pages} `{section['name']}`")
 	return "\n".join(lines)
 
 
@@ -308,7 +308,7 @@ TOOLS = [
 	Tool(
 		name="read_section",
 		side="server",
-		description="Read one section's markdown body and metadata. Pass the section id (shown in <angle brackets> in the tree).",
+		description="Read one section's markdown body and metadata. Pass the section id (shown in backticks in the tree).",
 		parameters={
 			"type": "object",
 			"properties": {
