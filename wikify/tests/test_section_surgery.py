@@ -6,6 +6,7 @@ import frappe
 import frappe.model.document
 from frappe.tests.utils import FrappeTestCase
 
+from wikify.agent import session
 from wikify.agent.context import Ctx
 from wikify.agent.registry import build_default_registry
 from wikify.agent.tools import tree as tt
@@ -170,6 +171,16 @@ class TestSectionSurgery(FrappeTestCase):
 		self.assertIn("Merged 1 section(s) into '2. Beta'", out)
 		out = tt._delete_section(self.ctx, {"name": self._name("5. Epsilon")})
 		self.assertIn("Deleted '5. Epsilon'", out)
+
+	def test_new_section_ids_survive_saving_the_tool_message(self):
+		agent_session = session.get_or_create(None, user="Administrator")
+		with patch("frappe.model.naming.get_trace_id", return_value="p"):
+			created = tt._create_section(self.ctx, {"title": "5. Epsilon"})
+			split = tt._split_section(self.ctx, {"name": self._name("1. Alpha"), "at_heading": "Part Two"})
+		for out, title in ((created, "5. Epsilon"), (split, "Part Two")):
+			message = session.append_message(agent_session.name, "tool", out, tool_name="create_section")
+			stored = frappe.db.get_value("Wikify Agent Message", message.name, "content")
+			self.assertIn(self._name(title), stored)
 
 
 class TestReplaceSectionsIsAtomic(FrappeTestCase):
