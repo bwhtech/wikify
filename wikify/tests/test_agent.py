@@ -4,9 +4,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
+import litellm
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import now_datetime
 
-from wikify.agent import session
+from wikify.agent import llm, session
 from wikify.agent.context import Ctx, resolve_attachments
 from wikify.agent.loop import AgentRunner, cancel_key, request_cancel
 from wikify.agent.tools.read import (
@@ -279,6 +281,65 @@ class TestAgent(FrappeTestCase):
 		frappe.db.set_value("Wikify Agent Session", created["session_id"], "title", "My chat")
 		listed = agent_api.list_sessions()
 		self.assertTrue(any(s["name"] == created["session_id"] for s in listed))
+
+	def test_completion_caps_max_tokens(self):
+		with (
+			patch("wikify.engine.claude_cli.is_enabled", return_value=False),
+			patch("wikify.engine.settings.openrouter_key", return_value="test-key"),
+			patch("litellm.completion") as completion,
+		):
+			llm.complete_with_tools("anthropic/claude-sonnet-4.6", [], [], stream=True)
+		max_tokens = completion.call_args.kwargs.get("max_tokens")
+		self.assertIsNotNone(max_tokens)
+		self.assertLess(max_tokens, 65536)
+
+	def run_failing_turn(self, exception):
+		agent_session = self._make_session()
+		started = now_datetime()
+		events = []
+
+		def failing_llm(model, messages, tools, *, stream=True):
+			raise exception
+
+		with (
+			patch("wikify.agent.llm.complete_with_tools", failing_llm),
+			patch(
+				"frappe.publish_realtime", lambda event, payload, **kwargs: events.append((event, payload))
+			),
+			patch("frappe.db.commit"),
+		):
+			AgentRunner(agent_session.name, "Administrator").run()
+		messages = frappe.get_all(
+			"Wikify Agent Message",
+			filters={"session": agent_session.name, "role": "assistant"},
+			fields=["content", "status"],
+		)
+		error_logs = frappe.get_all(
+			"Error Log",
+			filters={"method": "Wikify agent run failed", "creation": (">=", started)},
+			pluck="name",
+		)
+		errors = [payload["message"] for event, payload in events if event.startswith("wikify_agent_error")]
+		return messages, error_logs, errors
+
+	def test_insufficient_credits_names_the_cause(self):
+		exception = litellm.APIError(
+			status_code=402,
+			message='OpenrouterException - {"error": {"message": "This request requires more credits"}}',
+			llm_provider="openrouter",
+			model="openrouter/anthropic/claude-sonnet-4.6",
+		)
+		messages, error_logs, errors = self.run_failing_turn(exception)
+		self.assertEqual([message.status for message in messages], ["error"])
+		self.assertIn("credits", messages[0].content)
+		self.assertEqual(errors, [messages[0].content])
+		self.assertEqual(len(error_logs), 1)
+
+	def test_failed_run_logs_error_without_streaming_row(self):
+		messages, error_logs, errors = self.run_failing_turn(RuntimeError("model call failed"))
+		self.assertEqual([message.status for message in messages], ["error"])
+		self.assertEqual(errors, [messages[0].content])
+		self.assertEqual(len(error_logs), 1)
 
 
 class TestSearchSectionsRecall(FrappeTestCase):
