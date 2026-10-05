@@ -15,6 +15,7 @@ import { useIsMobile } from "@/composables/useMediaQuery";
 import { session } from "@/data/session";
 import AgentChatPanel from "@/components/AgentChatPanel.vue";
 import AppSettingsDialog from "@/components/AppSettingsDialog.vue";
+import { openSettings, visibleRoute } from "@/data/settingsRoute";
 
 const route = useRoute();
 const { resolvedTheme, toggleTheme, initializeTheme } = useTheme();
@@ -22,7 +23,6 @@ const isMobile = useIsMobile();
 
 const BUG_REPORT_URL = "https://github.com/bwhtech/wikify/issues/new";
 
-const settingsOpen = ref(false);
 const mobileMenuOpen = ref(false);
 // The agent panel + its floating button are mounted once here so they're available on
 // every screen (slice 12). On mobile the floating button is replaced by a MobileNav tab.
@@ -32,7 +32,7 @@ const menuItems = computed(() => [
 	{
 		label: "Settings",
 		icon: "lucide-settings",
-		onClick: () => (settingsOpen.value = true),
+		onClick: () => openSettings(),
 	},
 	{
 		label: resolvedTheme.value === "dark" ? "Light mode" : "Dark mode",
@@ -109,7 +109,7 @@ onMounted(initializeTheme);
 		<!-- Mobile: fixed column with a bottom tab bar; the Sidebar's destinations
 		     become tabs and the user menu moves into a bottom sheet. -->
 		<MobileShell v-if="isMobile">
-			<router-view />
+			<router-view :route="visibleRoute" />
 
 			<template #nav>
 				<MobileNav>
@@ -165,10 +165,10 @@ onMounted(initializeTheme);
 				</Sidebar>
 			</template>
 
-			<router-view />
+			<router-view :route="visibleRoute" />
 		</DesktopShell>
 
-		<AppSettingsDialog v-model:open="settingsOpen" />
+		<AppSettingsDialog />
 
 		<!-- Mobile overflow menu (settings / theme / logout). -->
 		<BottomSheet v-model:open="mobileMenuOpen" title="Wikify">
