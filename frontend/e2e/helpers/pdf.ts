@@ -28,7 +28,11 @@ export function makePdf(lines: string[]): Buffer {
 	return Buffer.from(body);
 }
 
-export function writePdfs(dir: string, names: string[], lines: string[] = defaultLines()): string[] {
+export function writePdfs(
+	dir: string,
+	names: string[],
+	lines: string[] = defaultLines(),
+): string[] {
 	fs.mkdirSync(dir, { recursive: true });
 	return names.map((name) => {
 		const file = path.join(dir, name.endsWith(".pdf") ? name : `${name}.pdf`);

@@ -27,22 +27,46 @@ export async function createProject(api: Api, projectName: string): Promise<stri
 }
 
 export async function findProject(api: Api, projectName: string): Promise<string | undefined> {
-	const rows = await api.getList("Wikify Project", { filters: { project_name: projectName }, limit: 1 });
+	const rows = await api.getList("Wikify Project", {
+		filters: { project_name: projectName },
+		limit: 1,
+	});
 	return rows[0]?.name;
 }
 
 export async function startImport(
 	api: Api,
-	{ title, project, pdf = FIXTURE_PDF, fileName }: { title: string; project: string; pdf?: string; fileName?: string },
+	{
+		title,
+		project,
+		pdf = FIXTURE_PDF,
+		fileName,
+	}: { title: string; project: string; pdf?: string; fileName?: string },
 ): Promise<string> {
-	const uniqueName = fileName || `${path.basename(pdf, ".pdf")}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`;
+	const uniqueName =
+		fileName ||
+		`${path.basename(pdf, ".pdf")}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`;
 	const fileUrl = await uploadFile(api, pdf, { fileName: uniqueName });
 	return api.call("wikify.api.imports.start_import", { pdf_file_url: fileUrl, title, project });
 }
 
-export async function waitForImport(api: Api, importName: string, status: string | string[], timeout = PARSE_TIMEOUT) {
-	await waitForValue(api, "Wikify Import", importName, "status", status, { timeout, interval: 5_000 });
-	return api.getValue<Row>("Wikify Import", importName, ["status", "stage_label", "error", "source_document", "wiki_space"]);
+export async function waitForImport(
+	api: Api,
+	importName: string,
+	status: string | string[],
+	timeout = PARSE_TIMEOUT,
+) {
+	await waitForValue(api, "Wikify Import", importName, "status", status, {
+		timeout,
+		interval: 5_000,
+	});
+	return api.getValue<Row>("Wikify Import", importName, [
+		"status",
+		"stage_label",
+		"error",
+		"source_document",
+		"wiki_space",
+	]);
 }
 
 export async function sectionRows(api: Api, sourceDocument: string): Promise<SectionRow[]> {
@@ -67,7 +91,11 @@ export async function sectionRows(api: Api, sourceDocument: string): Promise<Sec
 	});
 }
 
-export async function findSection(api: Api, sourceDocument: string, title: string): Promise<SectionRow> {
+export async function findSection(
+	api: Api,
+	sourceDocument: string,
+	title: string,
+): Promise<SectionRow> {
 	const section = (await sectionRows(api, sourceDocument)).find((row) => row.title === title);
 	if (!section) throw new Error(`No section titled "${title}" in ${sourceDocument}`);
 	return section;
@@ -76,7 +104,15 @@ export async function findSection(api: Api, sourceDocument: string, title: strin
 export async function pageRows(api: Api, sourceDocument: string): Promise<Row[]> {
 	return api.getList("Source Page", {
 		filters: { source_document: sourceDocument },
-		fields: ["name", "page_no", "verdict", "composite", "canonical_composite", "canonical_source", "canonical_markdown"],
+		fields: [
+			"name",
+			"page_no",
+			"verdict",
+			"composite",
+			"canonical_composite",
+			"canonical_source",
+			"canonical_markdown",
+		],
 		orderBy: "page_no asc",
 	});
 }

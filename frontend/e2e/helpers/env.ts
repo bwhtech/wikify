@@ -2,7 +2,10 @@ import path from "node:path";
 
 function required(name: string): string {
 	const value = process.env[name];
-	if (!value) throw new Error(`${name} is not set. Copy e2e/.env.e2e.example to e2e/.env.e2e and fill it in.`);
+	if (!value)
+		throw new Error(
+			`${name} is not set. Copy e2e/.env.e2e.example to e2e/.env.e2e and fill it in.`,
+		);
 	return value;
 }
 

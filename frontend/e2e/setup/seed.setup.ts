@@ -21,7 +21,9 @@ const IN_PROGRESS = ["Queued", "Parsing", "Remediating"];
 async function isPristine(api: Api, sourceDocument: string): Promise<boolean> {
 	const rows = await sectionRows(api, sourceDocument);
 	const root = rows.find((row) => row.title === FIXTURE_ROOT && !row.parent_source_section);
-	const children = rows.filter((row) => root && row.parent_source_section === root.name).map((row) => row.title);
+	const children = rows
+		.filter((row) => root && row.parent_source_section === root.name)
+		.map((row) => row.title);
 	return (
 		!!root &&
 		rows.length === FIXTURE_SECTIONS.length + 1 &&
@@ -36,7 +38,11 @@ async function seedImport(api: Api, project: string, title: string): Promise<Imp
 		fields: ["name", "status", "source_document"],
 	});
 	for (const imp of existing) {
-		if (imp.status === "Review" && imp.source_document && (await isPristine(api, imp.source_document))) {
+		if (
+			imp.status === "Review" &&
+			imp.source_document &&
+			(await isPristine(api, imp.source_document))
+		) {
 			return { import: imp.name, sourceDocument: imp.source_document, title };
 		}
 		if (IN_PROGRESS.includes(imp.status)) {
@@ -56,7 +62,8 @@ setup("seed the fixture project and imports", async () => {
 	setup.setTimeout(PARSE_TIMEOUT + 120_000);
 	const api = await Api.create();
 	try {
-		const project = (await findProject(api, PROJECT_NAME)) || (await createProject(api, PROJECT_NAME));
+		const project =
+			(await findProject(api, PROJECT_NAME)) || (await createProject(api, PROJECT_NAME));
 		const [review, agent] = await Promise.all([
 			seedImport(api, project, `${FIXTURE_PREFIX} review`),
 			seedImport(api, project, `${FIXTURE_PREFIX} agent`),

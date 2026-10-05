@@ -20,7 +20,11 @@ export class Api {
 		return (await readJson(response, method)).message as T;
 	}
 
-	async getValue<T = any>(doctype: string, name: string | Row, fields: string | string[]): Promise<T> {
+	async getValue<T = any>(
+		doctype: string,
+		name: string | Row,
+		fields: string | string[],
+	): Promise<T> {
 		const message = await this.call("frappe.client.get_value", {
 			doctype,
 			filters: name,
@@ -48,19 +52,26 @@ export class Api {
 	}
 
 	async getDoc<T extends Row = Row>(doctype: string, name: string): Promise<T> {
-		const response = await this.context.get(`/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`);
+		const response = await this.context.get(
+			`/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
+		);
 		return (await readJson(response, `${doctype} ${name}`)).data as T;
 	}
 
 	async setValue(doctype: string, name: string, values: Row): Promise<Row> {
-		const response = await this.context.put(`/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, {
-			data: values,
-		});
+		const response = await this.context.put(
+			`/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
+			{
+				data: values,
+			},
+		);
 		return (await readJson(response, `${doctype} ${name}`)).data;
 	}
 
 	async delete(doctype: string, name: string): Promise<void> {
-		const response = await this.context.delete(`/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`);
+		const response = await this.context.delete(
+			`/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
+		);
 		await readJson(response, `delete ${doctype} ${name}`);
 	}
 

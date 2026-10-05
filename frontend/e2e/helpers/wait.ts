@@ -14,7 +14,11 @@ export async function waitForValue(
 	name: string,
 	field: string,
 	expected: Expected,
-	{ timeout = 300_000, interval = 3_000, errorField = "error" }: { timeout?: number; interval?: number; errorField?: string } = {},
+	{
+		timeout = 300_000,
+		interval = 3_000,
+		errorField = "error",
+	}: { timeout?: number; interval?: number; errorField?: string } = {},
 ): Promise<any> {
 	const deadline = Date.now() + timeout;
 	let last: any;
@@ -23,7 +27,9 @@ export async function waitForValue(
 		last = row?.[field];
 		if (matches(last, expected)) return last;
 		if (row?.[errorField] && !matches(last, expected)) {
-			throw new Error(`${doctype} ${name}: ${field} = ${JSON.stringify(last)}, ${errorField} = ${row[errorField]}`);
+			throw new Error(
+				`${doctype} ${name}: ${field} = ${JSON.stringify(last)}, ${errorField} = ${row[errorField]}`,
+			);
 		}
 		await new Promise((resolve) => setTimeout(resolve, interval));
 	}
@@ -37,12 +43,19 @@ export async function waitForValue(
 export async function waitFor<T>(
 	read: () => Promise<T>,
 	done: (value: T) => boolean,
-	{ timeout = 60_000, interval = 2_000, label = "condition" }: { timeout?: number; interval?: number; label?: string } = {},
+	{
+		timeout = 60_000,
+		interval = 2_000,
+		label = "condition",
+	}: { timeout?: number; interval?: number; label?: string } = {},
 ): Promise<T> {
 	const deadline = Date.now() + timeout;
 	let last: T = await read();
 	while (!done(last)) {
-		if (Date.now() > deadline) throw new Error(`${label} not met within ${timeout / 1000}s; last value ${JSON.stringify(last)}`);
+		if (Date.now() > deadline)
+			throw new Error(
+				`${label} not met within ${timeout / 1000}s; last value ${JSON.stringify(last)}`,
+			);
 		await new Promise((resolve) => setTimeout(resolve, interval));
 		last = await read();
 	}
