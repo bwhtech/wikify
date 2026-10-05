@@ -102,8 +102,8 @@ def _delete_section(ctx: Ctx, args: dict) -> str:
 	).format(title, res["deleted"])
 
 
-def summarize_delete_section(args: dict) -> str:
-	name = args.get("name")
+def summarize_delete_section(tool_args: dict) -> str:
+	name = tool_args.get("name")
 	try:
 		names = sections._subtree_names(name)[1]
 	except frappe.ValidationError:
