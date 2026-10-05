@@ -5,13 +5,13 @@ import time
 
 import requests
 
-from wikify.engine import settings
+from wikify.engine import claude_cli, settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 def has_openrouter() -> bool:
-	return bool(settings.openrouter_key())
+	return claude_cli.is_enabled() or bool(settings.openrouter_key())
 
 
 _metrics_lock = threading.Lock()
@@ -40,6 +40,12 @@ def chat_completion(
 	api_key: str = "",
 	provider: dict | None = None,
 ) -> dict:
+	if claude_cli.is_enabled():
+		t0 = time.monotonic()
+		data = claude_cli.chat_completion(messages, response_format, timeout)
+		record_metrics(label, f"claude-cli/{claude_cli.MODEL}", time.monotonic() - t0, data["usage"])
+		return data
+
 	key = api_key or settings.openrouter_key()
 	if not key:
 		raise RuntimeError("OPENROUTER key not set; cloud features unavailable.")
@@ -68,16 +74,19 @@ def chat_completion(
 	resp.raise_for_status()
 	data = resp.json()
 
-	usage = data.get("usage") or {}
+	record_metrics(label, model, dt, data.get("usage") or {})
+	return data
+
+
+def record_metrics(label: str, model: str, seconds: float, usage: dict) -> None:
 	with _metrics_lock:
 		_metrics.append(
 			{
 				"label": label,
 				"model": model,
-				"seconds": round(dt, 3),
+				"seconds": round(seconds, 3),
 				"prompt_tokens": usage.get("prompt_tokens"),
 				"completion_tokens": usage.get("completion_tokens"),
 				"cost": usage.get("cost"),
 			}
 		)
-	return data

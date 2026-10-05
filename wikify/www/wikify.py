@@ -44,5 +44,6 @@ def get_boot():
 			"read_only_mode": frappe.flags.read_only,
 			"max_file_size": get_max_file_size(),
 			"system_timezone": get_system_timezone(),
+			"developer_mode": bool(frappe.conf.developer_mode),
 		}
 	)

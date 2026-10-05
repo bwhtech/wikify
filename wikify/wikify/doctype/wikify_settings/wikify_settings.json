@@ -5,6 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "models_section",
+  "use_local_models",
   "vlm_model",
   "cleanup_model",
   "judge_model",
@@ -29,6 +30,13 @@
    "fieldname": "models_section",
    "fieldtype": "Section Break",
    "label": "Models"
+  },
+  {
+   "default": "0",
+   "description": "Developer mode only: run every AI step on Sonnet through this machine's Claude Code login instead of OpenRouter.",
+   "fieldname": "use_local_models",
+   "fieldtype": "Check",
+   "label": "Use Local Models"
   },
   {
    "default": "mistralai/mistral-medium-3.1",
@@ -147,7 +155,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-20 00:00:00",
+ "modified": "2026-10-05 21:10:00",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Wikify Settings",

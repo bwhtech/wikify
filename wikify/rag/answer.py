@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable
 
 from wikify.agent import llm
-from wikify.engine import settings
+from wikify.engine.llm import has_openrouter
 from wikify.rag import evidence, usage
 from wikify.rag import search as rag_search
 from wikify.rag.router import Route, route
@@ -185,7 +185,7 @@ def answer(
 
 		hits = retrieve(decided, project, rerank, allowed_projects)
 		mode = MODE_FOR_INTENT[decided.intent]
-		refused = below_floor(hits, mode) or not settings.openrouter_key()
+		refused = below_floor(hits, mode) or not has_openrouter()
 
 		citations = [] if refused else [hit.as_dict() for hit in hits]
 		if citations and rerank_overruled(hits):

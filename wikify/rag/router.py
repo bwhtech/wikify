@@ -140,7 +140,7 @@ def route(question: str, project: str | None = None, history: list | None = None
 	question = (question or "").strip()
 	if not question:
 		return fallback(question, "There was no question to route.")
-	if not settings.openrouter_key():
+	if not llm.has_openrouter():
 		return fallback(question)
 
 	try:

@@ -41,6 +41,8 @@ const save = useCall({
 const keyIsSet = computed(() => !!settings.doc?.openrouter_api_key);
 const newKey = ref("");
 
+const isDeveloperMode = !!window.developer_mode;
+
 const MODEL_FIELDS = [
 	{ key: "agent_model", label: "Agent model", hint: "Assistant model (projects can override)." },
 	{
@@ -87,6 +89,7 @@ watch(
 		for (const f of FLOAT_FIELDS) next[f.key] = doc[f.key] ?? "";
 		for (const f of INT_FIELDS) next[f.key] = doc[f.key] ?? "";
 		next.judge_all_pages = !!doc.judge_all_pages;
+		next.use_local_models = !!doc.use_local_models;
 		form.value = next;
 		newKey.value = "";
 	},
@@ -96,7 +99,11 @@ watch(
 async function submit() {
 	// Build the field map for the standard document-update API. The key is omitted unless
 	// the user typed one, so an empty save never clobbers the stored secret.
-	const fields = { ...form.value, judge_all_pages: form.value.judge_all_pages ? 1 : 0 };
+	const fields = {
+		...form.value,
+		judge_all_pages: form.value.judge_all_pages ? 1 : 0,
+		use_local_models: form.value.use_local_models ? 1 : 0,
+	};
 	if (newKey.value.trim()) fields.openrouter_api_key = newKey.value.trim();
 	// submit() resolves (it doesn't throw) on a server error — it sets save.error.
 	await save.submit(fields);
@@ -177,6 +184,14 @@ const activeTab = ref(TABS[0].value);
 				</SettingsHeader>
 				<SettingsBody>
 					<ErrorMessage class="mb-4" :message="save.error?.message" />
+					<SettingsRow
+						v-if="isDeveloperMode"
+						class="mb-4"
+						title="Local models"
+						description="Run every AI step on Sonnet through this machine's Claude Code login instead of OpenRouter. The model ids below are ignored while this is on."
+					>
+						<Switch v-model="form.use_local_models" />
+					</SettingsRow>
 					<div class="flex flex-col gap-4">
 						<div v-for="f in MODEL_FIELDS" :key="f.key">
 							<FormControl
