@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import frappe
 
-from wikify.engine import llm
+from wikify.engine import llm, settings
 from wikify.engine.verify import jev
 from wikify.jobs._util import log, publish_progress
 
@@ -12,6 +12,8 @@ def job_id(import_name: str) -> str:
 
 
 def run(import_name: str) -> dict | None:
+	if not settings.jev_enabled():
+		return None
 	imp = frappe.get_doc("Wikify Import", import_name)
 	if not imp.source_document:
 		return None

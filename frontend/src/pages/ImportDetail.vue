@@ -23,6 +23,7 @@ import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
 import { setDocument, setProject } from "@/data/agentContext";
+import { jevEnabled } from "@/data/jevSetting";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -264,7 +265,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					:route="{ name: 'ImportGraph', params: { name: props.name } }"
 				/>
 				<Button
-					v-if="imp.doc?.source_document"
+					v-if="jevEnabled && imp.doc?.source_document"
 					variant="subtle"
 					v-bind="actionButtonProps(isMobile, 'lucide-gauge', 'Re-score with Jev')"
 					:loading="rescoreJev.loading"
@@ -315,13 +316,13 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 								{{ imp.doc?.completed_at || "—" }}
 							</p>
 						</div>
-						<div>
+						<div v-if="!jevEnabled">
 							<p class="text-sm text-ink-gray-5">Audit score</p>
 							<p class="text-base text-ink-gray-8">
 								{{ docAudit != null ? Number(docAudit).toFixed(2) : "—" }}
 							</p>
 						</div>
-						<div>
+						<div v-else>
 							<p class="text-sm text-ink-gray-5">Jev score</p>
 							<div v-if="jevScored" class="flex items-center gap-2">
 								<Badge

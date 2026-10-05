@@ -18,6 +18,7 @@
   "escalate_threshold",
   "cleanup_recall_tolerance",
   "judge_all_pages",
+  "jev_enabled",
   "column_break_thresholds",
   "render_dpi",
   "visual_min_chars",
@@ -118,6 +119,13 @@
    "label": "Judge All Pages"
   },
   {
+   "default": "0",
+   "description": "Score conversions with Jev and show it instead of the audit score. Off: no Jev calls are made.",
+   "fieldname": "jev_enabled",
+   "fieldtype": "Check",
+   "label": "Jev Score"
+  },
+  {
    "fieldname": "column_break_thresholds",
    "fieldtype": "Column Break"
   },
@@ -155,7 +163,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-29 00:00:00",
+ "modified": "2026-10-05 00:00:00",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Wikify Settings",

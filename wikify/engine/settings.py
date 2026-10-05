@@ -34,6 +34,7 @@ DEFAULTS = {
 	"remediation_workers": 6,
 	"classify_workers": 8,
 	"judge_all_pages": 0,
+	"jev_enabled": 0,
 	"jev_model": "jev-latest",
 }
 
@@ -65,6 +66,10 @@ def _dotenv_key() -> str:
 		if line.startswith(("OPENROUTER_KEY", "OPENROUTER_API_KEY")) and "=" in line:
 			return line.split("=", 1)[1].strip().strip("\"'")
 	return ""
+
+
+def jev_enabled() -> bool:
+	return bool(get("jev_enabled"))
 
 
 def openrouter_key() -> str:

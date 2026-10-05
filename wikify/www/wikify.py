@@ -5,6 +5,8 @@ import frappe
 from frappe.core.api.file import get_max_file_size
 from frappe.utils import get_system_timezone
 
+from wikify.engine import settings
+
 no_cache = 1
 
 
@@ -44,5 +46,6 @@ def get_boot():
 			"read_only_mode": frappe.flags.read_only,
 			"max_file_size": get_max_file_size(),
 			"system_timezone": get_system_timezone(),
+			"jev_enabled": settings.jev_enabled(),
 		}
 	)

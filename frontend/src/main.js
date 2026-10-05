@@ -3,6 +3,7 @@ import { FrappeUI, frappeRequest, useCall } from "frappe-ui";
 import router from "./router";
 import App from "./App.vue";
 import { initSocket } from "./socket";
+import { jevEnabled } from "./data/jevSetting";
 import "./index.css";
 
 const app = createApp(App);
@@ -27,6 +28,7 @@ if (import.meta.env.DEV) {
 }
 
 function setupApp() {
+	jevEnabled.value = !!window.jev_enabled;
 	app.use(FrappeUI, {
 		config: {
 			resourceFetcher: frappeRequest,

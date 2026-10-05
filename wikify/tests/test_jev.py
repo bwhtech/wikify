@@ -138,6 +138,9 @@ class TestJevClient(FrappeTestCase):
 
 class TestJevJob(FrappeTestCase):
 	def setUp(self):
+		enabled = patch("wikify.engine.settings.jev_enabled", return_value=True)
+		enabled.start()
+		self.addCleanup(enabled.stop)
 		self.pdf = _pdf_file(
 			[BODY, "Filters are replaced every ninety days by the facilities contractor.", "Fig. 3"]
 		)
@@ -213,6 +216,24 @@ class TestJevJob(FrappeTestCase):
 		self.assertGreater(doc.jev_score, 0)
 		self.assertLess(doc.jev_score, 0.875)
 		self.assertIsNotNone(doc.jev_scored_at)
+
+	def test_disabled_setting_skips_scoring_without_calling_jev(self):
+		with (
+			patch("wikify.engine.settings.jev_enabled", return_value=False),
+			patch.object(jev_client, "system_one") as call,
+		):
+			self.assertIsNone(jev_score_job.run(self.imp.name))
+		call.assert_not_called()
+		self.assertFalse(self.page(1).jev_status)
+		self.assertIsNone(frappe.db.get_value("Source Document", self.source_document.name, "jev_scored_at"))
+
+	def test_rescore_is_refused_when_disabled(self):
+		with (
+			patch("wikify.engine.settings.jev_enabled", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+		):
+			self.assertRaises(frappe.ValidationError, imports_api.rescore_jev, self.imp.name)
+		enqueue.assert_not_called()
 
 	def test_rescore_enqueues_once(self):
 		with (

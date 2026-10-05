@@ -18,6 +18,7 @@ import {
 	useCall,
 	useDoc,
 } from "frappe-ui";
+import { jevEnabled } from "@/data/jevSetting";
 
 const open = defineModel("open", { type: Boolean, default: false });
 
@@ -92,6 +93,7 @@ watch(
 		for (const f of FLOAT_FIELDS) next[f.key] = doc[f.key] ?? "";
 		for (const f of INT_FIELDS) next[f.key] = doc[f.key] ?? "";
 		next.judge_all_pages = !!doc.judge_all_pages;
+		next.jev_enabled = !!doc.jev_enabled;
 		form.value = next;
 		newKey.value = "";
 	},
@@ -101,12 +103,17 @@ watch(
 async function submit() {
 	// Build the field map for the standard document-update API. The key is omitted unless
 	// the user typed one, so an empty save never clobbers the stored secret.
-	const fields = { ...form.value, judge_all_pages: form.value.judge_all_pages ? 1 : 0 };
+	const fields = {
+		...form.value,
+		judge_all_pages: form.value.judge_all_pages ? 1 : 0,
+		jev_enabled: form.value.jev_enabled ? 1 : 0,
+	};
 	if (newKey.value.trim()) fields.openrouter_api_key = newKey.value.trim();
 	// submit() resolves (it doesn't throw) on a server error — it sets save.error.
 	await save.submit(fields);
 	if (save.error) return;
 	await settings.reload();
+	jevEnabled.value = !!settings.doc?.jev_enabled;
 	toast.success("Settings saved");
 }
 
@@ -222,6 +229,12 @@ const activeTab = ref(TABS[0].value);
 							description="Visual pages are always judged; costs more."
 						>
 							<Switch v-model="form.judge_all_pages" />
+						</SettingsRow>
+						<SettingsRow
+							title="Jev score"
+							description="Score conversions with Jev and show it instead of the audit score."
+						>
+							<Switch v-model="form.jev_enabled" />
 						</SettingsRow>
 						<SettingsRow v-for="f in FLOAT_FIELDS" :key="f.key" :title="f.label">
 							<FormControl

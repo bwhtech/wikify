@@ -5,6 +5,7 @@ from frappe import _
 from frappe.utils.background_jobs import is_job_enqueued
 
 from wikify.engine import preview_wiki as _preview_wiki
+from wikify.engine import settings
 from wikify.jobs import generate as generate_job
 from wikify.jobs import jev_score as jev_score_job
 from wikify.jobs._util import log, publish_progress
@@ -102,6 +103,8 @@ def reclassify(import_name: str) -> str:
 def rescore_jev(import_name: str) -> str:
 	imp = frappe.get_doc("Wikify Import", import_name)
 	imp.check_permission("write")
+	if not settings.jev_enabled():
+		frappe.throw(_("Jev scoring is turned off in Settings."))
 	if not imp.source_document:
 		frappe.throw(_("Nothing to score — parse hasn't produced a document yet."))
 	if not is_job_enqueued(jev_score_job.job_id(import_name)):

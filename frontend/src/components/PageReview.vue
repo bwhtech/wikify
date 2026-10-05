@@ -8,6 +8,7 @@ import "splitpanes/dist/splitpanes.css";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useIsNarrow, useMediaQuery } from "@/composables/useMediaQuery";
 import { setPage } from "@/data/agentContext";
+import { jevEnabled } from "@/data/jevSetting";
 import { JEV_LOW_CONFIDENCE, jevDetail, jevPercent, jevTheme } from "@/utils/jev";
 
 const props = defineProps({
@@ -363,11 +364,11 @@ function fmtDelta(v) {
 									variant="subtle"
 									size="sm"
 								/>
-								<span class="text-xs text-ink-gray-5">{{
+								<span v-if="!jevEnabled" class="text-xs text-ink-gray-5">{{
 									fmt(pageAudit(page))
 								}}</span>
 								<Badge
-									v-if="page.jev_status === 'scored'"
+									v-else-if="page.jev_status === 'scored'"
 									:label="`Jev ${jevPercent(page.jev_score)}${
 										jevLowConfidence(page) ? '?' : ''
 									}`"
@@ -434,7 +435,7 @@ function fmtDelta(v) {
 									variant="subtle"
 								/>
 							</div>
-							<div class="flex items-baseline gap-1.5">
+							<div v-if="!jevEnabled" class="flex items-baseline gap-1.5">
 								<span class="text-xs uppercase tracking-wide text-ink-gray-5"
 									>Audit</span
 								>
@@ -443,7 +444,7 @@ function fmtDelta(v) {
 								}}</span>
 							</div>
 							<div
-								v-if="selected.jev_status === 'scored'"
+								v-else-if="selected.jev_status === 'scored'"
 								class="flex items-baseline gap-1.5"
 							>
 								<span class="text-xs uppercase tracking-wide text-ink-gray-5"
@@ -472,7 +473,10 @@ function fmtDelta(v) {
 								</template>
 								<template #body-main>
 									<div class="w-72 p-3 sm:w-80">
-										<div class="flex flex-wrap gap-x-5 gap-y-1">
+										<div
+											v-if="!jevEnabled"
+											class="flex flex-wrap gap-x-5 gap-y-1"
+										>
 											<div
 												v-for="c in scoreCells"
 												:key="c.label"
@@ -494,17 +498,14 @@ function fmtDelta(v) {
 											</div>
 										</div>
 										<p
-											v-if="selected.kind === 'visual'"
+											v-if="!jevEnabled && selected.kind === 'visual'"
 											class="mt-1.5 text-xs text-ink-gray-5"
 										>
 											Recall / extra are not meaningful on visual pages —
 											judged on the rendered image.
 										</p>
 
-										<div
-											v-if="selected.jev_status"
-											class="mt-2 border-t border-outline-gray-1 pt-2"
-										>
+										<div v-if="jevEnabled && selected.jev_status">
 											<p
 												v-if="selected.jev_status !== 'scored'"
 												class="text-xs text-ink-gray-5"
