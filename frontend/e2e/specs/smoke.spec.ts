@@ -1,5 +1,5 @@
-import type { Locator, Page } from "@playwright/test";
-import type { Api, Row } from "../helpers/api";
+import type { Page } from "@playwright/test";
+import type { Row } from "../helpers/api";
 import { iconButton, waitForTurn } from "../helpers/assistant";
 import { deleteTestProjects } from "../helpers/cleanup";
 import { env, FIXTURE_PDF, PREFIX } from "../helpers/env";
@@ -15,13 +15,7 @@ import {
 } from "../helpers/tree";
 import { pickInDialog } from "../helpers/upload";
 import { waitFor } from "../helpers/wait";
-import {
-	FIXTURE_ROOT,
-	FIXTURE_SECTIONS,
-	pageRows,
-	sectionRows,
-	waitForImport,
-} from "../helpers/wikify";
+import { findFigure, outline, pageRows, sectionRows, waitForImport } from "../helpers/wikify";
 
 const stamp = Date.now();
 const NAME = `${PREFIX} smoke ${stamp}`;
@@ -146,13 +140,10 @@ test.describe("smoke", () => {
 		"S-04 rename, exclude and drag persist after reload",
 		{ tag: ["@smoke", "@tree"] },
 		async ({ page, api }) => {
-			const before = await sectionRows(api, run.sourceDocument);
-			const byTitle = (title: string) => before.find((row) => row.title === title)!;
-			const root = before.find((row) => !row.parent_source_section)!;
-			expect(root.title).toBe(FIXTURE_ROOT);
-			const children = childOrder(before, root.name);
-			const renamed = byTitle(FIXTURE_SECTIONS[2]);
-			const excluded = byTitle(FIXTURE_SECTIONS[3]);
+			const { rows: before, root, children: childRows } = await outline(api, run.sourceDocument);
+			const children = childRows.map((row) => row.name);
+			const renamed = childRows[2];
+			const excluded = childRows[3];
 			const moved = children.at(-1)!;
 			const newTitle = `${NAME} renamed`;
 
@@ -198,12 +189,20 @@ test.describe("smoke", () => {
 		"S-05 crop a figure, the page markdown gets the cropped image",
 		{ tag: ["@smoke", "@crop"] },
 		async ({ page, api }) => {
-			const pageTwo = (await pageRows(api, run.sourceDocument)).find((row) => row.page_no === 2)!;
-			const [[, caption, originalUrl]] = [...pageTwo.canonical_markdown.matchAll(IMAGE_TAG)];
 			// A double quote in the caption breaks the UI crop (the preview truncates the alt text).
-			expect(caption).not.toContain('"');
+			const {
+				page: pageName,
+				pageNo,
+				caption,
+				url: originalUrl,
+			} = await findFigure(api, run.sourceDocument, {
+				plainCaption: true,
+			});
 
-			await page.goto(`/wikify/import/${run.import}/pages?page=2`);
+			const cropUrl = new RegExp(
+				`^/private/files/page-${String(pageNo).padStart(4, "0")}-crop\\w*\\.png$`,
+			);
+			await page.goto(`/wikify/import/${run.import}/pages?page=${pageNo}`);
 			const image = page.getByRole("img", { name: caption, exact: true });
 			await image.scrollIntoViewIfNeeded();
 			await image.click();
@@ -218,16 +217,14 @@ test.describe("smoke", () => {
 			expect((await cropped).ok()).toBe(true);
 			await expect(dialog).toBeHidden();
 
-			await expect(image).toHaveAttribute("src", /^\/private\/files\/page-0002-crop\w*\.png$/);
+			await expect(image).toHaveAttribute("src", cropUrl);
 			await expect
 				.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth))
 				.toBeGreaterThan(0);
-			const markdown = await api.getValue("Source Page", pageTwo.name, "canonical_markdown");
-			const tags = [...markdown.matchAll(IMAGE_TAG)];
-			expect(tags).toHaveLength(1);
-			expect(tags[0][1]).toBe(caption);
-			expect(tags[0][2]).toMatch(/^\/private\/files\/page-0002-crop\w*\.png$/);
-			expect(tags[0][2]).not.toBe(originalUrl);
+			const markdown = await api.getValue("Source Page", pageName, "canonical_markdown");
+			const tag = [...markdown.matchAll(IMAGE_TAG)].find((match) => match[1] === caption);
+			expect(tag?.[2]).toMatch(cropUrl);
+			expect(tag?.[2]).not.toBe(originalUrl);
 		},
 	);
 
@@ -238,8 +235,8 @@ test.describe("smoke", () => {
 		{ tag: ["@smoke", "@agent", "@llm"] },
 		async ({ page, api }) => {
 			test.setTimeout(2 * QUEUE_TIMEOUT);
-			const before = await sectionRows(api, run.sourceDocument);
-			const target = before.find((row) => row.title === FIXTURE_SECTIONS[0])!;
+			const { rows: before, children } = await outline(api, run.sourceDocument);
+			const target = children[0];
 			const newTitle = `${NAME} renamed by agent`;
 			const prompt = `${NAME} Rename section "${target.title}" to "${newTitle}"`;
 

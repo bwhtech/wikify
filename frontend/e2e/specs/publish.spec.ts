@@ -6,8 +6,9 @@ import { expect, test } from "../helpers/test";
 import { waitFor } from "../helpers/wait";
 import {
 	createProject,
-	FIXTURE_SECTIONS,
-	pageRows,
+	escapeRegExp,
+	findFigure,
+	outline,
 	sectionRows,
 	startImport,
 	waitForImport,
@@ -23,7 +24,6 @@ type WikiDocument = {
 	content: string;
 };
 
-const IMAGE_TAG = /!\[([^\]]*)\]\(([^)]*)\)/;
 // One background worker serves every agent's parses and jobs, so queues can be long.
 const QUEUE_TIMEOUT = 1_800_000;
 
@@ -72,6 +72,8 @@ test.describe("publish", () => {
 	const second = { import: "" };
 	let sections: SectionRow[] = [];
 	let excluded: SectionRow;
+	let leafTitle = "";
+	let otherTitle = "";
 	let crop: { url: string; section: SectionRow };
 	let space = "";
 	let publishedDocuments: WikiDocument[] = [];
@@ -85,18 +87,19 @@ test.describe("publish", () => {
 			await waitForImport(api, first.import, "Review", QUEUE_TIMEOUT)
 		).source_document;
 
-		sections = await sectionRows(api, first.sourceDocument);
-		excluded = sections.find((row) => row.title === FIXTURE_SECTIONS[7])!;
+		const { children } = await outline(api, first.sourceDocument);
+		excluded = children.at(-1)!;
+		leafTitle = children[0].title;
+		otherTitle = children[1].title;
 		await api.call("wikify.api.sections.toggle_include", { name: excluded.name, include: 0 });
 
-		// Page 3, not 1 or 2: a crop rebuilds every section covering the page from whole pages, and page 1
+		// Page 3 on, not 1 or 2: a crop rebuilds every section covering the page from whole pages, and page 1
 		// holds the root's own text, which would then leak into its first child and hide bug #30.
-		const page3 = (await pageRows(api, first.sourceDocument)).find((row) => row.page_no === 3)!;
-		const [, caption] = page3.canonical_markdown.match(IMAGE_TAG)!;
+		const figure = await findFigure(api, first.sourceDocument, { fromPage: 3 });
 		const result = await api.call("wikify.api.pages.crop_page_figure", {
 			source_document: first.sourceDocument,
-			page_no: 3,
-			caption,
+			page_no: figure.pageNo,
+			caption: figure.caption,
 			occurrence: 0,
 			x0: 0.25,
 			y0: 0.25,
@@ -141,7 +144,7 @@ test.describe("publish", () => {
 			});
 			const dialog = await openPublishDialog(page, first.import);
 			await expect(dialog).toContainText(
-				new RegExp(`${FIXTURE_SECTIONS[0]}|\\b${preview.pages} pages?\\b`, "i"),
+				new RegExp(`${escapeRegExp(leafTitle)}|\\b${preview.pages} pages?\\b`, "i"),
 			);
 		},
 	);
@@ -177,10 +180,10 @@ test.describe("publish", () => {
 				expect(documentNames, section.title).toContain(section.wiki_document);
 			await expectRoutesOpen(page, publishedDocuments);
 
-			const leaf = publishedDocuments.find((document) => document.title === FIXTURE_SECTIONS[0])!;
+			const leaf = publishedDocuments.find((document) => document.title === leafTitle)!;
 			await page.goto(`/${leaf.route}`);
 			await expect(
-				page.getByRole("main").getByRole("heading", { level: 1, name: FIXTURE_SECTIONS[0] }),
+				page.getByRole("main").getByRole("heading", { level: 1, name: leafTitle }),
 			).toBeVisible();
 		},
 	);
@@ -236,12 +239,12 @@ test.describe("publish", () => {
 			});
 			expect(publishedDocuments.map((document) => document.title)).not.toContain(excluded.title);
 
-			const leaf = publishedDocuments.find((document) => document.title === FIXTURE_SECTIONS[0])!;
+			const leaf = publishedDocuments.find((document) => document.title === leafTitle)!;
 			await page.goto(`/${leaf.route}`);
 			const sidebar = page
 				.getByRole("navigation")
-				.filter({ has: page.getByRole("link", { name: FIXTURE_SECTIONS[0] }) });
-			await expect(sidebar.getByRole("link", { name: FIXTURE_SECTIONS[6] })).toBeVisible();
+				.filter({ has: page.getByRole("link", { name: leafTitle }) });
+			await expect(sidebar.getByRole("link", { name: otherTitle })).toBeVisible();
 			await expect(sidebar.getByText(excluded.title)).toHaveCount(0);
 		},
 	);
@@ -297,17 +300,16 @@ test.describe("publish", () => {
 			);
 			await expectRoutesOpen(page, added);
 
-			const newPage = added.find((document) => document.title === FIXTURE_SECTIONS[0])!;
-			const oldPage = before.find((document) => document.title === FIXTURE_SECTIONS[0])!;
-			for (const document of [newPage, oldPage]) {
+			const secondLeaf = (await outline(api, sourceDocument)).children[0];
+			const firstLeaf = (await outline(api, first.sourceDocument)).children[0];
+			for (const leaf of [secondLeaf, firstLeaf]) {
+				const document = after.find((row) => row.name === leaf.wiki_document)!;
 				await page.goto(`/${document.route}`);
 				const main = page.getByRole("main");
-				await expect(
-					main.getByRole("heading", { level: 1, name: FIXTURE_SECTIONS[0] }),
-				).toBeVisible();
+				await expect(main.getByRole("heading", { level: 1, name: leaf.title })).toBeVisible();
 				const sidebar = page
 					.getByRole("navigation")
-					.filter({ has: page.getByRole("link", { name: FIXTURE_SECTIONS[0] }) });
+					.filter({ has: page.getByRole("link", { name: leaf.title }) });
 				for (const group of importGroups) {
 					await expect(
 						sidebar.getByRole("button", { name: group.title, exact: true }),

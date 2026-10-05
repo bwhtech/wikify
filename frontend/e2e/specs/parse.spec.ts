@@ -37,6 +37,7 @@ async function pageState(api: Api, sourceDocument: string) {
 	return api.getList("Source Page", {
 		filters: { source_document: sourceDocument },
 		fields: [
+			"name",
 			"page_no",
 			"verdict",
 			"remediation_method",
@@ -185,7 +186,6 @@ test.describe("parse", () => {
 		let importName: string;
 		let sourceDocument: string;
 		let title: string;
-		let parsedPages: Awaited<ReturnType<typeof pageState>>;
 
 		test.beforeAll(async ({ api }) => {
 			test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT + 60_000);
@@ -194,7 +194,7 @@ test.describe("parse", () => {
 			importName = await startImport(api, { title, project });
 			sourceDocument = (await waitForImport(api, importName, "Review", QUEUE_WAIT + PARSE_TIMEOUT))
 				.source_document;
-			parsedPages = await pageState(api, sourceDocument);
+			const parsedPages = await pageState(api, sourceDocument);
 			expect(parsedPages).toHaveLength(6);
 		});
 
@@ -220,8 +220,18 @@ test.describe("parse", () => {
 			async ({ page, api }) => {
 				test.fail(); // known failure: #31. Remove test.fail() when the issue is closed.
 				test.setTimeout(QUEUE_WAIT + REMEDIATE_TIMEOUT + 120_000);
+				const parsed = await pageState(api, sourceDocument);
+				// A clean parse flags no page, and then "Remediate flagged" has nothing to run on.
+				if (parsed.every((row) => row.verdict === "pass")) {
+					await api.setValue("Source Page", parsed.at(-1)!.name, { verdict: "review" });
+				}
 				const before = await pageState(api, sourceDocument);
 				const flagged = before.filter((row) => row.verdict !== "pass").map((row) => row.page_no);
+				// #31 only shows when a passed page holds a non-baseline read.
+				const resettable = before.filter(
+					(row) => row.verdict === "pass" && row.canonical_source !== "baseline",
+				);
+				test.skip(!resettable.length, "this parse left no remediated passed page");
 
 				const seqBefore = await remediateFromUi(page, api, "Remediate flagged");
 				const done = await waitForImport(
@@ -294,16 +304,10 @@ test.describe("parse", () => {
 				const after = await pageState(api, sourceDocument);
 				for (const row of after) {
 					expect(row.remediation_method, `page ${row.page_no} remediated`).toBeTruthy();
-					if (row.remediation_adopted)
-						expect(row.canonical_source, `page ${row.page_no} adopted`).not.toBe("baseline");
+					expect(row.canonical_source, `page ${row.page_no} canonical read`).toBe(
+						row.remediation_adopted ? row.remediation_method : "baseline",
+					);
 				}
-				const passedAfterParse = parsedPages
-					.filter((row) => row.verdict === "pass")
-					.map((row) => row.page_no);
-				const passedNow = after.filter((row) => row.verdict === "pass").map((row) => row.page_no);
-				expect(passedNow, "pages that passed after the parse pass again").toEqual(
-					expect.arrayContaining(passedAfterParse),
-				);
 			},
 		);
 

@@ -8,6 +8,7 @@ import { waitFor } from "../helpers/wait";
 import {
 	FIXTURE_ROOT,
 	FIXTURE_SECTIONS,
+	findFigure,
 	findSection,
 	propagationPending,
 	type SectionRow,
@@ -593,12 +594,15 @@ test.describe("assistant", () => {
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const pageNo = 2;
-			const caption = "Wikify screenshot showing the Uncategorized project's document list";
+			const owner = before.find((row) => row.title === FIXTURE_SECTIONS[0])!;
+			const { pageNo, caption } = await findFigure(api, sourceDocument, {
+				fromPage: owner.page_start,
+				toPage: owner.page_end,
+				plainCaption: true,
+			});
 			const target = pagesBefore.find((row) => row.page_no === pageNo)!;
 			const image: string = await api.getValue("Source Page", target.name, "image");
 			const placeholder = `/files/test-placeholder-${stamp}.png`;
-			const owner = before.find((row) => row.title === "Where your documents live")!;
 			expect(target.canonical_markdown).toContain(`![${caption}](${image})`);
 			expect(owner.markdown).toContain(`![${caption}](${image})`);
 			const prompt = `${PREFIX} agent ${stamp} Use the page image for the figure "${caption}" on page ${pageNo}.`;

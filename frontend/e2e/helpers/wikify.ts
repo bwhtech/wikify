@@ -170,3 +170,34 @@ export async function propagationPending(api: Api, sourceDocument: string): Prom
 	});
 	return jobs.some((job) => JSON.parse(job.arguments).kwargs?.source_document === sourceDocument);
 }
+
+// A fresh parse runs LLM remediation, so heading text and image captions vary between parses.
+// Specs that parse their own import pick sections by position and figures by search.
+export async function outline(api: Api, sourceDocument: string) {
+	const rows = await sectionRows(api, sourceDocument);
+	const root = rows.find((row) => !row.parent_source_section);
+	const children = root ? rows.filter((row) => row.parent_source_section === root.name) : [];
+	if (!root || children.length < 5) {
+		const shape = rows.map((row) => [row.title, row.parent_source_section]);
+		throw new Error(`Unexpected section tree for ${sourceDocument}: ${JSON.stringify(shape)}`);
+	}
+	return { rows, root, children };
+}
+
+export async function findFigure(
+	api: Api,
+	sourceDocument: string,
+	{ fromPage = 1, toPage = Infinity, plainCaption = false } = {},
+) {
+	for (const page of await pageRows(api, sourceDocument)) {
+		if (page.page_no < fromPage || page.page_no > toPage) continue;
+		for (const [, caption, url] of (page.canonical_markdown || "").matchAll(
+			/!\[([^\]]*)\]\(([^)]*)\)/g,
+		)) {
+			if (caption && !(plainCaption && caption.includes('"'))) {
+				return { page: page.name as string, pageNo: page.page_no as number, caption, url };
+			}
+		}
+	}
+	throw new Error(`No figure on pages ${fromPage}-${toPage} of ${sourceDocument}`);
+}

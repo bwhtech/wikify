@@ -17,6 +17,7 @@ import {
 	FIXTURE_ROOT,
 	FIXTURE_SECTIONS,
 	findSection,
+	outline,
 	sectionRows,
 	startImport,
 	waitForImport,
@@ -334,13 +335,11 @@ test.describe("tree after publish", () => {
 				"Review",
 				1_800_000,
 			);
-			const sections = await sectionRows(api, sourceDocument);
-			const root = sections.find((row) => !row.parent_source_section)!;
-			const children = childOrder(sections, root.name);
-			const bySectionTitle = (title: string) => sections.find((row) => row.title === title)!.name;
-			const renamed = bySectionTitle(FIXTURE_SECTIONS[0]);
-			const removed = bySectionTitle(FIXTURE_SECTIONS[3]);
-			const excluded = bySectionTitle(FIXTURE_SECTIONS[7]);
+			const { rows: sections, root, children: childRows } = await outline(api, sourceDocument);
+			const children = childRows.map((row) => row.name);
+			const renamed = children[0];
+			const removed = children[3];
+			const excluded = children.at(-1)!;
 			await api.call("wikify.api.sections.toggle_include", { name: excluded, include: 0 });
 			await api.call("wikify.api.sections.build_graph", { import_name: importName });
 			await api.call("wikify.api.imports.generate_wiki", {
