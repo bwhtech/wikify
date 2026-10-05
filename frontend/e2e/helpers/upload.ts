@@ -35,3 +35,9 @@ export async function uploadFile(
 	const response = await api.context.post("/api/method/upload_file", { multipart });
 	return (await readJson(response, `upload ${filePath}`)).message.file_url;
 }
+
+export async function pickInDialog(page: Page, files: string | string[]): Promise<void> {
+	const chooser = page.waitForEvent("filechooser");
+	await page.getByRole("dialog").getByRole("button", { name: "Choose PDFs" }).click();
+	await (await chooser).setFiles(files);
+}

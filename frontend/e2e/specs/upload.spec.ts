@@ -6,9 +6,9 @@ import { deleteImport, deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { writePdfs } from "../helpers/pdf";
 import { expect, test } from "../helpers/test";
-import { uploadFile } from "../helpers/upload";
+import { pickInDialog, uploadFile } from "../helpers/upload";
 import { waitFor, waitForValue } from "../helpers/wait";
-import { createProject } from "../helpers/wikify";
+import { createProject, escapeRegExp } from "../helpers/wikify";
 
 const AREA_PREFIX = `${PREFIX} upload ${Date.now()}`;
 const STARTED = ["Queued", "Parsing", "Remediating", "Review"];
@@ -17,10 +17,6 @@ const BULK_PROJECT = `${AREA_PREFIX} bulk`;
 const QUEUE_WAIT = 1_200_000;
 
 const strayImports: string[] = [];
-
-function escapeRegExp(text: string): string {
-	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 async function projectImports(api: Api, project: string) {
 	return api.getList("Wikify Import", {
@@ -50,12 +46,6 @@ async function dropFiles(
 	);
 	for (const type of ["dragenter", "dragover", "drop"])
 		await target.dispatchEvent(type, { dataTransfer });
-}
-
-async function pickInDialog(page: Page, files: string | string[]): Promise<void> {
-	const chooser = page.waitForEvent("filechooser");
-	await page.getByRole("dialog").getByRole("button", { name: "Choose PDFs" }).click();
-	await (await chooser).setFiles(files);
 }
 
 test.describe("upload", () => {

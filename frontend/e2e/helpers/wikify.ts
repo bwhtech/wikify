@@ -128,3 +128,28 @@ export const FIXTURE_SECTIONS = [
 	"The assistant",
 	"Which AI service Wikify uses",
 ];
+
+// A REST save on a section with an empty old_parent runs NestedSet's move and scrambles lft, so
+// renumber the tree from sort_order afterwards (move_section rebuilds the whole document's tree).
+export async function setSectionMarkdown(
+	api: Api,
+	sourceDocument: string,
+	updates: { name: string; markdown: string }[],
+): Promise<void> {
+	if (!updates.length) return;
+	for (const { name, markdown } of updates) {
+		await api.setValue("Source Section", name, { markdown });
+	}
+	const [firstRoot] = (await sectionRows(api, sourceDocument))
+		.filter((row) => !row.parent_source_section)
+		.sort((a, b) => a.sort_order - b.sort_order);
+	await api.call("wikify.api.sections.move_section", {
+		name: firstRoot.name,
+		new_parent: "",
+		new_index: 0,
+	});
+}
+
+export function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

@@ -1,7 +1,7 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import type { Api } from "../helpers/api";
 import { expect, test } from "../helpers/test";
-import { FIXTURE_SECTIONS, findSection } from "../helpers/wikify";
+import { FIXTURE_SECTIONS, findSection, setSectionMarkdown } from "../helpers/wikify";
 import { waitFor } from "../helpers/wait";
 
 type PageSnapshot = {
@@ -155,14 +155,13 @@ async function restoreCrops(api: Api, sourceDocument: string, before: Snapshot):
 		});
 	}
 	const sections = (await takeSnapshot(api, sourceDocument)).sections;
-	for (const section of sections) {
-		const original = before.sections.find((row) => row.name === section.name);
-		if (original && original.markdown !== section.markdown) {
-			await api.setValue("Source Section", section.name, {
-				markdown: original.markdown,
-			});
-		}
-	}
+	await setSectionMarkdown(
+		api,
+		sourceDocument,
+		before.sections.filter((original) =>
+			sections.some((row) => row.name === original.name && row.markdown !== original.markdown),
+		),
+	);
 	const after = await takeSnapshot(api, sourceDocument);
 	expect(after.pages).toEqual(before.pages);
 	expect(after.sections.map(({ name, markdown }) => ({ name, markdown }))).toEqual(

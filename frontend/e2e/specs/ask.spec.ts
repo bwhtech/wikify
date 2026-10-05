@@ -3,15 +3,12 @@ import type { Api } from "../helpers/api";
 import { deleteByPrefix } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
+import { escapeRegExp } from "../helpers/wikify";
 
 const AREA_PREFIX = `${PREFIX} ask ${Date.now()}`;
 const ANSWER_TIMEOUT = 180_000;
 
 type Counts = Record<string, number>;
-
-function escapeRegExp(text: string): string {
-	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 async function pickProject(page: Page, projectName: string): Promise<void> {
 	await page.getByRole("combobox").click();
