@@ -15,6 +15,7 @@ class Tool:
 	parameters: dict
 	handler: Callable[[Ctx, dict], str]
 	confirm: bool = False
+	confirm_summary: Callable[[dict], str] | None = None
 	mutates: bool = False
 
 

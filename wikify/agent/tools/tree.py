@@ -102,6 +102,18 @@ def _delete_section(ctx: Ctx, args: dict) -> str:
 	).format(title, res["deleted"])
 
 
+def summarize_delete_section(args: dict) -> str:
+	name = args.get("name")
+	try:
+		names = sections._subtree_names(name)[1]
+	except frappe.ValidationError:
+		return _("Delete section {0} and its whole subtree.").format(name)
+	subsections = len(names) - 1
+	if not subsections:
+		return _("Delete section '{0}'.").format(_title(name))
+	return _("Delete section '{0}' and its {1} subsection(s).").format(_title(name), subsections)
+
+
 def _split_section(ctx: Ctx, args: dict) -> str:
 	name, at_heading = args.get("name"), args.get("at_heading")
 	if not name or not (at_heading or "").strip():
@@ -255,6 +267,7 @@ TOOLS = [
 		handler=_delete_section,
 		mutates=True,
 		confirm=True,
+		confirm_summary=summarize_delete_section,
 	),
 	Tool(
 		name="split_section",

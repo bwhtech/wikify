@@ -196,6 +196,29 @@ class TestAgentWrite(FrappeTestCase):
 		enq2.assert_called_once()
 		self.assertEqual(enq2.call_args.args[0], "wikify.jobs.remediate.run")
 
+	def test_delete_confirm_names_the_section(self):
+		alpha = self._sections()[0].name
+		sess = self._make_session()
+		fake = FakeLLM(
+			[
+				[_tool_chunk(0, "c1", "delete_section", f'{{"name": "{alpha}"}}')],
+				[_text_chunk("Confirm the delete?")],
+			]
+		)
+		events = []
+		with (
+			patch("wikify.agent.llm.complete_with_tools", fake),
+			patch(
+				"frappe.publish_realtime",
+				lambda event, payload=None, *a, **k: events.append((event, payload)),
+			),
+		):
+			AgentRunner(sess.name, "Administrator").run()
+		confirm = next(payload for event, payload in events if event.startswith("wikify_agent_confirm"))
+		self.assertIn("'1. Alpha'", confirm["summary"])
+		self.assertIn("1 subsection", confirm["summary"])
+		self.assertTrue(frappe.db.exists("Source Section", alpha))
+
 	def test_ask_clarification_ends_turn(self):
 		sess = self._make_session()
 		fake = FakeLLM(
