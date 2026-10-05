@@ -174,6 +174,7 @@ def move_section(name: str, new_parent: str | None = None, new_index: int | None
 	sec = frappe.db.get_value("Source Section", name, ["source_document", "lft", "rgt"], as_dict=True)
 	if not sec:
 		frappe.throw(_("Section {0} not found.").format(name))
+	_assert_editable(sec.source_document)
 
 	if new_parent:
 		parent = frappe.db.get_value(
@@ -211,8 +212,10 @@ def move_section(name: str, new_parent: str | None = None, new_index: int | None
 
 @frappe.whitelist(methods=["POST"])
 def set_section_type(name: str, section_type: str | None = None) -> dict:
-	if not frappe.db.exists("Source Section", name):
+	source_document = frappe.db.get_value("Source Section", name, "source_document")
+	if not source_document:
 		frappe.throw(_("Section {0} not found.").format(name))
+	_assert_editable(source_document)
 	section_type = (section_type or "").strip() or None
 	if section_type and not frappe.db.exists("Section Type", section_type):
 		frappe.throw(_("Unknown Section Type {0}.").format(section_type))
@@ -271,6 +274,7 @@ def create_section(
 		frappe.throw(_("Title can't be empty."))
 	if not frappe.db.exists("Source Document", source_document):
 		frappe.throw(_("Source Document {0} not found.").format(source_document))
+	_assert_editable(source_document)
 	if parent:
 		prow = frappe.db.get_value("Source Section", parent, "source_document")
 		if prow != source_document:
@@ -320,6 +324,7 @@ def split_section(name: str, at_heading: str, new_title: str | None = None) -> d
 	)
 	if not sec:
 		frappe.throw(_("Section {0} not found.").format(name))
+	_assert_editable(sec.source_document)
 
 	want = (at_heading or "").strip().lstrip("#").strip().lower()
 	if not want:
@@ -406,6 +411,7 @@ def merge_sections(names: list | str) -> dict:
 		frappe.throw(_("Sections must be siblings (same document and same parent) to merge."))
 
 	survivor = rows[names[0]]
+	_assert_editable(survivor.source_document)
 	ordered = sorted(rows.values(), key=lambda r: r.lft)
 	merged_md = "\n\n".join((r.markdown or "").strip() for r in ordered if (r.markdown or "").strip())
 	starts = [r.page_start for r in ordered if r.page_start]
