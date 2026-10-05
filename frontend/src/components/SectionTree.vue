@@ -7,6 +7,7 @@ import WikiPreview from "@/components/WikiPreview.vue";
 import WikiPublish from "@/components/WikiPublish.vue";
 import { useIsNarrow } from "@/composables/useMediaQuery";
 import { setSection } from "@/data/agentContext";
+import { isPublished } from "@/utils/status";
 
 const props = defineProps({
 	sourceDocument: { type: String, default: null },
@@ -36,6 +37,7 @@ const sections = useList({
 		"include_in_wiki",
 		"markdown",
 		"lint_issues",
+		"wiki_document",
 	],
 	filters: computed(() => ({ source_document: props.sourceDocument || "__none__" })),
 	orderBy: "lft asc",
@@ -118,7 +120,24 @@ const isNarrow = useIsNarrow();
 const showPreview = ref(!!props.initialSection);
 const SplitHost = computed(() => (isNarrow.value ? "div" : Splitpanes));
 const SplitPane = computed(() => (isNarrow.value ? "div" : Pane));
+
+// A completed publish hands editing off to the Wiki app — clicking a page opens its
+// real editor there instead of Wikify's own (now-stale-on-regenerate) preview.
+const published = computed(() => isPublished(props.status));
 function onSelect(name) {
+	if (published.value) {
+		const wikiDocument = byName.value[name]?.wiki_document;
+		if (wikiDocument && props.wikiSpace) {
+			window.open(
+				`/wiki-app/spaces/${props.wikiSpace}/page/${wikiDocument}`,
+				"_blank",
+				"noopener"
+			);
+		} else {
+			toast.error("This page isn't in the published wiki.");
+		}
+		return;
+	}
 	selectedName.value = name;
 	showPreview.value = true;
 }
@@ -300,6 +319,7 @@ async function buildGraph() {
 					/>
 					<span v-if="mutating" class="text-xs text-ink-gray-4">Saving…</span>
 					<Button
+						v-if="!published"
 						class="ml-auto shrink-0"
 						size="sm"
 						variant="solid"
@@ -308,20 +328,27 @@ async function buildGraph() {
 						@click="buildGraph"
 					/>
 					<WikiPublish
+						class="ml-auto"
 						:import-name="importName"
 						:status="status"
 						:wiki-space="wikiSpace"
 					/>
 				</div>
+				<p
+					v-if="published"
+					class="border-b border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-xs text-ink-gray-6"
+				>
+					This wiki has been published — click a page below to edit it in the Wiki app.
+				</p>
 				<!-- A tighter indent on narrow screens: ICAI titles run to 140 chars and every
 				     nesting step is width the title no longer gets. -->
 				<div class="flex-1 overflow-auto p-2 [--tree-indent:14px] lg:[--tree-indent:24px]">
 					<Tree
 						:nodes="tree"
 						node-key="name"
-						draggable
+						:draggable="!published"
 						:move="canMove"
-						:disabled="mutating"
+						:disabled="mutating || published"
 						@drag-end="onDragEnd"
 					>
 						<template #item="{ node, expanded, hasChildren, toggle: toggleNode }">
@@ -399,8 +426,13 @@ async function buildGraph() {
 								</button>
 
 								<!-- Touch has no hover, so the row menu stays visible on narrow
-								     screens instead of being hover-revealed. -->
-								<Dropdown :options="rowActions(node)" placement="right">
+								     screens instead of being hover-revealed. Hidden once published —
+								     the API rejects these edits anyway; the Wiki app owns them now. -->
+								<Dropdown
+									v-if="!published"
+									:options="rowActions(node)"
+									placement="right"
+								>
 									<button
 										class="shrink-0 rounded p-0.5 text-ink-gray-5 hover:bg-surface-gray-3 lg:opacity-0 lg:group-hover:opacity-100"
 										@click.stop

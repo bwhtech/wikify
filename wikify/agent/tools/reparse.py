@@ -5,14 +5,7 @@ from frappe import _
 
 from wikify.agent.context import Ctx
 from wikify.agent.registry import Tool
-
-
-def _pdf_path(source_document: str) -> str | None:
-	pdf_url = frappe.db.get_value("Wikify Import", {"source_document": source_document}, "pdf")
-	if not pdf_url:
-		return None
-	file_name = frappe.db.get_value("File", {"file_url": pdf_url}, "name")
-	return frappe.get_doc("File", file_name).get_full_path() if file_name else None
+from wikify.engine.store import get_import_pdf_path
 
 
 def _project_context(ctx: Ctx) -> str:
@@ -63,14 +56,21 @@ def _use_page_image(ctx: Ctx, args: dict) -> str:
 
 	source_document = ctx.default_document(args.get("source_document"))
 	page_no = _page_no(args)
+	caption = (args.get("caption") or "").strip() or None
 	if not source_document:
 		return _("No document specified. Open a document or pass `source_document`.")
 	if page_no is None:
 		return _("Provide the `page_no` to embed as an image.")
 	try:
-		embed_page_image(source_document, page_no)
+		embed_page_image(source_document, page_no, caption)
 	except (ValueError, RuntimeError) as e:
 		return _("Couldn't embed the page image: {0}").format(str(e))
+	if caption:
+		return _(
+			"Replaced the '{0}' image tag on page {1} with the full page photo — the rest of "
+			"the page's content is untouched. The user can crop the figure out of it later on "
+			"the wiki."
+		).format(caption, page_no) + _propagate_page(source_document, page_no)
 	return _("Page {0} now embeds its rendered image as canonical markdown (no re-parse).").format(
 		page_no
 	) + _propagate_page(source_document, page_no)
@@ -85,7 +85,7 @@ def _reparse_page(ctx: Ctx, args: dict) -> str:
 		return _("No document specified. Open a document or pass `source_document`.")
 	if page_no is None:
 		return _("Provide the `page_no` to re-parse.")
-	pdf_path = _pdf_path(source_document)
+	pdf_path = get_import_pdf_path(source_document)
 	if not pdf_path:
 		return _("Couldn't locate the source PDF for {0}.").format(source_document)
 	method = args.get("method")
@@ -133,15 +133,28 @@ TOOLS = [
 		side="server",
 		# nosemgrep
 		description=(
-			"Deterministically replace a page's canonical markdown with an embed of its "
-			"rendered image (no LLM). Use when the user wants the page shown as an image rather "
-			"than transcribed/diagrammed. Defaults to the attached document."
+			"Deterministically embed a page's rendered photo (no LLM, no cropping). Omit "
+			"`caption` to replace the WHOLE page's canonical markdown with just the image — "
+			"use when the user wants the page shown as an image rather than transcribed. Pass "
+			"`caption` to instead replace ONLY that one existing `![caption](...)` image tag "
+			"with the full page photo, leaving the rest of the page's content untouched — use "
+			"this when a figure/screenshot placeholder needs a real image and precise cropping "
+			"isn't reliable; the user can crop the exact figure out of the full page photo "
+			"themselves later, in the wiki. `caption` must exactly match the alt text of an "
+			"existing tag on that page, as seen via read_page. Defaults to the attached document."
 		),
 		parameters={
 			"type": "object",
 			"properties": {
 				"source_document": {"type": "string", "description": "Omit to use the attached document."},
 				"page_no": {"type": "integer", "description": "1-based page number."},
+				"caption": {
+					"type": "string",
+					"description": (
+						"Omit to replace the whole page. Otherwise the exact alt text of the "
+						"existing image tag to replace with the full page photo."
+					),
+				},
 			},
 			"required": ["page_no"],
 		},

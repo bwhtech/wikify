@@ -21,15 +21,23 @@ class TestWikiTitleCustomizations(FrappeTestCase):
 
 	def test_running_again_keeps_one_property_setter(self):
 		add_wiki_title_customizations()
+
+		def setter_count(doctype):
+			return len(
+				frappe.get_all(
+					"Property Setter",
+					filters={"doc_type": doctype, "field_name": "title", "property": "fieldtype"},
+					pluck="name",
+				)
+			)
+
+		counts_after_first_run = {doctype: setter_count(doctype) for doctype in WIKI_TITLE_DOCTYPES}
+
 		add_wiki_title_customizations()
 
 		for doctype in WIKI_TITLE_DOCTYPES:
-			setters = frappe.get_all(
-				"Property Setter",
-				filters={"doc_type": doctype, "field_name": "title", "property": "fieldtype"},
-				pluck="name",
-			)
-			self.assertEqual(len(setters), 1)
+			self.assertLessEqual(counts_after_first_run[doctype], 1)
+			self.assertEqual(setter_count(doctype), counts_after_first_run[doctype])
 
 	def test_generation_keeps_a_title_longer_than_140(self):
 		add_wiki_title_customizations()

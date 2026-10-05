@@ -42,6 +42,18 @@ class TestSectionEdits(FrappeTestCase):
 			],
 		)
 
+	def _import(self, status):
+		return frappe.get_doc(
+			{
+				"doctype": "Wikify Import",
+				"import_title": "Edit Test",
+				"pdf": "/files/none.pdf",
+				"status": status,
+				"project": seed_uncategorized_project(),
+				"source_document": self.sd.name,
+			}
+		).insert(ignore_permissions=True)
+
 	def _rows(self):
 		return {
 			r.title: r
@@ -140,18 +152,27 @@ class TestSectionEdits(FrappeTestCase):
 		self.assertLess(beta.lft, beta.rgt)
 
 	def test_build_graph_advances_status(self):
-		imp = frappe.get_doc(
-			{
-				"doctype": "Wikify Import",
-				"import_title": "Edit Test",
-				"pdf": "/files/none.pdf",
-				"status": "Review",
-				"project": seed_uncategorized_project(),
-				"source_document": self.sd.name,
-			}
-		).insert(ignore_permissions=True)
+		imp = self._import("Review")
 
 		out = api.build_graph(imp.name)
 		self.assertEqual(out["status"], "Graphed")
 		self.assertEqual(frappe.db.get_value("Wikify Import", imp.name, "status"), "Graphed")
 		self.assertEqual(frappe.db.get_value("Source Document", self.sd.name, "status"), "Graphed")
+
+	def test_completed_import_blocks_further_tree_edits(self):
+		# A published wiki is a one-way handoff to the Wiki app's own editor — nothing
+		# that would let the source tree drift from what's already published should
+		# still be reachable once the import is Completed.
+		imp = self._import("Completed")
+		alpha, beta = self._name("1. Alpha"), self._name("2. Beta")
+
+		with self.assertRaises(frappe.ValidationError):
+			api.reorder_section(beta, new_parent=alpha, new_index=0, siblings=[beta])
+		with self.assertRaises(frappe.ValidationError):
+			api.rename_section(alpha, "Renamed")
+		with self.assertRaises(frappe.ValidationError):
+			api.toggle_include(alpha, False)
+		with self.assertRaises(frappe.ValidationError):
+			api.delete_section(alpha)
+		with self.assertRaises(frappe.ValidationError):
+			api.build_graph(imp.name)

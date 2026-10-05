@@ -288,6 +288,18 @@ class TestWikiGenerate(FrappeTestCase):
 
 		enqueue.assert_not_called()
 
+	def test_generate_refuses_once_already_completed(self):
+		imp = self._import("Completed")
+
+		with (
+			patch.object(imports_api, "is_job_enqueued", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+			self.assertRaises(frappe.ValidationError),
+		):
+			imports_api.generate_wiki(imp.name, new_space={"space_name": "x", "route": "x"})
+
+		enqueue.assert_not_called()
+
 	def test_job_ends_early_when_stop_is_requested(self):
 		space = self._generate()["space"]
 		imp = self._import("Generating Wiki")

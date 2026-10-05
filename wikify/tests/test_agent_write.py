@@ -118,6 +118,26 @@ class TestAgentWrite(FrappeTestCase):
 		self.assertEqual(row.canonical_source, "image")
 		self.assertTrue(row.canonical_markdown.startswith("![Page 1]("))
 
+	def test_use_page_image_with_caption_replaces_only_that_tag(self):
+		baseline = "# Heading\n\nSome body text.\n\n![Figure 1.1](image1.png)\n\nMore text after."
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, baseline)
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "caption": "Figure 1.1"})
+		self.assertIn("Replaced the 'Figure 1.1' image tag", out)
+		row = frappe.db.get_value(
+			"Source Page", page_name, ["canonical_source", "canonical_markdown"], as_dict=True
+		)
+		self.assertIn("# Heading", row.canonical_markdown)
+		self.assertIn("Some body text.", row.canonical_markdown)
+		self.assertIn("More text after.", row.canonical_markdown)
+		self.assertNotIn("image1.png", row.canonical_markdown)
+		image_url = frappe.db.get_value("Source Page", page_name, "image")
+		self.assertIn(f"![Figure 1.1]({image_url})", row.canonical_markdown)
+
+	def test_use_page_image_with_unmatched_caption_errors(self):
+		store.add_page(self.sd.name, 1, "visual", _PNG, "![Figure 1.1](image1.png)")
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "caption": "Figure 9.9"})
+		self.assertIn("No image tag captioned", out)
+
 	def _make_session(self):
 		sess = session.get_or_create(
 			None, user="Administrator", scope="document", source_document=self.sd.name

@@ -141,6 +141,9 @@ function onProgress(payload) {
 			pageReview.value?.reload();
 			sectionTree.value?.reload();
 		}
+		// A finished publish assigned each included section its wiki_document — the
+		// mounted tree still holds the pre-publish (empty) values until refetched.
+		if (payload.status === "Completed") sectionTree.value?.reload();
 		sdStats.reload();
 	}
 }

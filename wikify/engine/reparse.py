@@ -5,15 +5,15 @@ import fitz
 from wikify.engine import diagrams, llm, pdf_utils, regions, remediate, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
 from wikify.engine.parsers import vlm
+from wikify.engine.tags import find_tag_spans
 from wikify.engine.verify import score_page
 
 
 def _page_row(source_document: str, page_no: int) -> dict:
-	pages = store.get_pages(source_document)
-	for p in pages:
-		if p["page_no"] == page_no:
-			return p
-	raise ValueError(f"Page {page_no} of {source_document} not found.")
+	page = store.get_page(source_document, page_no)
+	if not page:
+		raise ValueError(f"Page {page_no} of {source_document} not found.")
+	return page
 
 
 def reparse_page(
@@ -54,6 +54,7 @@ def reparse_page(
 	)
 	page_image = store.get_page_image(page["name"]) or ""
 	new_md, diagram_notes = diagrams.remove_unverified_diagrams(new_md, page_image)
+	new_md = remediate.repair_broken_image_tags(new_md, page_image)
 	new_md = remediate.with_page_crop(new_md, page_image)
 	new_ps = score_page(page_no, new_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind)
 	notes = "; ".join([*new_ps.notes, *diagram_notes]) or None
@@ -72,14 +73,30 @@ def reparse_page(
 	}
 
 
-def embed_page_image(source_document: str, page_no: int) -> dict:
+def embed_page_image(source_document: str, page_no: int, caption: str | None = None) -> dict:
 	page = _page_row(source_document, page_no)
 	image_url = store.get_page_image(page["name"])
 	if not image_url:
 		raise ValueError(f"Page {page_no} has no rendered image to embed.")
-	markdown = f"![Page {page_no}]({image_url})"
-	store.set_canonical(page["name"], markdown, None, "image")
-	_recompute_canonical_mean(source_document)
+
+	if not caption:
+		markdown = f"![Page {page_no}]({image_url})"
+		store.set_canonical(page["name"], markdown, None, "image")
+		_recompute_canonical_mean(source_document)
+		return {"page_no": page_no, "image_url": image_url}
+
+	old_markdown = page["canonical_markdown"] or page["baseline_markdown"] or ""
+	spans = find_tag_spans(old_markdown, caption)
+	if len(spans) == 0:
+		raise ValueError(f"No image tag captioned '{caption}' found on page {page_no}.")
+	if len(spans) > 1:
+		raise ValueError(
+			f"{len(spans)} image tags captioned '{caption}' found on page {page_no} — "
+			"captions must be unique on the page."
+		)
+	start, end = spans[0]
+	new_markdown = old_markdown[:start] + f"![{caption}]({image_url})" + old_markdown[end:]
+	store.set_canonical_markdown(page["name"], new_markdown)
 	return {"page_no": page_no, "image_url": image_url}
 
 

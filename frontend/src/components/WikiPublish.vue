@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import {
+	Badge,
 	Button,
 	Dialog,
 	FormControl,
@@ -11,6 +12,7 @@ import {
 	toast,
 } from "frappe-ui";
 import { useSocket } from "@/socket";
+import { isPublished } from "@/utils/status";
 
 const props = defineProps({
 	importName: { type: String, required: true },
@@ -18,13 +20,15 @@ const props = defineProps({
 	wikiSpace: { type: String, default: null },
 });
 
-// Generation is gated on an approved tree (Graphed) — or a prior run
-// (Completed → it regenerates in place).
+// Generation is gated on an approved tree (Graphed) or a stopped run.
 const canPublish = computed(() =>
-	["Graphed", "Completed", "Generating Wiki", "Stopped"].includes(props.status)
+	["Graphed", "Generating Wiki", "Stopped"].includes(props.status)
 );
 const generating = computed(() => props.status === "Generating Wiki");
 const alreadyGenerated = computed(() => props.status === "Completed" || !!props.wikiSpace);
+// A completed publish is a one-way handoff — the API rejects a regenerate from here on,
+// so the control disappears rather than sitting there disabled.
+const published = computed(() => isPublished(props.status));
 
 // Existing spaces (also resolves the current space's route for the "View wiki" link).
 const spaces = useList({
@@ -143,7 +147,9 @@ const wikiUrl = computed(() => currentSpace.value && `/${currentSpace.value.rout
 			{{ currentSpace?.space_name || "View wiki" }}
 			<span aria-hidden>↗</span>
 		</a>
+		<Badge v-if="published" label="Published" theme="green" variant="subtle" size="sm" />
 		<Button
+			v-else
 			size="sm"
 			variant="subtle"
 			:label="alreadyGenerated ? 'Regenerate' : 'Publish'"
