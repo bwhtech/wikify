@@ -371,16 +371,20 @@ test.describe("crop", () => {
 		async ({ page, api, fixture }) => {
 			test.setTimeout(2 * PROPAGATION_TIMEOUT + 120_000);
 			const sourceDocument = fixture.review.sourceDocument;
+			// Only a page with one owner is propagated; a crop on a shared page edits the section holding the image.
 			const ownedFigurePages = (name: string) =>
-				before.pages.filter(
-					(row) =>
+				before.pages.filter((row) => {
+					const owners = owningSections(before.sections, row.page_no);
+					return (
 						imageTags(row.canonical_markdown).length &&
-						owningSections(before.sections, row.page_no).some((owner) => owner.name === name),
-				);
+						owners.length === 1 &&
+						owners[0].name === name
+					);
+				});
 			const found = fixture.review.outline.children.find(
 				(child) => ownedFigurePages(child.name).length,
 			);
-			test.skip(!found, "no top-level section of this parse owns a page with a figure");
+			test.skip(!found, "no top-level section of this parse alone owns a page with a figure");
 			const section = found!;
 			const crops: { caption: string; url: string }[] = [];
 			for (const { page_no: pageNo, canonical_markdown } of ownedFigurePages(section.name).slice(
