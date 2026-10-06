@@ -39,6 +39,10 @@ def _outline():
 	]
 
 
+def _words(count):
+	return " ".join(["word"] * count)
+
+
 def _llm_reply(payload):
 	content = payload if isinstance(payload, str) else json.dumps(payload)
 	return {"choices": [{"message": {"content": content}}]}
@@ -196,3 +200,53 @@ class TestLlmPagePlan(FrappeTestCase):
 			_titles(pages),
 			["Preamble", "5.8 Care", "5.8.1 Chaperone", "6.1 Protocols", "6.1.2 Lupus nephritis"],
 		)
+
+	def test_an_unnumbered_top_level_fragment_folds_into_the_page_before_it(self):
+		sections = [
+			_sec(["Preamble"], 1),
+			_sec(["IMMEDIATE PRE-OPERATIVE PROTOCOLS"], 7, 9, markdown=_words(60)),
+			_sec(["Pre transplant day"], 9, markdown=""),
+			_sec(["PRE-TRANSPLANT RECIPIENT ORDER SHEET"], 9, 10, markdown=_words(60)),
+			_sec(["6.3.3.2 Donor evaluation"], 11),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [1, 2]}), sections)
+		self.assertEqual(
+			_titles(pages), ["Preamble", "IMMEDIATE PRE-OPERATIVE PROTOCOLS", "6.3.3.2 Donor evaluation"]
+		)
+		self.assertIn("## Pre transplant day\n\n## PRE-TRANSPLANT RECIPIENT ORDER SHEET", pages[1].markdown)
+		self.assertEqual(pages[1].page_end, 10)
+		self.assertEqual(
+			_titles(plan_pages(sections)),
+			[
+				"Preamble",
+				"IMMEDIATE PRE-OPERATIVE PROTOCOLS",
+				"PRE-TRANSPLANT RECIPIENT ORDER SHEET",
+				"6.3.3.2 Donor evaluation",
+			],
+		)
+
+	def test_a_page_spanning_too_many_pdf_pages_splits_at_its_numbered_children(self):
+		capd = "6.2.2 CAPD"
+		initiation = "6.2.2.1 Initiation"
+		sections = [
+			_sec([capd], 4, markdown=""),
+			_sec([capd, "6.2.2.0 Introduction"], 4, markdown=_words(80)),
+			_sec([capd, initiation], 4, markdown=""),
+			_sec([capd, initiation, "6.2.2.1.1 Counselling"], 4, 5, markdown=_words(200)),
+			_sec([capd, initiation, "6.2.2.1.2 Pre-op evaluation"], 5, 17, markdown=_words(2000)),
+			_sec([capd, initiation, "6.2.2.1.3 Intra-op"], 17, 20, markdown=_words(800)),
+			_sec([capd, "6.2.2.2 Note"], 20, markdown=_words(10)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": []}), sections)
+		self.assertEqual(
+			_titles(pages),
+			[
+				capd,
+				"6.2.2.0 Introduction",
+				initiation,
+				"6.2.2.1.1 Counselling",
+				"6.2.2.1.2 Pre-op evaluation",
+				"6.2.2.1.3 Intra-op",
+			],
+		)
+		self.assertIn("## 6.2.2.2 Note", pages[0].markdown)

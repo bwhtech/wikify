@@ -6,7 +6,7 @@ wiki page granularity is set.
 from __future__ import annotations
 
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 
 import frappe
 
@@ -17,6 +17,9 @@ from wikify.engine.store import resolve_parent_indexes
 
 FALLBACK_PAGE_NUMBER_DEPTH = 3
 FALLBACK_PAGE_TREE_DEPTH = 1
+FRAGMENT_WORDS = 40
+MAX_PAGE_WORDS = 2500
+MAX_PAGE_PDF_PAGES = 6
 OUTLINE_BATCH_LINES = 250
 
 _PROMPT = (
@@ -35,7 +38,9 @@ _PROMPT = (
 	"- Avoid tiny pages (under ~150 words including their subsections) unless the section is "
 	"a standalone policy or topic.\n"
 	"- Split a very long topic (over ~4000 words) only at its natural numbered sub-sections.\n"
-	"- Depth-1 sections are always pages; a section can only be a page if its parent is one.\n\n"
+	"- Numbered depth-1 sections are always pages; an unnumbered depth-1 fragment (a form label, a "
+	"caption, a stray sentence) is not, and merges into the page before it. A section can only be a "
+	"page if its parent is one.\n\n"
 	'Respond ONLY as JSON: {"pages": [<indices of the sections that start their own wiki page>]}\n\n'
 )
 
@@ -95,11 +100,17 @@ def ancestors(parents: list[int | None], index: int):
 
 
 def enforce_invariants(sections: list[Section], parents: list[int | None], chosen: set[int]) -> set[int]:
+	numbers = outline_numbers(sections, parents)
+	child_counts = Counter(parent for parent in parents if parent is not None)
 	pages: set[int] = set()
 	for index, parent in enumerate(parents):
-		if parent is None or (index in chosen and parent in pages):
+		if parent is None:
+			fragment = index not in child_counts and len(sections[index].markdown.split()) < FRAGMENT_WORDS
+			if index == 0 or numbers[index] or (index in chosen and not fragment):
+				pages.add(index)
+		elif index in chosen and parent in pages:
 			pages.add(index)
-	child_counts = Counter(parent for parent in parents if parent is not None)
+	pages = split_long_pages(sections, parents, numbers, pages)
 	return {
 		index
 		for index in pages
@@ -107,6 +118,38 @@ def enforce_invariants(sections: list[Section], parents: list[int | None], chose
 		or index in child_counts
 		or (sections[index].markdown.strip() and child_counts[parents[index]] > 1)
 	}
+
+
+def split_long_pages(
+	sections: list[Section], parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
+) -> set[int]:
+	"""A page too long to read in one scroll is split at its numbered children, recursively; tiny
+	children stay folded."""
+	children: dict[int, list[int]] = defaultdict(list)
+	subtree_words = [len(section.markdown.split()) for section in sections]
+	for index in reversed(range(len(sections))):
+		parent = parents[index]
+		if parent is not None:
+			children[parent].insert(0, index)
+			subtree_words[parent] += subtree_words[index]
+	pages = set(pages)
+	queue = sorted(pages)
+	for page in queue:
+		folded = [page]
+		for index in folded:
+			folded.extend(child for child in children[index] if child not in pages)
+		words = sum(len(sections[index].markdown.split()) for index in folded)
+		pdf_pages = max(sections[index].page_end for index in folded) - sections[page].page_start + 1
+		if words <= MAX_PAGE_WORDS and pdf_pages <= MAX_PAGE_PDF_PAGES:
+			continue
+		split = [
+			child
+			for child in children[page]
+			if numbers[child] and child not in pages and subtree_words[child] >= FRAGMENT_WORDS
+		]
+		pages.update(split)
+		queue.extend(split)
+	return pages
 
 
 def fold_sections(sections: list[Section], parents: list[int | None], pages: set[int]) -> list[Section]:
@@ -117,8 +160,11 @@ def fold_sections(sections: list[Section], parents: list[int | None], pages: set
 			owner[index], depth_below_page[index] = index, 0
 			continue
 		parent = parents[index]
-		page = sections[owner[parent]]
-		owner[index], depth_below_page[index] = owner[parent], depth_below_page[parent] + 1
+		if parent is None:
+			owner[index], depth_below_page[index] = owner[index - 1], 1
+		else:
+			owner[index], depth_below_page[index] = owner[parent], depth_below_page[parent] + 1
+		page = sections[owner[index]]
 		heading = f"{'#' * min(6, depth_below_page[index] + 1)} {section.title}"
 		page.markdown = "\n\n".join(
 			part for part in (page.markdown.strip(), heading, section.markdown.strip()) if part
