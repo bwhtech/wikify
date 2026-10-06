@@ -143,8 +143,6 @@ test.describe("ask", () => {
 				annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/53" },
 			},
 			async ({ page, api, fixture }) => {
-				// known failure: #53. Remove test.fail() when the issue is closed.
-				test.fail();
 				test.setTimeout(ANSWER_TIMEOUT + 60_000);
 				const topic = fixture.review.outline.children[2].title;
 				const question = `${AREA_PREFIX} What does the document say about "${topic}"?`;
@@ -175,6 +173,7 @@ test.describe("ask", () => {
 				const row = page.getByRole("listitem").filter({ hasText: question });
 				await row.locator("button:has(.lucide-trash-2)").click();
 				const confirm = page.getByRole("dialog");
+				test.fail(); // known failure: #53. Remove test.fail() when the issue is closed.
 				await expect(confirm).toBeVisible();
 				expect(
 					await api.call("frappe.client.get_count", {

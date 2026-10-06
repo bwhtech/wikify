@@ -529,7 +529,6 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/21" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #21. Remove test.fail() when the issue is closed.
 			test.setTimeout(TEST_TIMEOUT * 2);
 			const { sourceDocument } = fixture.agent;
 			const stamp = Date.now();
@@ -581,6 +580,7 @@ test.describe("assistant", () => {
 				await page.goto(`/wikify/import/${fixture.agent.import}/pages?page=${pageNo}`);
 				await expect(page.getByText("([test] page edit)")).toBeVisible();
 
+				test.fail(); // known failure: #21. Remove test.fail() when the issue is closed.
 				const after = await sectionRows(api, sourceDocument);
 				const others = (rows: SectionRow[]) =>
 					rows
@@ -731,7 +731,6 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/38" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #38. Remove test.fail() when the issue is closed.
 			test.setTimeout(TEST_TIMEOUT);
 			const { sourceDocument } = fixture.agent;
 			const before = await sectionRows(api, sourceDocument);
@@ -759,6 +758,7 @@ test.describe("assistant", () => {
 				expect(await pageSnapshot(api, sourceDocument)).toEqual(pagesBefore);
 				expect(await sectionRows(api, sourceDocument)).toEqual(before);
 				// The wording is the bug (#38): the reply sends the user to the wiki editor, not the crop dialog.
+				test.fail(); // known failure: #38. Remove test.fail() when the issue is closed.
 				expect(reply.content).toMatch(/crop/i);
 				expect(reply.content).toMatch(/\bPages\b/);
 				expect(reply.content).toMatch(/click/i);
@@ -845,7 +845,6 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/24" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #24. Remove test.fail() when the issue is closed.
 			// Waits: queue (TURN_TIMEOUT) + stop (15 s) + follow-up or cleanup settle (TURN_TIMEOUT), so a timeout can't hide the bug.
 			test.setTimeout(TURN_TIMEOUT * 2 + 120_000);
 			const { sourceDocument } = fixture.agent;
@@ -867,6 +866,7 @@ test.describe("assistant", () => {
 					.poll(() => toolCards.count(), { timeout: TURN_TIMEOUT })
 					.toBeGreaterThanOrEqual(2);
 
+				test.fail(); // known failure: #24. Remove test.fail() when the issue is closed.
 				await iconButton(page, "lucide-square", panel).click();
 				const toolsAtStop = await toolCards.count();
 				await waitFor(
@@ -947,7 +947,6 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/25" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #25. Remove test.fail() when the issue is closed.
 			test.setTimeout(TEST_TIMEOUT);
 			const { sourceDocument } = fixture.agent;
 			const stamp = Date.now();
@@ -1003,6 +1002,7 @@ test.describe("assistant", () => {
 			const rows = await waitForTurn(api, sessionId, prompt, TURN_TIMEOUT);
 			const reply = finalReply(rows);
 			expect(reply.status).toBe("done");
+			test.fail(); // known failure: #25. Remove test.fail() when the issue is closed.
 			expect(reply.content).toContain(codeWord);
 		},
 	);
