@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Button, ErrorMessage, FormControl, PageHeader, toast, useCall, useDoc } from "frappe-ui";
+import { Button, ErrorMessage, FormControl, toast, useCall, useDoc } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -68,7 +69,7 @@ function submit() {
 
 <template>
 	<div>
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-2">
 				<Button
 					variant="ghost"
@@ -91,7 +92,7 @@ function submit() {
 					<span class="shrink-0 text-ink-gray-9">Settings</span>
 				</nav>
 			</div>
-		</PageHeader>
+		</AppPageHeader>
 
 		<div class="body-container pt-5 pb-40">
 			<div class="flex max-w-2xl flex-col gap-5">

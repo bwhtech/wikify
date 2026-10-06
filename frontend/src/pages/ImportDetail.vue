@@ -5,7 +5,6 @@ import {
 	Badge,
 	Button,
 	Dropdown,
-	PageHeader,
 	Progress,
 	TabButtons,
 	Tabs,
@@ -16,6 +15,7 @@ import {
 	useDoc,
 	useList,
 } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import { useSocket } from "@/socket";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
@@ -23,6 +23,7 @@ import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
 import { setDocument, setProject } from "@/data/agentContext";
+import { recordRecent } from "@/data/commandPalette";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -121,6 +122,19 @@ watch(
 		else if (projectChip) setProject(projectChip);
 	},
 	{ immediate: true }
+);
+
+watch(
+	() => imp.doc?.import_title,
+	(label) =>
+		label &&
+		recordRecent({
+			kind: "import",
+			name: props.name,
+			label,
+			sub: imp.doc.project_name,
+			project: imp.doc.project,
+		})
 );
 
 const pageReview = ref(null);
@@ -229,7 +243,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 
 <template>
 	<div>
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-2 sm:gap-3">
 				<Button
 					variant="ghost"
@@ -269,44 +283,45 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					>{{ imp.doc?.stage_label }}</span
 				>
 			</div>
-
-			<div class="flex shrink-0 items-center gap-2 pl-2">
-				<Button
-					v-if="imp.doc?.source_document"
-					variant="subtle"
-					v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
-					:route="{ name: 'ImportGraph', params: { name: props.name } }"
-				/>
-				<Dropdown
-					v-if="canRemediate || canReclassify"
-					:options="[
-						{
-							label: 'Remediate flagged',
-							onClick: () => runRemediation('flagged'),
-							condition: () => canRemediate,
-						},
-						{
-							label: 'Remediate all pages',
-							onClick: () => runRemediation('all'),
-							condition: () => canRemediate,
-						},
-						{
-							label: 'Reclassify sections',
-							onClick: confirmReclassify,
-							condition: () => canReclassify,
-						},
-					]"
-				>
+			<template #actions>
+				<div class="flex shrink-0 items-center gap-2 pl-2">
 					<Button
-						variant="solid"
-						theme="gray"
-						v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
-						:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
-						:loading="remediate.loading"
+						v-if="imp.doc?.source_document"
+						variant="subtle"
+						v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
+						:route="{ name: 'ImportGraph', params: { name: props.name } }"
 					/>
-				</Dropdown>
-			</div>
-		</PageHeader>
+					<Dropdown
+						v-if="canRemediate || canReclassify"
+						:options="[
+							{
+								label: 'Remediate flagged',
+								onClick: () => runRemediation('flagged'),
+								condition: () => canRemediate,
+							},
+							{
+								label: 'Remediate all pages',
+								onClick: () => runRemediation('all'),
+								condition: () => canRemediate,
+							},
+							{
+								label: 'Reclassify sections',
+								onClick: confirmReclassify,
+								condition: () => canReclassify,
+							},
+						]"
+					>
+						<Button
+							variant="solid"
+							theme="gray"
+							v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
+							:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
+							:loading="remediate.loading"
+						/>
+					</Dropdown>
+				</div>
+			</template>
+		</AppPageHeader>
 
 		<Tabs v-model="activeTab" :tabs="tabs">
 			<template #tab-panel="{ tab }">
