@@ -132,6 +132,92 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual(secs[0].title, "Preamble")
 		self.assertEqual(secs[0].level, 1)
 
+	def test_content_before_the_first_heading_is_kept(self):
+		pages = [
+			(
+				1,
+				"- ✓ Concessions of Rs 2,500 are discussed.\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n## 5.7 Billing\nbill body",
+			),
+		]
+		secs = sectionize(pages)
+		self.assertEqual((secs[0].title, secs[0].hierarchy_path), ("Preamble", ["Preamble"]))
+		self.assertIn("Concessions of Rs 2,500", secs[0].markdown)
+		self.assertIn("| 1 | 2 |", secs[0].markdown)
+		self.assertEqual(secs[1].hierarchy_path, ["5.7 Billing"])
+
+	def test_running_sub_header_variants_fold_into_the_open_section(self):
+		running = "## 5.8 Policies on patient care"
+		pages = [
+			(1, f"{running}\n### 5.8.1 Chaperone\na\n{running}\n### 5.8.2 Antibiotics\nb"),
+			(2, f"{running}\n### 5.8.3 Pain\nc"),
+			(3, f"{running}\n### 5.8.4 Sedation\nd\n## 5.8Policies on patient care\n### 5.8.5 Restraints\ne"),
+		]
+		secs = sectionize(clean_pages(pages))
+		self.assertEqual([s.title for s in secs].count("5.8 Policies on patient care"), 1)
+		self.assertEqual(secs[0].title, "5.8 Policies on patient care")
+		self.assertTrue(all(s.hierarchy_path[0] == "5.8 Policies on patient care" for s in secs))
+
+	def test_repeated_chapter_title_with_another_number_or_plural_is_not_a_new_section(self):
+		protocols = [
+			(1, "# 6.1 PROTOCOLS FOR MANAGEMENT\n## 6.1.1 IgA nephropathy\na"),
+			(2, "# 6. PROTOCOLS FOR MANAGEMENT\n## 6.1.2 Lupus nephritis\n#### Hydroxychloroquine.\nb"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(protocols)}
+		self.assertNotIn("6. PROTOCOLS FOR MANAGEMENT", paths)
+		self.assertEqual(
+			paths["6.1.2 Lupus nephritis"], ["6.1 PROTOCOLS FOR MANAGEMENT", "6.1.2 Lupus nephritis"]
+		)
+		self.assertIn("Hydroxychloroquine", paths)
+
+		jobs = [
+			(1, "# 3. JOB DESCRIPTIONS\n## 3.1 Head\na"),
+			(2, "## 3. JOB DESCRIPTION\n## 3.2 Unit head\nb"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(jobs)}
+		self.assertNotIn("3. JOB DESCRIPTION", paths)
+		self.assertEqual(paths["3.2 Unit head"], ["3. JOB DESCRIPTIONS", "3.2 Unit head"])
+
+	def test_bold_line_continuing_the_numbering_is_a_heading(self):
+		pages = [
+			(
+				1,
+				"## 5.8.6 Blood Donation\na\n### 5.8.6.2 Donor criteria\nb\n"
+				"**5.8.6.3 Requesting blood from blood bank**\n**For use in ward**\nc\n"
+				"**5.8.6.4 For use in OR**\nd\n**1. Not a heading**\ne",
+			)
+		]
+		secs = sectionize(pages)
+		self.assertEqual(
+			[(s.title, s.level) for s in secs],
+			[
+				("5.8.6 Blood Donation", 3),
+				("5.8.6.2 Donor criteria", 4),
+				("5.8.6.3 Requesting blood from blood bank", 4),
+				("5.8.6.4 For use in OR", 4),
+			],
+		)
+		self.assertNotIn("Requesting blood", secs[1].markdown)
+		self.assertIn("**For use in ward**", secs[2].markdown)
+		self.assertIn("**1. Not a heading**", secs[3].markdown)
+
+	def test_unnumbered_heading_never_parents_a_numbered_heading(self):
+		pages = [(1, "# Contraindications\na\n# 5.8.4.2 Patient Assessment\nb\n### 5.8.5 Restraints\nc")]
+		paths = {s.title: s.hierarchy_path for s in sectionize(pages)}
+		self.assertEqual(paths["5.8.4.2 Patient Assessment"], ["5.8.4.2 Patient Assessment"])
+		self.assertEqual(paths["5.8.5 Restraints"], ["5.8.5 Restraints"])
+
+	def test_numbered_list_headings_nest_under_a_deep_numbered_section(self):
+		pages = [
+			(1, "#### 5.9.2.2 Staff tested for HIV\na\n# 1. Drug Regimen\nb\n# 2. Testing for HBsAg\nc"),
+			(2, "# 6.1 PROTOCOLS\n## 6.1.1 IgA nephropathy\nd"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(pages)}
+		self.assertEqual(paths["1. Drug Regimen"], ["5.9.2.2 Staff tested for HIV", "1. Drug Regimen"])
+		self.assertEqual(
+			paths["2. Testing for HBsAg"], ["5.9.2.2 Staff tested for HIV", "2. Testing for HBsAg"]
+		)
+		self.assertEqual(paths["6.1.1 IgA nephropathy"], ["6.1 PROTOCOLS", "6.1.1 IgA nephropathy"])
+
 	def test_emphasis_is_stripped_from_heading_titles(self):
 		pages = [
 			(1, "## _**Verbal Orders**_\nbody"),

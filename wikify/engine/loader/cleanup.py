@@ -35,6 +35,9 @@ _PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
 _SENTENCE_START = re.compile(r"^[a-z]")
 # A sentence cut by a page break ran to the page edge, so its last line is never a short label.
 _MIN_BROKEN_LINE_LENGTH = 40
+# A numbered heading repeated as a running sub-header is still the real section start on its first
+# page; the sectionizer folds the repeats, so stripping them here would lose the section itself.
+_NUMBERED_HEADING = re.compile(r"^\s*#{1,6}\s+[*_]*\d+(?:\.\d+)*\.?\s*[A-Za-z]")
 
 
 def _norm(line: str) -> str:
@@ -103,7 +106,8 @@ def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> li
 		kept = [
 			line
 			for line in md.splitlines()
-			if not (_norm(line) and _norm(line) in boilerplate) and not _is_varying(line)
+			if not (_norm(line) and _norm(line) in boilerplate and not _NUMBERED_HEADING.match(line))
+			and not _is_varying(line)
 		]
 		out.append((pno, _strip_page_residue(_strip_footer_blocks("\n".join(kept)))))
 	return out
