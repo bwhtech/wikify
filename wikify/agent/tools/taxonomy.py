@@ -99,10 +99,7 @@ TOOLS = [
 	Tool(
 		name="rename_section_type",
 		side="server",
-		description=(
-			"Change a Section Type's human label. The machine key stays, so every section "
-			"tagged with it keeps the type. The user must confirm before it runs."
-		),
+		description="Change a Section Type's label; its key stays, so tagged sections keep it. Needs user confirmation.",
 		parameters={
 			"type": "object",
 			"properties": {
@@ -119,11 +116,7 @@ TOOLS = [
 	Tool(
 		name="merge_section_types",
 		side="server",
-		description=(
-			"Move every section tagged `source` to `target`, then delete `source` from the "
-			"taxonomy. Also the way to delete a type: its sections need a replacement type. "
-			"The user must confirm before it runs."
-		),
+		description="Move every section tagged `source` to `target`, then delete `source`. Also how to delete a type. Needs user confirmation.",
 		parameters={
 			"type": "object",
 			"properties": {
