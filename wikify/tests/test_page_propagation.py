@@ -120,10 +120,9 @@ class TestPagePropagation(FrappeTestCase):
 		self.assertEqual(events.take_dirty_pages(self.source_document.name), [1, 2, 3, 4])
 
 	def test_a_pass_that_rebuilds_the_tree_itself_suspends_page_invalidation(self):
-		with invalidation_live(), patch("frappe.enqueue") as enqueue:
-			with events.suspended_indexing():
-				for page_no in range(1, 5):
-					self.save_canonical(page_no, f"canonical page {page_no} — bulk")
+		with invalidation_live(), patch("frappe.enqueue") as enqueue, events.suspended_indexing():
+			for page_no in range(1, 5):
+				self.save_canonical(page_no, f"canonical page {page_no} — bulk")
 
 		enqueue.assert_not_called()
 		self.assertEqual(events.take_dirty_pages(self.source_document.name), [])
@@ -301,9 +300,12 @@ class TestSectionInvalidation(FrappeTestCase):
 
 	def test_a_bulk_pass_that_rebuilds_the_tree_itself_reindexes_nothing_per_section(self):
 		section = self.section_named("1. Alpha")
-		with invalidation_live(), patch("wikify.rag.index.upsert_sections") as upsert:
-			with events.suspended_indexing():
-				store.set_section_markdown(section, "written inside a bulk pass")
+		with (
+			invalidation_live(),
+			patch("wikify.rag.index.upsert_sections") as upsert,
+			events.suspended_indexing(),
+		):
+			store.set_section_markdown(section, "written inside a bulk pass")
 
 		upsert.assert_not_called()
 

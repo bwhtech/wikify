@@ -72,7 +72,7 @@ class Section:
 	section_type: str | None = None
 
 
-def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = None) -> list[Section]:
+def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = None) -> list[Section]:  # noqa: C901
 	level_map = level_map or {}
 	sections: list[Section] = []
 	stack: list[tuple[int, str, bool]] = []

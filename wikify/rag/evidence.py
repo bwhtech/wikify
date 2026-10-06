@@ -48,7 +48,7 @@ NOT_LOCATED = {
 FIGURES_DIFFER = "quote misstates a figure in the cited source"
 
 
-def normalise(text: str) -> tuple[str, list[int]]:
+def normalise(text: str) -> tuple[str, list[int]]:  # noqa: C901
 	normalised: list[str] = []
 	offsets: list[int] = []
 	source = text or ""

@@ -207,9 +207,8 @@ class TestAgent(FrappeTestCase):
 	def test_run_rejects_when_already_running(self):
 		sess = session.get_or_create(None, user="Administrator", scope="global")
 		session.set_running(sess.name, True)
-		with patch("frappe.enqueue"):
-			with self.assertRaises(frappe.ValidationError):
-				agent_api.run(prompt="hello", session_id=sess.name)
+		with patch("frappe.enqueue"), self.assertRaises(frappe.ValidationError):
+			agent_api.run(prompt="hello", session_id=sess.name)
 
 	def test_run_enqueues_and_returns_ids(self):
 		with patch("frappe.enqueue") as enq:

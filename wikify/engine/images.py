@@ -86,12 +86,11 @@ def embed_genuine_images(page, markdown: str, source_document: str, page_no: int
 	# Case 1: genuine-graphic placeholders (omitted, no "picture text"), matched in order.
 	genuine = [m for m in _OMIT_RE.finditer(markdown) if not _is_text_image(markdown, m.end())]
 	if genuine:
-		out, cursor, idx = [], 0, 0
-		for m in genuine:
+		out, cursor = [], 0
+		for idx, m in enumerate(genuine):
 			out.append(markdown[cursor : m.start()])
 			url = _save_png(page, imgs[idx], source_document, page_no, idx) if idx < len(imgs) else None
-			idx += 1
-			out.append(f"![Figure {page_no}.{idx}]({url})" if url else m.group(0))
+			out.append(f"![Figure {page_no}.{idx + 1}]({url})" if url else m.group(0))
 			cursor = m.end()
 		out.append(markdown[cursor:])
 		return "".join(out)

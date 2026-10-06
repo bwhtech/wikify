@@ -174,7 +174,7 @@ class AgentRunner:
 
 	# --- one round --------------------------------------------------------------------
 
-	def _run_round(self, messages: list[dict]) -> bool:
+	def _run_round(self, messages: list[dict]) -> bool:  # noqa: C901
 		"""Stream one completion. Returns True when the turn is finished."""
 		tools = list(self.registry.values())
 		assistant_msg = session.append_message(self.session_id, "assistant", "", status="streaming")

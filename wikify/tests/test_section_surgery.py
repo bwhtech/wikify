@@ -252,9 +252,11 @@ class TestReplaceSectionsIsAtomic(FrappeTestCase):
 				raise frappe.ValidationError("insert blew up mid-rebuild")
 			return real_insert(self, *args, **kwargs)
 
-		with patch.object(frappe.model.document.Document, "insert", insert_but_fail_on_the_third):
-			with self.assertRaises(frappe.ValidationError):
-				store.replace_sections(self.source_document.name, replacement)
+		with (
+			patch.object(frappe.model.document.Document, "insert", insert_but_fail_on_the_third),
+			self.assertRaises(frappe.ValidationError),
+		):
+			store.replace_sections(self.source_document.name, replacement)
 
 		self.assertEqual(self.titles(), ["1. Alpha", "2. Beta", "3. Gamma"])
 

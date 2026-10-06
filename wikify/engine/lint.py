@@ -57,7 +57,7 @@ def _table_blocks(lines: list[str]):
 			i += 1
 
 
-def lint_markdown(markdown: str) -> list[dict]:
+def lint_markdown(markdown: str) -> list[dict]:  # noqa: C901
 	"""Structural issues as [{code, line, message}] (1-based lines), capped at
 	MAX_ISSUES. Empty list for clean (or empty) markdown."""
 	issues: list[dict] = []
