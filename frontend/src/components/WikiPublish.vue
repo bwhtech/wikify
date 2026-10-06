@@ -6,6 +6,7 @@ import {
 	Dialog,
 	FormControl,
 	TabButtons,
+	Tree,
 	dialog,
 	useCall,
 	useList,
@@ -79,6 +80,12 @@ watch(open, (isOpen) => {
 const hasSectionsToPublish = computed(
 	() => (preview.data?.pages ?? 0) + (preview.data?.groups ?? 0) > 0
 );
+const previewSummary = computed(() => {
+	const { pages = 0, groups = 0 } = preview.data || {};
+	return `${pages} ${pages === 1 ? "page" : "pages"} · ${groups} ${
+		groups === 1 ? "group" : "groups"
+	}`;
+});
 
 // Generate / regenerate.
 const generate = useCall({
@@ -199,6 +206,29 @@ const wikiUrl = computed(() => currentSpace.value && `/${currentSpace.value.rout
 						v-model="newRoute"
 					/>
 				</template>
+
+				<div v-if="hasSectionsToPublish" class="mt-5">
+					<div class="mb-2 flex flex-wrap items-center gap-2">
+						<span class="text-sm font-medium text-ink-gray-8">Pages to publish</span>
+						<Badge :label="previewSummary" theme="gray" variant="subtle" size="sm" />
+						<Badge
+							v-if="preview.data.excluded"
+							:label="`${preview.data.excluded} excluded`"
+							theme="orange"
+							variant="subtle"
+							size="sm"
+						/>
+					</div>
+					<div class="max-h-64 overflow-auto rounded border border-outline-gray-1 p-1">
+						<Tree :nodes="preview.data.tree" node-key="name">
+							<template #item-label="{ node }">
+								<span class="truncate text-sm text-ink-gray-8">{{
+									node.title
+								}}</span>
+							</template>
+						</Tree>
+					</div>
+				</div>
 
 				<div class="mt-5 flex items-center gap-2">
 					<Button
