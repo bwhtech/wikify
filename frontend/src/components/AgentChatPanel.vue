@@ -383,14 +383,16 @@ function onKeydown(e) {
 							/>
 							<span>{{ m.content }}</span>
 						</div>
-						<div v-if="m.options?.length" class="mt-2.5 flex flex-wrap gap-1.5">
-							<Button
+						<div v-if="m.options?.length" class="mt-2.5 flex flex-col gap-1.5">
+							<button
 								v-for="opt in m.options"
 								:key="opt"
-								variant="outline"
-								:label="opt"
+								type="button"
+								class="rounded border border-outline-gray-2 bg-surface-base px-2 py-1.5 text-left text-base text-ink-gray-8 transition-colors hover:border-outline-gray-3 active:bg-surface-gray-4"
 								@click="chat.selectClarifyOption(opt)"
-							/>
+							>
+								{{ opt }}
+							</button>
 						</div>
 					</div>
 
