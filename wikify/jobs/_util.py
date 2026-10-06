@@ -11,6 +11,12 @@ import json
 
 import frappe
 
+IMPORT_JOB_TIMEOUT = 6 * 60 * 60
+
+
+def import_job_id(import_name: str) -> str:
+	return f"wikify_import:{import_name}"
+
 
 def project_context(import_doc) -> str:
 	"""The owning project's steering `context_prompt` (blank when unset).

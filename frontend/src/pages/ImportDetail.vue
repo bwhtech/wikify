@@ -85,7 +85,9 @@ const sortedLogs = computed(() =>
 );
 
 const status = computed(() => imp.doc?.status);
-const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
+const canRemediate = computed(
+	() => ["Review", "Failed"].includes(status.value) && !!imp.doc?.source_document
+);
 const canReclassify = computed(
 	() => !!imp.doc?.source_document && ["Review", "Graphed", "Stopped"].includes(status.value)
 );

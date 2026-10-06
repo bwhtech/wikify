@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
+from frappe.utils.background_jobs import is_job_enqueued
 
 from wikify.agent.context import Ctx
 from wikify.agent.registry import Tool
 from wikify.engine import store
 from wikify.engine.store import get_import_pdf_path
+from wikify.jobs._util import IMPORT_JOB_TIMEOUT, import_job_id
 
 
 def _project_context(ctx: Ctx) -> str:
@@ -147,11 +149,14 @@ def _reparse_document(ctx: Ctx, args: dict) -> str:
 	import_name = ctx.default_import(args.get("source_document"))
 	if not import_name:
 		return _("No document specified. Open a document or pass `source_document`.")
+	if is_job_enqueued(import_job_id(import_name)):
+		return _("{0} is still being processed. Try again once it finishes.").format(import_name)
 	instruction = (args.get("instruction") or "").strip()
 	frappe.enqueue(
 		"wikify.jobs.remediate.run",
 		queue="long",
-		timeout=3600,
+		timeout=IMPORT_JOB_TIMEOUT,
+		job_id=import_job_id(import_name),
 		import_name=import_name,
 		scope="all",
 		instruction=instruction,
