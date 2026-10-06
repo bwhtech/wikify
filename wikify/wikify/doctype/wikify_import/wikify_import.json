@@ -126,7 +126,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-19 00:00:00",
+ "modified": "2026-10-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Wikify Import",
@@ -146,6 +146,7 @@
    "write": 1
   }
  ],
+ "search_fields": "import_title,project_name",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

@@ -106,16 +106,34 @@ def ask(
 		if cached:
 			result = replay_cached_answer(cached, publish, spend)
 		else:
-			result = rag_answer.answer(
-				question,
-				project=project,
-				history=history,
-				rerank=rerank_enabled,
-				allowed_projects=readable,
-				decided=decided,
-				on_citations=lambda citations: publish({"citations": citations}),
-				on_delta=lambda delta: publish({"delta": delta}),
-			)
+			try:
+				result = rag_answer.answer(
+					question,
+					project=project,
+					history=history,
+					rerank=rerank_enabled,
+					allowed_projects=readable,
+					decided=decided,
+					on_citations=lambda citations: publish({"citations": citations}),
+					on_delta=lambda delta: publish({"delta": delta}),
+				)
+			except frappe.ValidationError:
+				raise
+			except Exception as exception:
+				frappe.log_error(title="Wikify: could not generate the answer")
+				# The failed request rolls back, which would take the Error Log with it.
+				frappe.db.commit()
+				if getattr(exception, "status_code", None) == 402:
+					frappe.throw(
+						_(
+							"The answer couldn't be generated: the model provider needs more API credits. Add credits and try again."
+						)
+					)
+				frappe.throw(
+					_(
+						"The answer couldn't be generated: the language model call failed. Try again in a moment."
+					)
+				)
 			if not result["refused"]:
 				answer_cache.set(key, result)
 			result["cached"] = False

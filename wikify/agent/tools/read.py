@@ -10,6 +10,7 @@ from wikify.agent.context import Ctx
 from wikify.agent.registry import Tool
 
 _BODY_LIMIT = 6000
+HISTORY_MATCHES = 5
 _WORD_SEPARATOR = re.compile(r"[^a-z0-9]+")
 
 
@@ -34,7 +35,7 @@ def render_tree(source_document: str) -> str:
 		if start:
 			pages = f" [p.{start}]" if not end or end == start else f" [p.{start}-{end}]"
 		stype = f" ({node['section_type']})" if node.get("section_type") else ""
-		lines.append(f"{indent}- {node.get('title') or '(untitled)'}{stype}{pages} <{node['name']}>")
+		lines.append(f"{indent}- {node.get('title') or '(untitled)'}{stype}{pages} `{node['name']}`")
 		for child in node.get("children", []):
 			walk(child, depth + 1)
 
@@ -56,7 +57,7 @@ def _read_tree(ctx: Ctx, args: dict) -> str:
 def _read_section(ctx: Ctx, args: dict) -> str:
 	name = args.get("name")
 	if not name:
-		return _("Provide the section `name` (the id shown in <angle brackets> in the tree).")
+		return _("Provide the section `name` (the id shown in backticks in the tree).")
 	row = frappe.db.get_value(
 		"Source Section",
 		name,
@@ -139,7 +140,7 @@ def format_section_groups(groups: list[dict]) -> str:
 		lines.append(f"# {group['doc_title']} ({group['source_document']})")
 		for section in group["sections"]:
 			pages = f" [p.{section['page_start']}-{section['page_end']}]" if section.get("page_start") else ""
-			lines.append(f"  - {section['hierarchy_path'] or section['title']}{pages} <{section['name']}>")
+			lines.append(f"  - {section['hierarchy_path'] or section['title']}{pages} `{section['name']}`")
 	return "\n".join(lines)
 
 
@@ -262,7 +263,10 @@ def _read_wiki_page(ctx: Ctx, args: dict) -> str:
 		return _("Provide the section `name`.")
 	sec = frappe.db.get_value("Source Section", name, ["title", "markdown", "wiki_document"], as_dict=True)
 	if not sec:
-		return _("Section {0} not found.").format(name)
+		return _(
+			"Section {0} not found. read_wiki_page takes a Source Section id from read_tree, not a "
+			"document or import id; this says nothing about whether the wiki is published."
+		).format(name)
 	if not sec.wiki_document or not frappe.db.exists("Wiki Document", sec.wiki_document):
 		return _(
 			"'{0}' has no generated wiki page yet. The wiki preview still works; generate the "
@@ -282,6 +286,36 @@ def _read_wiki_page(ctx: Ctx, args: dict) -> str:
 		"",
 	]
 	return "\n".join(meta) + _truncate(wd.content or "(empty)")
+
+
+def read_history(ctx: Ctx, args: dict) -> str:
+	call_id = (args.get("call_id") or "").strip()
+	query = (args.get("query") or "").strip()
+	tool_name = (args.get("tool_name") or "").strip()
+	if not (call_id or query or tool_name):
+		return _("Pass `call_id`, `query` or `tool_name`.")
+	filters = {"session": ctx.session}
+	if call_id:
+		filters["tool_call_id"] = call_id
+	if query:
+		filters["content"] = ("like", f"%{query}%")
+	if tool_name:
+		filters["tool_name"] = tool_name
+	rows = frappe.get_all(
+		"Wikify Agent Message",
+		filters=filters,
+		fields=["role", "tool_name", "tool_call_id", "content"],
+		order_by="creation desc",
+		limit=HISTORY_MATCHES,
+	)
+	if not rows:
+		return _("No earlier message in this conversation matches.")
+	return "\n\n".join(
+		f"{row.role} ({row.tool_name}, call_id {row.tool_call_id}):\n{_truncate(row.content)}"
+		if row.tool_name
+		else f"{row.role}:\n{_truncate(row.content)}"
+		for row in rows
+	)
 
 
 TOOLS = [
@@ -308,7 +342,7 @@ TOOLS = [
 	Tool(
 		name="read_section",
 		side="server",
-		description="Read one section's markdown body and metadata. Pass the section id (shown in <angle brackets> in the tree).",
+		description="Read one section's markdown body and metadata. Pass the section id (shown in backticks in the tree).",
 		parameters={
 			"type": "object",
 			"properties": {
@@ -405,5 +439,24 @@ TOOLS = [
 			},
 		},
 		handler=_search_sections,
+	),
+	Tool(
+		name="read_history",
+		side="server",
+		# nosemgrep
+		description=(
+			"Search earlier messages of this conversation, including tool results that were "
+			"cleared from the history to save space. Pass the `call_id` from a cleared note, "
+			"or a `query` and/or `tool_name`. Returns the newest {0} matches."
+		).format(HISTORY_MATCHES),
+		parameters={
+			"type": "object",
+			"properties": {
+				"call_id": {"type": "string", "description": "Tool call id from a cleared result note."},
+				"query": {"type": "string", "description": "Text to find in earlier messages."},
+				"tool_name": {"type": "string", "description": "Only results of this tool."},
+			},
+		},
+		handler=read_history,
 	),
 ]

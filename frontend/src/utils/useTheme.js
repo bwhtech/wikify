@@ -1,6 +1,11 @@
 import { ref } from "vue";
 
 const STORAGE_KEY = "wikify-theme";
+export const THEMES = [
+	{ value: "light", label: "Light", icon: "lucide-sun" },
+	{ value: "dark", label: "Dark", icon: "lucide-moon" },
+	{ value: "system", label: "System", icon: "lucide-monitor" },
+];
 const currentTheme = ref("light"); // the stored mode: 'light' | 'dark' | 'system'
 const resolvedTheme = ref("light"); // what's actually applied: 'light' | 'dark'
 
@@ -27,7 +32,7 @@ export function useTheme() {
 
 	function initializeTheme() {
 		const stored = localStorage.getItem(STORAGE_KEY);
-		setTheme(["light", "dark", "system"].includes(stored) ? stored : "system");
+		setTheme(THEMES.some((t) => t.value === stored) ? stored : "system");
 	}
 
 	return { currentTheme, resolvedTheme, setTheme, toggleTheme, initializeTheme };

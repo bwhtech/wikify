@@ -43,6 +43,8 @@ _TOOL_LAYERS = {
 	"split_section": ["tree"],
 	"merge_sections": ["tree"],
 	"create_section_type": ["taxonomy"],
+	"rename_section_type": ["taxonomy"],
+	"merge_section_types": ["taxonomy", "tree"],
 }
 
 # No-op guard (Builder's `claims_unbacked_action`): the model narrates a mutating action
@@ -103,6 +105,8 @@ class AgentRunner:
 		# Mutations queue up per turn and flush as ONE aggregated event when the answer
 		# lands (or at a confirm pause / error) — 0.4 slice 25.
 		self._pending_mutations: list[dict] = []
+		self._turn_write_results: list[str] = []
+		self._turn_read_count = 0
 		self.ctx = Ctx(
 			session=session_id,
 			user=user,
@@ -118,7 +122,8 @@ class AgentRunner:
 		frappe.publish_realtime(f"{event}:{self.session_id}", payload, user=self.user)
 
 	def _cancelled(self) -> bool:
-		return bool(frappe.cache().get_value(cancel_key(self.session_id)))
+		# Stop is set by a web request; the job's request-local cache would keep the first read.
+		return bool(frappe.cache().get_value(cancel_key(self.session_id), use_local_cache=False))
 
 	def _clear_cancel(self) -> None:
 		frappe.cache().delete_value(cancel_key(self.session_id))
@@ -136,8 +141,20 @@ class AgentRunner:
 				done = self._run_round(messages)
 				if done:
 					return
-			# Ran out of rounds without a final answer.
-			self._emit_error(_("The assistant took too many steps without finishing."))
+			# Ran out of rounds without a final answer; this turn's writes are already committed.
+			blocks = [_("I stopped after {0} steps before finishing.").format(MAX_ROUNDS)]
+			if self._turn_write_results:
+				blocks.append(
+					_("What I did so far:")
+					+ "\n"
+					+ "\n".join(f"- {result}" for result in self._turn_write_results)
+				)
+			else:
+				blocks.append(_("Nothing was changed yet."))
+			if self._turn_read_count:
+				blocks.append(_("Read-only lookups: {0}.").format(self._turn_read_count))
+			blocks.append(_("Ask me to continue for the rest."))
+			self._emit_error("\n\n".join(blocks))
 		except Exception as exception:
 			frappe.log_error(title="Wikify agent run failed")
 			frappe.db.delete(
@@ -255,6 +272,7 @@ class AgentRunner:
 		for call in ordered:
 			result = self._run_tool(call)
 			messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
+		session.clear_old_tool_results(messages)
 		return False
 
 	def _accumulate_tool_call(self, acc: dict[int, dict], tcd) -> None:
@@ -286,9 +304,10 @@ class AgentRunner:
 			# The user is about to look at the screen to decide — flush what's applied so
 			# far so the views behind the confirm card are current.
 			self._flush_mutations()
+			summary = tool.confirm_summary(args) if tool.confirm_summary else tool.description
 			self._emit(
 				"wikify_agent_confirm",
-				{"name": name, "args": args, "call_id": call["id"], "summary": tool.description},
+				{"name": name, "args": args, "call_id": call["id"], "summary": summary},
 			)
 			result = _(
 				"[NOT EXECUTED — awaiting user confirmation] This is an expensive/destructive "
@@ -305,9 +324,12 @@ class AgentRunner:
 				result = tool.handler(self.ctx, args)
 				if tool.mutates:
 					self._turn_mutated = True
+					self._turn_write_results.append(result)
 					# Commit now (durability + confirm-gating rely on it) but queue the
 					# frontend signal — open views refresh once, when the answer lands.
 					self._record_mutation(name)
+				else:
+					self._turn_read_count += 1
 			except Exception:
 				frappe.log_error(title=f"Wikify agent tool failed: {name}")
 				result = _("Tool {0} failed: {1}").format(name, frappe.get_traceback(with_context=False))

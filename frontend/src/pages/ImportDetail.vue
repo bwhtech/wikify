@@ -5,15 +5,17 @@ import {
 	Badge,
 	Button,
 	Dropdown,
-	PageHeader,
 	Progress,
 	TabButtons,
 	Tabs,
+	dialog,
 	dayjs,
+	toast,
 	useCall,
 	useDoc,
 	useList,
 } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import { useSocket } from "@/socket";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
@@ -21,6 +23,7 @@ import { statusTheme, isActive } from "@/utils/status";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
 import { setDocument, setProject } from "@/data/agentContext";
+import { recordRecent } from "@/data/commandPalette";
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -82,6 +85,30 @@ const sortedLogs = computed(() =>
 
 const status = computed(() => imp.doc?.status);
 const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
+const canReclassify = computed(
+	() => !!imp.doc?.source_document && ["Review", "Graphed", "Stopped"].includes(status.value)
+);
+const reclassify = useCall({
+	url: "/api/v2/method/wikify.api.imports.reclassify",
+	method: "POST",
+	immediate: false,
+});
+function confirmReclassify() {
+	dialog.confirm({
+		title: "Reclassify sections",
+		message:
+			"Reclassify all sections? This runs the AI on every section and uses API credits.",
+		confirmLabel: "Reclassify",
+		async onConfirm() {
+			await reclassify.submit({ import_name: props.name });
+			if (reclassify.error) {
+				throw new Error(
+					reclassify.error?.messages?.[0] || "Could not start reclassification"
+				);
+			}
+		},
+	});
+}
 
 // Attach the document (with its project) as the agent's default context. Keyed on the
 // source_document id so reloads (progress ticks) don't reset a page/section selection.
@@ -95,6 +122,19 @@ watch(
 		else if (projectChip) setProject(projectChip);
 	},
 	{ immediate: true }
+);
+
+watch(
+	() => imp.doc?.import_title,
+	(label) =>
+		label &&
+		recordRecent({
+			kind: "import",
+			name: props.name,
+			label,
+			sub: imp.doc.project_name,
+			project: imp.doc.project,
+		})
 );
 
 const pageReview = ref(null);
@@ -131,7 +171,9 @@ const socket = useSocket();
 function onProgress(payload) {
 	if (payload.import !== props.name || !imp.doc) return;
 	const wasRemediating = imp.doc.status === "Remediating";
+	const statusChanged = payload.status && payload.status !== imp.doc.status;
 	imp.doc.stage_progress = payload.percent;
+	imp.doc.stage_label = payload.stage_label;
 	if (payload.status) imp.doc.status = payload.status;
 	// Terminal transitions carry fields set server-side (source_document, wiki_space, error).
 	if (["Review", "Failed", "Completed", "Graphed", "Stopped"].includes(payload.status)) {
@@ -145,6 +187,8 @@ function onProgress(payload) {
 		// mounted tree still holds the pre-publish (empty) values until refetched.
 		if (payload.status === "Completed") sectionTree.value?.reload();
 		sdStats.reload();
+	} else if (statusChanged) {
+		imp.reload();
 	}
 }
 function onLog(payload) {
@@ -171,15 +215,27 @@ function onAgentMutation(payload) {
 	sectionTree.value?.reload();
 	sdStats.reload();
 }
+function onClassifyDone(payload) {
+	if (payload.import !== props.name) return;
+	if (payload.error) {
+		toast.error("Reclassification failed");
+		return;
+	}
+	toast.success("Sections reclassified");
+	sectionTree.value?.reload();
+	sdStats.reload();
+}
 onMounted(() => {
 	socket?.on("wikify_import_progress", onProgress);
 	socket?.on("wikify_import_log", onLog);
 	socket?.on("wikify_agent_mutation", onAgentMutation);
+	socket?.on("wikify_classify_done", onClassifyDone);
 });
 onUnmounted(() => {
 	socket?.off("wikify_import_progress", onProgress);
 	socket?.off("wikify_import_log", onLog);
 	socket?.off("wikify_agent_mutation", onAgentMutation);
+	socket?.off("wikify_classify_done", onClassifyDone);
 });
 
 const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "text-ink-red-6" };
@@ -187,7 +243,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 
 <template>
 	<div>
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-2 sm:gap-3">
 				<Button
 					variant="ghost"
@@ -227,31 +283,45 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					>{{ imp.doc?.stage_label }}</span
 				>
 			</div>
-
-			<div class="flex shrink-0 items-center gap-2 pl-2">
-				<Button
-					v-if="imp.doc?.source_document"
-					variant="subtle"
-					v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
-					:route="{ name: 'ImportGraph', params: { name: props.name } }"
-				/>
-				<Dropdown
-					v-if="canRemediate"
-					:options="[
-						{ label: 'Remediate flagged', onClick: () => runRemediation('flagged') },
-						{ label: 'Remediate all pages', onClick: () => runRemediation('all') },
-					]"
-				>
+			<template #actions>
+				<div class="flex shrink-0 items-center gap-2 pl-2">
 					<Button
-						variant="solid"
-						theme="gray"
-						v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Remediate')"
-						:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
-						:loading="remediate.loading"
+						v-if="imp.doc?.source_document"
+						variant="subtle"
+						v-bind="actionButtonProps(isMobile, 'lucide-waypoints', 'Graph')"
+						:route="{ name: 'ImportGraph', params: { name: props.name } }"
 					/>
-				</Dropdown>
-			</div>
-		</PageHeader>
+					<Dropdown
+						v-if="canRemediate || canReclassify"
+						:options="[
+							{
+								label: 'Remediate flagged',
+								onClick: () => runRemediation('flagged'),
+								condition: () => canRemediate,
+							},
+							{
+								label: 'Remediate all pages',
+								onClick: () => runRemediation('all'),
+								condition: () => canRemediate,
+							},
+							{
+								label: 'Reclassify sections',
+								onClick: confirmReclassify,
+								condition: () => canReclassify,
+							},
+						]"
+					>
+						<Button
+							variant="solid"
+							theme="gray"
+							v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
+							:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
+							:loading="remediate.loading"
+						/>
+					</Dropdown>
+				</div>
+			</template>
+		</AppPageHeader>
 
 		<Tabs v-model="activeTab" :tabs="tabs">
 			<template #tab-panel="{ tab }">

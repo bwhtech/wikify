@@ -6,7 +6,8 @@
  * tab; clicking a document node opens that import.
  */
 import { useRouter } from "vue-router";
-import { Button, PageHeader, useDoc, useList } from "frappe-ui";
+import { Button, useDoc, useList } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import GraphView from "@/components/GraphView.vue";
 
 const props = defineProps({
@@ -46,7 +47,7 @@ function onSelect(node) {
 
 <template>
 	<div class="flex h-full flex-col">
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-3">
 				<Button
 					variant="ghost"
@@ -61,7 +62,7 @@ function onSelect(node) {
 				>
 				<h1 class="shrink-0 text-md text-ink-gray-9">Graph</h1>
 			</div>
-		</PageHeader>
+		</AppPageHeader>
 
 		<div class="min-h-0 flex-1">
 			<GraphView

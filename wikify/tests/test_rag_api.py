@@ -6,7 +6,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
+import litellm
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import now_datetime
 
 from wikify.agent import context as agent_context
 from wikify.agent.registry import build_default_registry
@@ -256,6 +258,42 @@ class TestRagApi(FrappeTestCase):
 		self.assertEqual(result["sections"], 4)
 		self.assertFalse(result["stale"])
 
+	def ask_with_failing_model(self, exception):
+		started = now_datetime()
+		decided = rag_router.Route("hybrid", None, "what does the handbook say about leave", "r")
+		with (
+			patch.object(api_rag, "route_question", return_value=decided),
+			patch.object(api_rag.rag_answer, "answer", side_effect=exception),
+			patch.object(frappe, "publish_realtime"),
+			patch("frappe.db.commit"),
+			self.assertRaises(frappe.ValidationError) as raised,
+		):
+			api_rag.ask("What does the handbook say about leave?", project=self.project.name)
+		error_logs = frappe.get_all(
+			"Error Log",
+			filters={"method": "Wikify: could not generate the answer", "creation": (">=", started)},
+			pluck="name",
+		)
+		return str(raised.exception), error_logs
+
+	def test_ask_names_missing_credits_and_logs_the_failure(self):
+		exception = litellm.APIError(
+			status_code=402,
+			message='OpenrouterException - {"error": {"message": "This request requires more credits"}}',
+			llm_provider="openrouter",
+			model="openrouter/anthropic/claude-sonnet-4.6",
+		)
+		message, error_logs = self.ask_with_failing_model(exception)
+		self.assertIn("credits", message)
+		self.assertNotIn("OpenrouterException", message)
+		self.assertEqual(len(error_logs), 1)
+
+	def test_ask_reports_a_model_failure_without_leaking_it(self):
+		message, error_logs = self.ask_with_failing_model(RuntimeError("upstream socket reset"))
+		self.assertIn("couldn't be generated", message)
+		self.assertNotIn("socket reset", message)
+		self.assertEqual(len(error_logs), 1)
+
 
 class TestIndexStatsAcl(FrappeTestCase):
 	def test_an_omitted_scope_throws_instead_of_counting_the_whole_site(self):
@@ -389,7 +427,7 @@ class TestRagAgentTool(FrappeTestCase):
 		with patch.object(api_rag, "search", return_value=payload) as search:
 			output = retrieve.semantic_search(Ctx(session="s", user="Administrator"), {"query": "roles"})
 		self.assertFalse(search.call_args.kwargs["use_router"])
-		self.assertIn("<sec-Backend Engineer>", output)
+		self.assertIn("`sec-Backend Engineer`", output)
 
 
 class TestReindexHook(FrappeTestCase):

@@ -18,8 +18,8 @@ import {
 	useCall,
 	useDoc,
 } from "frappe-ui";
-
-const open = defineModel("open", { type: Boolean, default: false });
+import { settings as settingsDialog } from "@/data/settingsRoute";
+import { SETTINGS_TABS } from "@/data/settingsTabs";
 
 // Wikify Settings is a Single — name equals the doctype. System Manager only (enforced
 // by the doctype's permissions), so this dialog leans on the standard document API.
@@ -111,21 +111,18 @@ async function submit() {
 	await settings.reload();
 	toast.success("Settings saved");
 }
-
-const TABS = [
-	{ value: "openrouter", label: "OpenRouter", icon: "lucide-key-round" },
-	{ value: "models", label: "Models", icon: "lucide-cpu" },
-	{ value: "scoring", label: "Scoring", icon: "lucide-gauge" },
-];
-const activeTab = ref(TABS[0].value);
 </script>
 
 <template>
 	<!-- One form spans all panels, so keep hidden panels mounted to preserve edits. -->
-	<SettingsDialog v-model="open" v-model:tab="activeTab" :unmount-on-hide="false">
+	<SettingsDialog
+		v-model="settingsDialog.open"
+		v-model:tab="settingsDialog.tab"
+		:unmount-on-hide="false"
+	>
 		<SettingsSidebar>
 			<SettingsNavGroup label="Wikify">
-				<SettingsNavItem v-for="tab in TABS" :key="tab.value" :value="tab.value">
+				<SettingsNavItem v-for="tab in SETTINGS_TABS" :key="tab.value" :value="tab.value">
 					<template #prefix>
 						<span
 							:class="[tab.icon, 'size-4 shrink-0 text-ink-gray-6']"

@@ -117,10 +117,11 @@ function handleAnswerClick(event) {
 				{{ turn.sources.length ? "Composing the answer…" : "Retrieving sources…" }}
 			</span>
 			<template v-else-if="turn.errorText">
-				<p class="text-ink-gray-7">
+				<p v-if="turn.connectionDropped" class="text-ink-gray-7">
 					The answer was lost in transit — the sources below it were retrieved before the
 					connection dropped.
 				</p>
+				<p v-else class="text-ink-gray-7">{{ turn.errorText }}</p>
 				<Button
 					class="mt-2"
 					variant="subtle"
