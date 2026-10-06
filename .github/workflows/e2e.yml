@@ -1,0 +1,110 @@
+name: E2E
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/e2e.yml
+      - .github/actions/e2e-site/**
+
+jobs:
+  playwright:
+    name: Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+    services:
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+
+      - name: Build and start the site
+        uses: ./.github/actions/e2e-site
+
+      - name: Memory with the site up
+        run: |
+          free -m
+          nohup bash -c 'while true; do free -m | awk "/^Mem:/ {print \$3}" >> ~/memory-used.log; sleep 5; done' > /dev/null 2>&1 &
+
+      - name: Check the Local models backend
+        working-directory: /home/runner/frappe-bench
+        run: |
+          which claude && claude --version
+          enabled=$(bench --site wikify.localhost execute wikify.engine.claude_cli.is_enabled | tail -n 1)
+          has_llm=$(bench --site wikify.localhost execute wikify.engine.llm.has_openrouter | tail -n 1)
+          echo "claude_cli.is_enabled: $enabled"
+          echo "llm.has_openrouter: $has_llm"
+          test "$enabled" = "true" && test "$has_llm" = "true"
+
+      - name: Run login tests (no AI)
+        if: env.CLAUDE_CODE_OAUTH_TOKEN == ''
+        working-directory: frontend
+        run: |
+          echo "::notice title=AI tests skipped::CLAUDE_CODE_OAUTH_TOKEN is not set, so only the login tests ran."
+          npx playwright test -c e2e --project setup --project chromium --no-deps -g "log in|S-01" auth.setup.ts smoke.spec.ts
+
+      - name: Run the full suite
+        if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
+        working-directory: frontend
+        run: npx playwright test -c e2e
+
+      - name: Memory after the tests
+        if: always()
+        run: |
+          free -m
+          echo "Peak used memory (MB): $(sort -n ~/memory-used.log | tail -n 1)"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/e2e/playwright-report
+            frontend/e2e/test-results
+          if-no-files-found: ignore
+
+      - name: Upload bench logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-logs
+          path: /home/runner/frappe-bench/logs/*.log
+          if-no-files-found: ignore
+
+      - name: Report a failed weekly run
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Weekly e2e run failed"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          number=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [ -n "$number" ]; then
+            gh issue comment "$number" -R "$GITHUB_REPOSITORY" --body "Failed again: $url"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "$url"
+          fi

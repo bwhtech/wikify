@@ -1,0 +1,112 @@
+name: E2E site
+description: Build a wikify.localhost bench site with the Local models backend, start it, and prepare Playwright.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.14'
+
+    - name: Setup Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        check-latest: true
+
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml', '**/setup.py', '**/setup.cfg') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          ${{ runner.os }}-
+
+    - name: Get yarn cache directory path
+      id: yarn-cache-dir-path
+      shell: bash
+      run: 'echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT'
+
+    - uses: actions/cache@v4
+      with:
+        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-yarn-
+
+    - name: Install MariaDB Client
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt-get install mariadb-client
+
+    - name: Install Claude Code CLI
+      shell: bash
+      run: |
+        npm install -g @anthropic-ai/claude-code
+        claude --version
+
+    - name: Setup bench
+      shell: bash
+      run: |
+        pip install frappe-bench
+        bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+
+    - name: Install site
+      shell: bash
+      working-directory: /home/runner/frappe-bench
+      env:
+        CI: 'Yes'
+      run: |
+        echo "127.0.0.1 wikify.localhost" | sudo tee -a /etc/hosts
+        bench get-app wiki --branch develop
+        bench get-app wikify $GITHUB_WORKSPACE
+        bench setup requirements --dev
+        bench new-site --db-root-password root --admin-password admin wikify.localhost
+        bench --site wikify.localhost install-app wiki
+        bench --site wikify.localhost install-app wikify
+        bench --site wikify.localhost set-config developer_mode 1
+        bench --site wikify.localhost execute frappe.db.set_single_value --args "['Wikify Settings', 'use_local_models', 1]"
+        bench build
+
+    - name: Start web, worker and socket.io
+      shell: bash
+      working-directory: /home/runner/frappe-bench
+      run: |
+        nohup bench serve --port 8000 --noreload > logs/e2e-web.log 2>&1 &
+        nohup bench worker > logs/e2e-worker.log 2>&1 &
+        nohup node apps/frappe/socketio.js > logs/e2e-socketio.log 2>&1 &
+        for attempt in $(seq 1 60); do
+          curl -sf http://wikify.localhost:8000/api/method/ping && exit 0
+          sleep 2
+        done
+        cat logs/e2e-web.log
+        exit 1
+
+    - name: Create the e2e user
+      shell: bash
+      working-directory: /home/runner/frappe-bench
+      run: |
+        password=$(openssl rand -hex 16)
+        echo "::add-mask::$password"
+        bench --site wikify.localhost add-user e2e@example.com --first-name E2E --password "$password" --add-role "System Manager"
+        keys=$(bench --site wikify.localhost execute frappe.core.doctype.user.user.generate_keys --args "['e2e@example.com']" | tail -n 1)
+        api_key=$(echo "$keys" | jq -r .api_key)
+        api_secret=$(echo "$keys" | jq -r .api_secret)
+        echo "::add-mask::$api_secret"
+        cat > $GITHUB_WORKSPACE/frontend/e2e/.env.e2e <<ENV
+        E2E_BASE_URL=http://wikify.localhost:8000
+        E2E_USER=e2e@example.com
+        E2E_PASSWORD=$password
+        E2E_API_KEY=$api_key
+        E2E_API_SECRET=$api_secret
+        ENV
+
+    - name: Install Playwright
+      shell: bash
+      working-directory: ${{ github.workspace }}/frontend
+      run: |
+        yarn install --frozen-lockfile
+        npx playwright install --with-deps chromium
