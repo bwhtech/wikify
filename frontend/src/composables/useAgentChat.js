@@ -117,7 +117,7 @@ export function useAgentChat() {
 			onError: ({ message }) => {
 				isRunning.value = false;
 				dropThinking();
-				errorText.value = message;
+				errorText.value = message.split("\n")[0];
 				messages.value.push({
 					id: `err-${Date.now()}`,
 					role: "assistant",
