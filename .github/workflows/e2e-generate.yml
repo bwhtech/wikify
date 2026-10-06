@@ -1,0 +1,353 @@
+name: E2E generate
+
+on:
+  schedule:
+    - cron: "0 0 * * 6"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Cover PRs merged in the last N days
+        default: "7"
+  pull_request:
+    paths:
+      - .github/workflows/e2e-generate.yml
+      - .claude/skills/e2e-from-prs/**
+
+concurrency:
+  group: e2e-generate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  MAX_PRS: 6
+  REPORT: frontend/e2e/.state/weekly-report.md
+
+jobs:
+  generate:
+    name: Generate tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    # Claude reads PR text written by others, so this job only gets a read token; publish pushes.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.result.outputs.changed }}
+      since: ${{ steps.prs.outputs.since }}
+      run_date: ${{ steps.prs.outputs.run_date }}
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    services:
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: List PRs merged this week
+        id: prs
+        env:
+          DAYS: ${{ inputs.days || '7' }}
+        run: |
+          [[ "$DAYS" =~ ^[0-9]+$ ]] || { echo "::error::days must be a whole number, got '$DAYS'"; exit 1; }
+          since=$(date -u -d "-$DAYS days" +%Y-%m-%d)
+          run_date=$(date -u +%Y-%m-%d)
+          echo "since=$since" >> "$GITHUB_OUTPUT"
+          echo "run_date=$run_date" >> "$GITHUB_OUTPUT"
+
+          gh pr list --state merged --base main --search "merged:>=$since" --limit 200 \
+            --json number,title,author,files,headRefName,mergedAt > "$RUNNER_TEMP/merged.json"
+          jq '[.[]
+              | select(.headRefName | startswith("e2e/weekly-") | not)
+              | select([.files[].path | select(test("^(frontend/e2e/|\\.github/)") | not)] | length > 0)]
+              | sort_by(.mergedAt)' "$RUNNER_TEMP/merged.json" > "$RUNNER_TEMP/eligible.json"
+          jq -r ".[:$MAX_PRS][].number" "$RUNNER_TEMP/eligible.json" > "$RUNNER_TEMP/prs.txt"
+
+          mkdir -p "$(dirname "$REPORT")"
+          {
+            echo "## Weekly e2e generation, PRs merged since $since"
+            echo
+            echo "Merged into main: $(jq length "$RUNNER_TEMP/merged.json"). Eligible: $(jq length "$RUNNER_TEMP/eligible.json") (e2e/weekly-* branches and PRs touching only frontend/e2e/ or .github/ are left out)."
+            echo
+            jq -r '.[] | "- #\(.number) \(.title) (@\(.author.login))"' <(jq ".[:$MAX_PRS]" "$RUNNER_TEMP/eligible.json")
+            if [ "$(jq length "$RUNNER_TEMP/eligible.json")" -gt "$MAX_PRS" ]; then
+              echo
+              echo "Not covered this week:"
+              jq -r ".[$MAX_PRS:][] | \"- #\(.number) \(.title)\"" "$RUNNER_TEMP/eligible.json"
+            fi
+            echo
+            echo "### Results"
+            echo
+          } > "$REPORT"
+          cat "$REPORT"
+          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+          echo "count=$(wc -l < "$RUNNER_TEMP/prs.txt" | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Choose the mode
+        id: mode
+        env:
+          COUNT: ${{ steps.prs.outputs.count }}
+        run: |
+          if [ "$COUNT" = "0" ]; then
+            echo "::notice title=Nothing to cover::No eligible PRs were merged in this window."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ] || [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "::notice title=Dry run::No CLAUDE_CODE_OAUTH_TOKEN or a pull_request run, so no site, no claude and no PR."
+            echo "mode=dry" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=real" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write the claude call and the guard
+        run: |
+          echo 'Follow ../.claude/skills/e2e-from-prs/SKILL.md for PR #{PR}.' > "$RUNNER_TEMP/prompt.txt"
+          cat > "$RUNNER_TEMP/claude-args.sh" <<'ARGS'
+          claude_args=(
+            --permission-mode acceptEdits
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(npx playwright test:*)"
+            --max-turns 80
+            --output-format stream-json
+            --verbose
+          )
+          ARGS
+          cat > "$RUNNER_TEMP/guard.sh" <<'GUARD'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          baseline=$1
+          label=$2
+          reverted=0
+          while IFS= read -r -d '' entry; do
+            status=${entry:0:2}
+            path=${entry:3}
+            case "$path" in frontend/e2e/specs/*) continue ;; esac
+            grep -qxF -- "$path" "$baseline" && continue
+            if [ "$status" = "??" ]; then rm -rf -- "$path"; else git checkout -- "$path"; fi
+            echo "- guard ($label): reverted \`$path\`" | tee -a "$REPORT"
+            reverted=$((reverted + 1))
+          done < <(git status --porcelain=v1 --untracked-files=all -z)
+          echo "guard ($label): $reverted path(s) reverted"
+          GUARD
+          chmod +x "$RUNNER_TEMP/guard.sh"
+
+      - name: Dry run
+        if: steps.mode.outputs.mode == 'dry'
+        run: |
+          source "$RUNNER_TEMP/claude-args.sh"
+          echo "PRs that would be covered, and the exact claude call for each (run from frontend/):"
+          while read -r PR; do
+            prompt=$(sed "s/{PR}/$PR/" "$RUNNER_TEMP/prompt.txt")
+            echo "PR #$PR"
+            echo "  prompt:  $prompt"
+            echo "  command: timeout 40m claude -p ${prompt@Q} ${claude_args[*]@Q}"
+          done < "$RUNNER_TEMP/prs.txt"
+
+          git status --porcelain=v1 --untracked-files=all | cut -c4- > "$RUNNER_TEMP/baseline.txt"
+          "$RUNNER_TEMP/guard.sh" "$RUNNER_TEMP/baseline.txt" "empty diff"
+
+          echo "Guard self-test: a stray file, a tracked edit and a spec edit"
+          touch stray-file.txt
+          echo "# stray" >> README.md
+          echo "// stray" >> frontend/e2e/specs/smoke.spec.ts
+          "$RUNNER_TEMP/guard.sh" "$RUNNER_TEMP/baseline.txt" "self-test"
+          test ! -e stray-file.txt
+          git diff --quiet -- README.md
+          test "$(git status --porcelain)" = " M frontend/e2e/specs/smoke.spec.ts"
+          git checkout -- frontend/e2e/specs/smoke.spec.ts
+          echo "Guard self-test passed"
+
+      - name: Build and start the site
+        if: steps.mode.outputs.mode == 'real'
+        uses: ./.github/actions/e2e-site
+
+      - name: Seed the fixtures
+        if: steps.mode.outputs.mode == 'real'
+        working-directory: frontend
+        run: npx playwright test -c e2e --project setup
+
+      - name: Generate tests per PR
+        if: steps.mode.outputs.mode == 'real'
+        run: |
+          git status --porcelain=v1 --untracked-files=all | cut -c4- > "$RUNNER_TEMP/baseline.txt"
+          source "$RUNNER_TEMP/claude-args.sh"
+          mkdir -p "$RUNNER_TEMP/claude"
+          while read -r PR; do
+            echo "::group::PR #$PR"
+            prompt=$(sed "s/{PR}/$PR/" "$RUNNER_TEMP/prompt.txt")
+            status=0
+            (cd frontend && timeout 40m claude -p "$prompt" "${claude_args[@]}" \
+              < /dev/null > "$RUNNER_TEMP/claude/pr-$PR.jsonl") || status=$?
+            jq -r 'select(.type == "result") | .result // .subtype' "$RUNNER_TEMP/claude/pr-$PR.jsonl" || true
+            if [ "$status" = "124" ]; then
+              echo "- PR #$PR: claude timed out after 40 min" >> "$REPORT"
+            elif [ "$status" != "0" ]; then
+              echo "- PR #$PR: claude exited with $status" >> "$REPORT"
+            fi
+            "$RUNNER_TEMP/guard.sh" "$RUNNER_TEMP/baseline.txt" "PR #$PR"
+            echo "::endgroup::"
+          done < "$RUNNER_TEMP/prs.txt"
+
+      - name: Run the new tests once
+        id: result
+        if: steps.mode.outputs.mode == 'real'
+        run: |
+          changed=$(git status --porcelain=v1 --untracked-files=all -- frontend/e2e/specs | cut -c4- | sed 's#^frontend/##')
+          if [ -z "$changed" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No spec changes; no PR will be opened." | tee -a "$REPORT"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          status=0
+          (cd frontend && npx playwright test -c e2e $changed --grep "W[0-9]+-") 2>&1 | tee "$RUNNER_TEMP/final-run.log" || status=$?
+          {
+            echo
+            echo "### Final run (exit $status)"
+            echo
+            echo '```'
+            grep -E '^\s+[0-9]+ (passed|failed|flaky|skipped|did not run|interrupted)' "$RUNNER_TEMP/final-run.log" || echo "no summary line"
+            echo '```'
+          } >> "$REPORT"
+
+      - name: Report
+        if: always()
+        run: |
+          [ -f "$REPORT" ] && cat "$REPORT" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload the report and transcripts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-report
+          path: |
+            ${{ env.REPORT }}
+            ${{ runner.temp }}/claude
+          if-no-files-found: ignore
+
+      - name: Upload the generated specs
+        if: steps.result.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-specs
+          path: frontend/e2e/specs/
+
+      - name: Upload Playwright report
+        if: always() && steps.mode.outputs.mode == 'real'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/e2e/playwright-report
+            frontend/e2e/test-results
+          if-no-files-found: ignore
+
+      - name: Upload bench logs
+        if: always() && steps.mode.outputs.mode == 'real'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-logs
+          path: /home/runner/frappe-bench/logs/*.log
+          if-no-files-found: ignore
+
+  publish:
+    name: Open the weekly PR
+    needs: generate
+    if: needs.generate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SINCE: ${{ needs.generate.outputs.since }}
+      RUN_DATE: ${{ needs.generate.outputs.run_date }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+
+      - name: Download the generated specs
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-specs
+          path: ${{ runner.temp }}/specs
+
+      - name: Download the report
+        uses: actions/download-artifact@v4
+        with:
+          name: weekly-report
+          path: ${{ runner.temp }}/report
+
+      - name: Commit, push and open the PR
+        run: |
+          branch="e2e/weekly-$RUN_DATE"
+          title="test(e2e): tests for PRs merged week of $SINCE"
+          rm -rf frontend/e2e/specs
+          cp -r "$RUNNER_TEMP/specs" frontend/e2e/specs
+          git switch -c "$branch"
+          git add frontend/e2e/specs
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "$title"
+          git push --force origin "HEAD:refs/heads/$branch"
+
+          body="$RUNNER_TEMP/body.md"
+          report=$(find "$RUNNER_TEMP/report" -name weekly-report.md | head -n 1)
+          {
+            cat "$report"
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$body"
+
+          gh label create e2e-weekly --color 0E8A16 --description "Weekly generated e2e tests" || true
+          number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$number" -F "body=@$body" --silent
+            echo "Updated #$number" >> "$GITHUB_STEP_SUMMARY"
+          else
+            gh pr create --base main --head "$branch" --title "$title" --body-file "$body" --label e2e-weekly | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  report-failure:
+    name: Report a failed weekly run
+    needs: [generate, publish]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Open or comment on the issue
+        run: |
+          title="Weekly e2e generation failed"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          number=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [ -n "$number" ]; then
+            gh issue comment "$number" -R "$GITHUB_REPOSITORY" --body "Failed again: $url"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "$url"
+          fi

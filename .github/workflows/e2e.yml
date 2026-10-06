@@ -13,10 +13,11 @@ jobs:
   playwright:
     name: Playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -65,6 +66,23 @@ jobs:
         run: |
           echo "::notice title=AI tests skipped::CLAUDE_CODE_OAUTH_TOKEN is not set, so only the login tests ran."
           npx playwright test -c e2e --project setup --project chromium --no-deps -g "log in|S-01" auth.setup.ts smoke.spec.ts
+
+      - name: Use the specs from the weekly generated PR
+        if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh pr list -R "$GITHUB_REPOSITORY" --label e2e-weekly --state open --json headRefName,number,isCrossRepository --limit 1 \
+            --jq '[.[] | select(.isCrossRepository | not)][0] // empty')
+          if [ -z "$pr" ]; then
+            echo "No open e2e-weekly PR; running the specs from $GITHUB_REF_NAME." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          branch=$(jq -r .headRefName <<< "$pr")
+          number=$(jq -r .number <<< "$pr")
+          git fetch origin "refs/heads/$branch"
+          git checkout FETCH_HEAD -- frontend/e2e/specs
+          echo "Running frontend/e2e/specs from #$number ($branch) on top of $GITHUB_REF_NAME." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the full suite
         if: env.CLAUDE_CODE_OAUTH_TOKEN != ''
