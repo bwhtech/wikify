@@ -71,20 +71,6 @@ runs:
         bench --site wikify.localhost execute frappe.db.set_single_value --args "['Wikify Settings', 'use_local_models', 1]"
         bench build
 
-    - name: Start web, worker and socket.io
-      shell: bash
-      working-directory: /home/runner/frappe-bench
-      run: |
-        nohup bench serve --port 8000 --noreload > logs/e2e-web.log 2>&1 &
-        nohup bench worker > logs/e2e-worker.log 2>&1 &
-        nohup node apps/frappe/socketio.js > logs/e2e-socketio.log 2>&1 &
-        for attempt in $(seq 1 60); do
-          curl -sf http://wikify.localhost:8000/api/method/ping && exit 0
-          sleep 2
-        done
-        cat logs/e2e-web.log
-        exit 1
-
     - name: Create the e2e user
       shell: bash
       working-directory: /home/runner/frappe-bench
@@ -103,6 +89,20 @@ runs:
         E2E_API_KEY=$api_key
         E2E_API_SECRET=$api_secret
         ENV
+
+    - name: Start web, worker and socket.io
+      shell: bash
+      working-directory: /home/runner/frappe-bench
+      run: |
+        nohup bench serve --port 8000 --noreload > logs/e2e-web.log 2>&1 &
+        nohup bench worker > logs/e2e-worker.log 2>&1 &
+        nohup node apps/frappe/socketio.js > logs/e2e-socketio.log 2>&1 &
+        for attempt in $(seq 1 60); do
+          curl -sf http://wikify.localhost:8000/api/method/ping && exit 0
+          sleep 2
+        done
+        cat logs/e2e-web.log
+        exit 1
 
     - name: Install Playwright
       shell: bash
