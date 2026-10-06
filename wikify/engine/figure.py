@@ -51,7 +51,9 @@ def crop_page_figure(source_document: str, page_no: int, caption: str, occurrenc
 	file_doc = store.save_crop_file(page.name, page_no, crop_png)
 	old_tag = old_markdown[start:end]
 	new_tag = f"![{caption}]({file_doc.file_url})"
-	store.set_canonical_markdown(page.name, old_markdown[:start] + new_tag + old_markdown[end:])
+	store.set_canonical_markdown(
+		page.name, old_markdown[:start] + new_tag + old_markdown[end:], keep_audit=True
+	)
 
 	owners = sections_covering_page(source_document, page_no)
 	if len(owners) > 1:

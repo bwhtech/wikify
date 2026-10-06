@@ -181,12 +181,11 @@ def get_canonical_composites(source_document: str) -> list[float | None]:
 	]
 
 
-def set_canonical_markdown(page_name: str, markdown: str) -> None:
-	frappe.db.set_value(
-		"Source Page",
-		page_name,
-		{"canonical_markdown": markdown, "canonical_composite": 0, "verdict": ""},
-	)
+def set_canonical_markdown(page_name: str, markdown: str, keep_audit: bool = False) -> None:
+	values = {"canonical_markdown": markdown}
+	if not keep_audit:
+		values.update({"canonical_composite": 0, "verdict": ""})
+	frappe.db.set_value("Source Page", page_name, values)
 	invalidate_page(page_name)
 
 
