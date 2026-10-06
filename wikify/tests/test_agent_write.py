@@ -9,6 +9,7 @@ from frappe.tests.utils import FrappeTestCase
 from wikify.agent import session
 from wikify.agent.context import Ctx
 from wikify.agent.loop import AgentRunner
+from wikify.agent.tools import content as ct
 from wikify.agent.tools import pipeline as pl
 from wikify.agent.tools import reparse as rep
 from wikify.agent.tools import taxonomy as tax
@@ -246,6 +247,36 @@ class TestAgentWrite(FrappeTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Source Section", alpha_one.name, "markdown").count("![Page 1]"), 1
 		)
+
+	def test_section_edit_says_the_page_in_view_is_unchanged(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha_one = self._sections()[1]
+		ctx = Ctx(
+			session="x",
+			user="Administrator",
+			source_document=self.sd.name,
+			attachments=[{"type": "page", "name": page_name}],
+		)
+		out = ct._edit_section_content(
+			ctx, {"name": alpha_one.name, "mode": "replace", "content": "new body"}
+		)
+		self.assertIn("page 1 is UNCHANGED", out)
+
+	def test_section_edit_is_silent_about_pages_outside_the_section(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		beta = self._sections()[2]
+		ctx = Ctx(
+			session="x",
+			user="Administrator",
+			source_document=self.sd.name,
+			attachments=[{"type": "page", "name": page_name}],
+		)
+		out = ct._edit_section_content(ctx, {"name": beta.name, "mode": "replace", "content": "new body"})
+		self.assertNotIn("UNCHANGED", out)
+		out = ct._edit_section_content(
+			self.ctx, {"name": beta.name, "mode": "replace", "content": "newer body"}
+		)
+		self.assertNotIn("UNCHANGED", out)
 
 	def test_use_page_image_rejects_a_section_from_another_document(self):
 		store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")

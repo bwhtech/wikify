@@ -31,7 +31,15 @@ def _section_row(name: str):
 	return frappe.db.get_value(
 		"Source Section",
 		name,
-		["title", "source_document", "markdown", "wiki_document", "include_in_wiki"],
+		[
+			"title",
+			"source_document",
+			"markdown",
+			"wiki_document",
+			"include_in_wiki",
+			"page_start",
+			"page_end",
+		],
 		as_dict=True,
 	)
 
@@ -44,6 +52,22 @@ def _wiki_hint(sec) -> str:
 			"call sync_wiki_page to update it."
 		)
 	return _("The wiki preview shows this immediately (no wiki generated yet for this section).")
+
+
+def _unchanged_page_hint(ctx: Ctx, sec) -> str:
+	for attachment in ctx.attachments:
+		if attachment.get("type") != "page" or not attachment.get("name"):
+			continue
+		page_no = frappe.db.get_value(
+			"Source Page", {"name": attachment["name"], "source_document": sec.source_document}, "page_no"
+		)
+		if page_no and (sec.page_start or 0) <= page_no <= (sec.page_end or 0):
+			return " " + _(
+				"The user is looking at page {0} in Page Review, and page {0} is UNCHANGED: this edit "
+				"only reached the section. Make the same change on the page with edit_page_content "
+				"before telling the user it is done."
+			).format(page_no)
+	return ""
 
 
 def _apply_edit(old: str, args: dict) -> tuple[str | None, str | None]:
@@ -85,7 +109,9 @@ def _edit_section_content(ctx: Ctx, args: dict) -> str:
 		return error
 
 	store.set_section_markdown(name, new, update_modified=False)
-	return _("Updated '{0}' ({1} → {2} chars). {3}").format(sec.title, len(old), len(new), _wiki_hint(sec))
+	return _("Updated '{0}' ({1} → {2} chars). {3}").format(
+		sec.title, len(old), len(new), _wiki_hint(sec)
+	) + _unchanged_page_hint(ctx, sec)
 
 
 def _edit_page_content(ctx: Ctx, args: dict) -> str:
