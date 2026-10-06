@@ -644,21 +644,29 @@ onBeforeUnmount(removeCanvas);
 			</div>
 		</template>
 
-		<!-- Legend doubles as the type filter (click a chip to dim that type). -->
 		<div
-			v-if="!isNarrow && meta.types.length"
-			class="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5"
+			v-if="!isNarrow"
+			class="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex flex-wrap items-center gap-x-4 gap-y-1.5"
 		>
-			<TypeChip
-				v-for="t in meta.types"
-				:key="t.name"
-				:label="t.label || t.name"
-				:color="typeColor[t.name]"
-				:count="t.count"
-				:active="!hiddenTypes.has(t.name)"
-				:class="hiddenTypes.has(t.name) ? 'opacity-45' : ''"
-				@click="toggleType(t.name)"
-			/>
+			<!-- Legend doubles as the type filter (click a chip to dim that type). -->
+			<div v-if="meta.types.length" class="pointer-events-auto flex flex-wrap gap-1.5">
+				<TypeChip
+					v-for="t in meta.types"
+					:key="t.name"
+					:label="t.label || t.name"
+					:color="typeColor[t.name]"
+					:count="t.count"
+					:active="!hiddenTypes.has(t.name)"
+					:class="hiddenTypes.has(t.name) ? 'opacity-45' : ''"
+					@click="toggleType(t.name)"
+				/>
+			</div>
+			<p
+				v-if="!graph.loading && !empty && graph.data && !refCount"
+				class="mx-auto text-xs text-ink-gray-4"
+			>
+				Showing hierarchy only — reference links appear when sections cite pages.
+			</p>
 		</div>
 
 		<div
@@ -684,11 +692,5 @@ onBeforeUnmount(removeCanvas);
 				No sections yet — parse the document and review its tree first.
 			</p>
 		</div>
-		<p
-			v-else-if="!isNarrow && graph.data && !refCount"
-			class="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-ink-gray-4"
-		>
-			Showing hierarchy only — reference links appear when sections cite pages.
-		</p>
 	</div>
 </template>

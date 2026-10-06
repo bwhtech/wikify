@@ -13,7 +13,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.nestedset import get_descendants_of
 
-from wikify.agent.context import Ctx
+from wikify.agent.context import Ctx, resolve_attachments
 from wikify.agent.tools import content as ct
 from wikify.agent.tools.reparse import _propagate_page
 from wikify.engine import generate_wiki, store
@@ -204,6 +204,12 @@ class TestAgentContent(FrappeTestCase):
 		after = {t: (r.lft, r.rgt, r.level) for t, r in self._rows().items()}
 		self.assertEqual(before, after)  # tree untouched
 
+	def test_rebuild_drops_the_section_own_heading(self):
+		store.set_canonical(self.pages[1], "# **1. Alpha**\n\nalpha intro", 0.9, "cleanup")
+		rebuild_section_markdown(self._name("1. Alpha"))
+		md = self._rows()["1. Alpha"].markdown
+		self.assertEqual(md, "alpha intro\n\ncanonical page 2")
+
 	def test_rebuild_reports_boundary_overlap(self):
 		res = rebuild_section_markdown(self._name("3. Gamma"))
 		self.assertEqual([o["title"] for o in res["overlaps"]], ["2. Beta"])
@@ -273,3 +279,13 @@ class TestAgentContent(FrappeTestCase):
 		self._generate()
 		out = ct._sync_wiki_page(self.ctx, {"name": self._name("1. Alpha")})
 		self.assertIn("Both the preview and the live wiki", out)
+
+	def test_document_context_says_where_the_wiki_is_published(self):
+		attachment = [{"type": "document", "name": self.sd.name}]
+		self.assertIn("Wiki: not generated yet.", resolve_attachments(attachment).block)
+		space = self._generate()["space"]
+		route = frappe.db.get_value("Wiki Space", space, "route")
+		self.assertIn(
+			f"Wiki: generated into wiki space Content Test Wiki at /{route}.",
+			resolve_attachments(attachment).block,
+		)

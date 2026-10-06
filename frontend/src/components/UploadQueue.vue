@@ -17,12 +17,9 @@ const emit = defineEmits(["remove", "retry"]);
 			<span class="lucide-file-text size-4 shrink-0 text-ink-gray-5" aria-hidden="true" />
 			<span class="min-w-0 flex-1 truncate text-sm text-ink-gray-8">{{ row.name }}</span>
 
-			<Progress
-				v-if="row.status === 'uploading'"
-				:value="row.progress"
-				size="sm"
-				class="w-20 shrink-0"
-			/>
+			<div v-if="row.status === 'uploading'" class="w-20 shrink-0">
+				<Progress :value="row.progress" size="sm" />
+			</div>
 			<span
 				v-else-if="row.status === 'uploaded'"
 				class="lucide-check size-4 shrink-0 text-ink-green-6"

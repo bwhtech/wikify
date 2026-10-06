@@ -8,7 +8,9 @@ import {
 	Progress,
 	TabButtons,
 	Tabs,
+	dialog,
 	dayjs,
+	toast,
 	useCall,
 	useDoc,
 	useList,
@@ -83,6 +85,30 @@ const sortedLogs = computed(() =>
 
 const status = computed(() => imp.doc?.status);
 const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
+const canReclassify = computed(
+	() => !!imp.doc?.source_document && ["Review", "Graphed", "Stopped"].includes(status.value)
+);
+const reclassify = useCall({
+	url: "/api/v2/method/wikify.api.imports.reclassify",
+	method: "POST",
+	immediate: false,
+});
+function confirmReclassify() {
+	dialog.confirm({
+		title: "Reclassify sections",
+		message:
+			"Reclassify all sections? This runs the AI on every section and uses API credits.",
+		confirmLabel: "Reclassify",
+		async onConfirm() {
+			await reclassify.submit({ import_name: props.name });
+			if (reclassify.error) {
+				throw new Error(
+					reclassify.error?.messages?.[0] || "Could not start reclassification"
+				);
+			}
+		},
+	});
+}
 
 // Attach the document (with its project) as the agent's default context. Keyed on the
 // source_document id so reloads (progress ticks) don't reset a page/section selection.
@@ -145,7 +171,9 @@ const socket = useSocket();
 function onProgress(payload) {
 	if (payload.import !== props.name || !imp.doc) return;
 	const wasRemediating = imp.doc.status === "Remediating";
+	const statusChanged = payload.status && payload.status !== imp.doc.status;
 	imp.doc.stage_progress = payload.percent;
+	imp.doc.stage_label = payload.stage_label;
 	if (payload.status) imp.doc.status = payload.status;
 	// Terminal transitions carry fields set server-side (source_document, wiki_space, error).
 	if (["Review", "Failed", "Completed", "Graphed", "Stopped"].includes(payload.status)) {
@@ -159,6 +187,8 @@ function onProgress(payload) {
 		// mounted tree still holds the pre-publish (empty) values until refetched.
 		if (payload.status === "Completed") sectionTree.value?.reload();
 		sdStats.reload();
+	} else if (statusChanged) {
+		imp.reload();
 	}
 }
 function onLog(payload) {
@@ -185,15 +215,27 @@ function onAgentMutation(payload) {
 	sectionTree.value?.reload();
 	sdStats.reload();
 }
+function onClassifyDone(payload) {
+	if (payload.import !== props.name) return;
+	if (payload.error) {
+		toast.error("Reclassification failed");
+		return;
+	}
+	toast.success("Sections reclassified");
+	sectionTree.value?.reload();
+	sdStats.reload();
+}
 onMounted(() => {
 	socket?.on("wikify_import_progress", onProgress);
 	socket?.on("wikify_import_log", onLog);
 	socket?.on("wikify_agent_mutation", onAgentMutation);
+	socket?.on("wikify_classify_done", onClassifyDone);
 });
 onUnmounted(() => {
 	socket?.off("wikify_import_progress", onProgress);
 	socket?.off("wikify_import_log", onLog);
 	socket?.off("wikify_agent_mutation", onAgentMutation);
+	socket?.off("wikify_classify_done", onClassifyDone);
 });
 
 const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "text-ink-red-6" };
@@ -250,21 +292,29 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:route="{ name: 'ImportGraph', params: { name: props.name } }"
 					/>
 					<Dropdown
-						v-if="canRemediate"
+						v-if="canRemediate || canReclassify"
 						:options="[
 							{
 								label: 'Remediate flagged',
 								onClick: () => runRemediation('flagged'),
+								condition: () => canRemediate,
 							},
-							{ label: 'Remediate all pages', onClick: () => runRemediation('all') },
+							{
+								label: 'Remediate all pages',
+								onClick: () => runRemediation('all'),
+								condition: () => canRemediate,
+							},
+							{
+								label: 'Reclassify sections',
+								onClick: confirmReclassify,
+								condition: () => canReclassify,
+							},
 						]"
 					>
 						<Button
 							variant="solid"
 							theme="gray"
-							v-bind="
-								actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Remediate')
-							"
+							v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
 							:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
 							:loading="remediate.loading"
 						/>

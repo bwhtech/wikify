@@ -34,7 +34,7 @@ def render_tree(source_document: str) -> str:
 		if start:
 			pages = f" [p.{start}]" if not end or end == start else f" [p.{start}-{end}]"
 		stype = f" ({node['section_type']})" if node.get("section_type") else ""
-		lines.append(f"{indent}- {node.get('title') or '(untitled)'}{stype}{pages} <{node['name']}>")
+		lines.append(f"{indent}- {node.get('title') or '(untitled)'}{stype}{pages} `{node['name']}`")
 		for child in node.get("children", []):
 			walk(child, depth + 1)
 
@@ -56,7 +56,7 @@ def _read_tree(ctx: Ctx, args: dict) -> str:
 def _read_section(ctx: Ctx, args: dict) -> str:
 	name = args.get("name")
 	if not name:
-		return _("Provide the section `name` (the id shown in <angle brackets> in the tree).")
+		return _("Provide the section `name` (the id shown in backticks in the tree).")
 	row = frappe.db.get_value(
 		"Source Section",
 		name,
@@ -139,7 +139,7 @@ def format_section_groups(groups: list[dict]) -> str:
 		lines.append(f"# {group['doc_title']} ({group['source_document']})")
 		for section in group["sections"]:
 			pages = f" [p.{section['page_start']}-{section['page_end']}]" if section.get("page_start") else ""
-			lines.append(f"  - {section['hierarchy_path'] or section['title']}{pages} <{section['name']}>")
+			lines.append(f"  - {section['hierarchy_path'] or section['title']}{pages} `{section['name']}`")
 	return "\n".join(lines)
 
 
@@ -262,7 +262,10 @@ def _read_wiki_page(ctx: Ctx, args: dict) -> str:
 		return _("Provide the section `name`.")
 	sec = frappe.db.get_value("Source Section", name, ["title", "markdown", "wiki_document"], as_dict=True)
 	if not sec:
-		return _("Section {0} not found.").format(name)
+		return _(
+			"Section {0} not found. read_wiki_page takes a Source Section id from read_tree, not a "
+			"document or import id; this says nothing about whether the wiki is published."
+		).format(name)
 	if not sec.wiki_document or not frappe.db.exists("Wiki Document", sec.wiki_document):
 		return _(
 			"'{0}' has no generated wiki page yet. The wiki preview still works; generate the "
@@ -308,7 +311,7 @@ TOOLS = [
 	Tool(
 		name="read_section",
 		side="server",
-		description="Read one section's markdown body and metadata. Pass the section id (shown in <angle brackets> in the tree).",
+		description="Read one section's markdown body and metadata. Pass the section id (shown in backticks in the tree).",
 		parameters={
 			"type": "object",
 			"properties": {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import frappe
 from frappe.utils.file_manager import save_file
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random
 
 from wikify.engine.verify.harness import get_verdict
 
@@ -180,12 +181,11 @@ def get_canonical_composites(source_document: str) -> list[float | None]:
 	]
 
 
-def set_canonical_markdown(page_name: str, markdown: str) -> None:
-	frappe.db.set_value(
-		"Source Page",
-		page_name,
-		{"canonical_markdown": markdown, "canonical_composite": 0, "verdict": ""},
-	)
+def set_canonical_markdown(page_name: str, markdown: str, keep_audit: bool = False) -> None:
+	values = {"canonical_markdown": markdown}
+	if not keep_audit:
+		values.update({"canonical_composite": 0, "verdict": ""})
+	frappe.db.set_value("Source Page", page_name, values)
 	invalidate_page(page_name)
 
 
@@ -299,6 +299,12 @@ def resolve_parent_indexes(sections) -> list[int | None]:
 	return parent_indexes
 
 
+@retry(
+	retry=retry_if_exception_type(frappe.QueryDeadlockError),
+	stop=stop_after_attempt(3),
+	wait=wait_random(0, 1),
+	reraise=True,
+)
 def replace_sections(source_document: str, sections) -> int:
 	from wikify.rag import events
 
@@ -327,6 +333,10 @@ def replace_sections(source_document: str, sections) -> int:
 				doc.markdown = sec.markdown
 				doc.insert(ignore_permissions=True)
 				names.append(doc.name)
+		except frappe.QueryDeadlockError:
+			# A deadlock already rolled back the whole transaction, so the savepoint is gone too.
+			frappe.db.rollback()
+			raise
 		except Exception:
 			frappe.db.rollback(save_point=save_point)
 			raise

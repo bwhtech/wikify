@@ -73,17 +73,11 @@ def reparse_page(
 	}
 
 
-def embed_page_image(source_document: str, page_no: int, caption: str | None = None) -> dict:
+def embed_page_image(source_document: str, page_no: int, caption: str) -> dict:
 	page = _page_row(source_document, page_no)
 	image_url = store.get_page_image(page["name"])
 	if not image_url:
 		raise ValueError(f"Page {page_no} has no rendered image to embed.")
-
-	if not caption:
-		markdown = f"![Page {page_no}]({image_url})"
-		store.set_canonical(page["name"], markdown, None, "image")
-		_recompute_canonical_mean(source_document)
-		return {"page_no": page_no, "image_url": image_url}
 
 	old_markdown = page["canonical_markdown"] or page["baseline_markdown"] or ""
 	spans = find_tag_spans(old_markdown, caption)

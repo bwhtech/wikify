@@ -210,8 +210,14 @@ function onDragEnd(info) {
 const editingKey = ref(null);
 const draft = ref("");
 
-// Focus + select the rename input as soon as it mounts.
-const vFocus = { mounted: (el) => el.focus() };
+const renameInput = ref(null);
+
+// The box mounts while the row menu still holds focus, and the menu then hands focus back to
+// its "..." trigger; take it from there.
+function focusRenameInput() {
+	renameInput.value?.focus();
+	renameInput.value?.select();
+}
 
 function startRename(node) {
 	editingKey.value = node.name;
@@ -381,7 +387,7 @@ async function buildGraph() {
 									@keydown.enter.prevent="commitRename(node)"
 									@keydown.esc.prevent="editingKey = null"
 									@blur="commitRename(node)"
-									v-focus
+									ref="renameInput"
 								/>
 								<button
 									v-else
@@ -436,6 +442,7 @@ async function buildGraph() {
 									<button
 										class="shrink-0 rounded p-0.5 text-ink-gray-5 hover:bg-surface-gray-3 lg:opacity-0 lg:group-hover:opacity-100"
 										@click.stop
+										@focus="editingKey === node.name && focusRenameInput()"
 									>
 										<span
 											class="lucide-more-horizontal size-4"

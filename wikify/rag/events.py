@@ -182,9 +182,10 @@ def propagate_pages(source_document: str, pages: list[int]) -> None:
 
 	section_names = []
 	for page_no in pages:
-		for section in sections_covering_page(source_document, page_no):
-			if section.name not in section_names:
-				section_names.append(section.name)
+		owners = sections_covering_page(source_document, page_no)
+		# A shared boundary page would be copied whole into every section on it.
+		if len(owners) == 1 and owners[0].name not in section_names:
+			section_names.append(owners[0].name)
 	if not section_names:
 		return
 
