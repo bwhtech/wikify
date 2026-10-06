@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable
 
 import fitz
+import frappe
 
 from wikify.engine import diagrams, llm, pdf_utils, regions, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
@@ -16,6 +17,7 @@ from wikify.rag import events
 
 ADOPTION_COMPOSITE_RATIO = 0.9
 MIN_CANONICAL_CHARS = 40
+SAVE_BATCH_PAGES = 10
 _IMAGE_EMBED_RE = re.compile(r"(!\[[^\]]*\]\()([^)]*)(\))")
 _MARKUP_RE = re.compile(r"[\s#*_>|`~\-]+")
 
@@ -74,6 +76,7 @@ def remediate_pdf(
 	progress_cb: Callable[[int, int], None] | None = None,
 	page_cb: Callable[..., None] | None = None,
 	stage_cb: Callable[[str], None] | None = None,
+	resume: bool = False,
 ) -> dict:
 	if not llm.has_openrouter():
 		raise RuntimeError("OpenRouter key not set — remediation needs cloud models.")
@@ -90,12 +93,21 @@ def remediate_pdf(
 	canon_md = {p["page_no"]: p["baseline_markdown"] or "" for p in pages}
 	canon_comp = {p["page_no"]: p["composite"] for p in pages}
 	canon_src = {p["page_no"]: "baseline" for p in pages}
+	saved_page_nos = {p["page_no"] for p in targets if resume and p["canonical_source"]}
+	for p in targets:
+		if p["page_no"] in saved_page_nos:
+			canon_md[p["page_no"]] = p["canonical_markdown"] or ""
+			canon_comp[p["page_no"]] = p["canonical_composite"]
+			canon_src[p["page_no"]] = p["canonical_source"]
+	unsaved_pages: list[dict] = []
 
 	with fitz.open(pdf_path) as doc:
 		furniture = det.find_furniture_lines([doc[p["page_no"] - 1].get_text("text") for p in pages])
 
 		doc_cost = 0.0
 		for i, p in enumerate(targets):
+			if p["page_no"] in saved_page_nos:
+				continue
 			page = doc[p["page_no"] - 1]
 			gt = page.get_text("text")
 			kind = p["kind"]
@@ -192,6 +204,16 @@ def remediate_pdf(
 				)
 			if progress_cb:
 				progress_cb(i + 1, total)
+
+			unsaved_pages.append(p)
+			if len(unsaved_pages) == SAVE_BATCH_PAGES:
+				with events.suspended_indexing():
+					for saved in unsaved_pages:
+						pno = saved["page_no"]
+						store.set_canonical(saved["name"], canon_md[pno], canon_comp[pno], canon_src[pno])
+				# nosemgrep
+				frappe.db.commit()
+				unsaved_pages = []
 
 	stitched = dict(stitch_cross_page_tables([(p["page_no"], canon_md[p["page_no"]]) for p in pages]))
 	with events.suspended_indexing():

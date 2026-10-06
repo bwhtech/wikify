@@ -6,6 +6,7 @@ from frappe import _
 from wikify.agent.context import Ctx
 from wikify.agent.registry import Tool
 from wikify.engine.store import get_import_pdf_path
+from wikify.jobs import remediate as remediate_job
 
 
 def _project_context(ctx: Ctx) -> str:
@@ -116,6 +117,7 @@ def _reparse_document(ctx: Ctx, args: dict) -> str:
 		"wikify.jobs.remediate.run",
 		queue="long",
 		timeout=3600,
+		job_id=remediate_job.job_id(import_name),
 		import_name=import_name,
 		scope="all",
 		instruction=instruction,

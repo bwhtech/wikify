@@ -8,6 +8,8 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.api import imports as imports_api
+from wikify.jobs import parse as parse_job
+from wikify.jobs import remediate as remediate_job
 from wikify.seed import seed_uncategorized_project
 
 
@@ -56,6 +58,7 @@ class TestImportsApi(FrappeTestCase):
 			self.assertEqual(call.args[0], "wikify.jobs.parse.run")
 			self.assertEqual(call.kwargs["queue"], "long")
 			self.assertEqual(call.kwargs["import_name"], names[i])
+			self.assertEqual(call.kwargs["job_id"], parse_job.job_id(names[i]))
 
 	def test_import_count_tracks_the_batch(self):
 		with patch.object(frappe, "enqueue"):
@@ -149,5 +152,74 @@ class TestImportsApi(FrappeTestCase):
 		try:
 			with self.assertRaises(frappe.PermissionError):
 				imports_api.assert_readable_file(file_url)
+		finally:
+			frappe.set_user("Administrator")
+
+
+class TestResumeImport(FrappeTestCase):
+	def make_import(self, status: str):
+		return frappe.get_doc(
+			{
+				"doctype": "Wikify Import",
+				"import_title": "Resume Test",
+				"pdf": "/private/files/resume-test.pdf",
+				"project": seed_uncategorized_project(),
+				"status": status,
+			}
+		).insert(ignore_permissions=True)
+
+	def test_a_stuck_import_requeues_its_parse_job(self):
+		for status in ("Parsing", "Remediating"):
+			imp = self.make_import(status)
+			with self.subTest(status=status), patch.object(frappe, "enqueue") as enqueue:
+				self.assertTrue(imports_api.can_resume_import(imp.name))
+				imports_api.resume_import(imp.name)
+
+				enqueue.assert_called_once()
+				self.assertEqual(enqueue.call_args.args[0], "wikify.jobs.parse.run")
+				self.assertEqual(enqueue.call_args.kwargs["queue"], "long")
+				self.assertEqual(enqueue.call_args.kwargs["import_name"], imp.name)
+				self.assertEqual(enqueue.call_args.kwargs["job_id"], parse_job.job_id(imp.name))
+
+	def test_refuses_while_a_job_for_the_import_is_queued_or_running(self):
+		imp = self.make_import("Remediating")
+		for running_job_id in (parse_job.job_id(imp.name), remediate_job.job_id(imp.name)):
+			with (
+				self.subTest(running_job_id=running_job_id),
+				patch.object(
+					imports_api, "is_job_enqueued", side_effect=lambda job_id: job_id == running_job_id
+				),
+				patch.object(frappe, "enqueue") as enqueue,
+			):
+				self.assertFalse(imports_api.can_resume_import(imp.name))
+				with self.assertRaises(frappe.ValidationError):
+					imports_api.resume_import(imp.name)
+				enqueue.assert_not_called()
+
+	def test_refuses_an_import_that_is_not_parsing_or_remediating(self):
+		imp = self.make_import("Review")
+		with patch.object(frappe, "enqueue") as enqueue:
+			self.assertFalse(imports_api.can_resume_import(imp.name))
+			with self.assertRaises(frappe.ValidationError):
+				imports_api.resume_import(imp.name)
+		enqueue.assert_not_called()
+
+	def test_a_user_without_write_permission_cannot_resume(self):
+		imp = self.make_import("Remediating")
+		outsider = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": f"resume-outsider-{frappe.generate_hash(length=6)}@example.com",
+				"first_name": "Outsider",
+			}
+		).insert(ignore_permissions=True)
+
+		frappe.set_user(outsider.name)
+		try:
+			with patch.object(frappe, "enqueue") as enqueue:
+				self.assertFalse(imports_api.can_resume_import(imp.name))
+				with self.assertRaises(frappe.PermissionError):
+					imports_api.resume_import(imp.name)
+			enqueue.assert_not_called()
 		finally:
 			frappe.set_user("Administrator")
