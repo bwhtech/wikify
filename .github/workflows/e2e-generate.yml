@@ -20,6 +20,10 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
   MAX_PRS: 6
   REPORT: frontend/e2e/.state/weekly-report.md
