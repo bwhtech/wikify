@@ -21,4 +21,10 @@ export const PREFIX = "[test]";
 export const FIXTURE_PREFIX = "[fixture]";
 
 export const STATE_DIR = path.resolve(import.meta.dirname, "../.state");
-export const FIXTURE_PDF = path.resolve(import.meta.dirname, "../../../docs/what-is-wikify.pdf");
+export const WHAT_IS_WIKIFY_PDF = path.resolve(
+	import.meta.dirname,
+	"../../../docs/what-is-wikify.pdf",
+);
+export const FIXTURE_PDF = WHAT_IS_WIKIFY_PDF;
+export const FIXTURE_PDF_SHA256 =
+	"ad23468830e90fc535623d6aab92d92bf64207bfb2178ab8e4a09c0b7d3352ad";

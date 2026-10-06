@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
 import { deleteTestProjects } from "../helpers/cleanup";
-import { FIXTURE_PDF, PREFIX } from "../helpers/env";
+import { PREFIX, WHAT_IS_WIKIFY_PDF } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor, waitForValue } from "../helpers/wait";
 import {
@@ -83,7 +83,7 @@ test.describe("parse", () => {
 			const dialog = page.getByRole("dialog");
 			const chooser = page.waitForEvent("filechooser");
 			await dialog.getByRole("button", { name: "Choose PDFs" }).click();
-			await (await chooser).setFiles(FIXTURE_PDF);
+			await (await chooser).setFiles(WHAT_IS_WIKIFY_PDF);
 			await dialog.getByLabel("Title").fill(title);
 			await dialog.getByRole("button", { name: "Start", exact: true }).click();
 
@@ -142,7 +142,7 @@ test.describe("parse", () => {
 			test.setTimeout(QUEUE_WAIT + 2 * PARSE_TIMEOUT);
 			const project = await createProject(api, `${AREA_PREFIX} logs`);
 			const title = `${AREA_PREFIX} logs`;
-			const importName = await startImport(api, { title, project });
+			const importName = await startImport(api, { title, project, pdf: WHAT_IS_WIKIFY_PDF });
 
 			await page.goto(`/wikify/import/${importName}`);
 			await page.getByRole("tab", { name: "Logs" }).click();
@@ -191,7 +191,7 @@ test.describe("parse", () => {
 			test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT + 60_000);
 			title = `${AREA_PREFIX} remediate`;
 			const project = await createProject(api, title);
-			importName = await startImport(api, { title, project });
+			importName = await startImport(api, { title, project, pdf: WHAT_IS_WIKIFY_PDF });
 			sourceDocument = (await waitForImport(api, importName, "Review", QUEUE_WAIT + PARSE_TIMEOUT))
 				.source_document;
 			const parsedPages = await pageState(api, sourceDocument);

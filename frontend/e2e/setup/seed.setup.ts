@@ -1,73 +1,178 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { test as setup } from "@playwright/test";
 import { Api } from "../helpers/api";
 import { deleteImport } from "../helpers/cleanup";
-import { FIXTURE_PREFIX, STATE_DIR } from "../helpers/env";
-import { FIXTURES_FILE, type Fixtures, type ImportFixture } from "../helpers/test";
+import { FIXTURE_PDF, FIXTURE_PDF_SHA256, FIXTURE_PREFIX, STATE_DIR } from "../helpers/env";
 import {
+	FIXTURES_FILE,
+	type FixtureOutline,
+	type Fixtures,
+	type ImportFixture,
+} from "../helpers/test";
+import {
+	cloneImport,
 	createProject,
-	FIXTURE_ROOT,
-	FIXTURE_SECTIONS,
 	findProject,
-	PARSE_TIMEOUT,
-	sectionRows,
+	outline,
+	renumberTree,
 	startImport,
 	waitForImport,
+	type SectionRow,
 } from "../helpers/wikify";
 
 const PROJECT_NAME = `${FIXTURE_PREFIX} e2e`;
+const SOURCE_PROJECT_NAME = `${FIXTURE_PREFIX} source`;
+const SOURCE_TITLE = `${FIXTURE_PREFIX} source`;
 const IN_PROGRESS = ["Queued", "Parsing", "Remediating"];
+const SOURCE_PARSE_TIMEOUT = 7_200_000;
 
-async function isPristine(api: Api, sourceDocument: string): Promise<boolean> {
-	const rows = await sectionRows(api, sourceDocument);
-	const root = rows.find((row) => row.title === FIXTURE_ROOT && !row.parent_source_section);
-	const children = rows
-		.filter((row) => root && row.parent_source_section === root.name)
-		.map((row) => row.title);
-	return (
-		!!root &&
-		rows.length === FIXTURE_SECTIONS.length + 1 &&
-		JSON.stringify(children) === JSON.stringify(FIXTURE_SECTIONS) &&
-		rows.every((row) => row.include_in_wiki === 1)
-	);
+function readPrevious(): Partial<Fixtures> {
+	try {
+		return JSON.parse(fs.readFileSync(FIXTURES_FILE, "utf8"));
+	} catch {
+		return {};
+	}
 }
 
-async function seedImport(api: Api, project: string, title: string): Promise<ImportFixture> {
+function entry({ name, title, page_start, page_end }: SectionRow) {
+	return { name, title, page_start, page_end };
+}
+
+function withoutNames({ root, children }: FixtureOutline): string {
+	const strip = ({ name, ...rest }: { name: string }) => rest;
+	return JSON.stringify({ root: root && strip(root), children: children.map(strip) });
+}
+
+async function intactOutline(
+	api: Api,
+	sourceDocument: string,
+	recorded?: FixtureOutline,
+): Promise<FixtureOutline | undefined> {
+	try {
+		const { rows, root, children } = await outline(api, sourceDocument);
+		if (rows.some((row) => !row.include_in_wiki)) return undefined;
+		const current = { root: root ? entry(root) : null, children: children.map(entry) };
+		if (recorded && JSON.stringify(current) !== JSON.stringify(recorded)) return undefined;
+		return current;
+	} catch {
+		return undefined;
+	}
+}
+
+async function findOrCreateProject(api: Api, projectName: string): Promise<string> {
+	return (await findProject(api, projectName)) || (await createProject(api, projectName));
+}
+
+async function seedSource(
+	api: Api,
+	pdfMd5: string,
+	recorded?: ImportFixture,
+): Promise<ImportFixture> {
+	const project = await findOrCreateProject(api, SOURCE_PROJECT_NAME);
+	const existing = await api.getList("Wikify Import", {
+		filters: { import_title: SOURCE_TITLE, project },
+		fields: ["name", "status", "source_document", "pdf"],
+	});
+	for (const imp of existing) {
+		let { status, source_document: sourceDocument } = imp;
+		const samePdf = (await api.getValue("File", { file_url: imp.pdf }, "content_hash")) === pdfMd5;
+		if (samePdf && IN_PROGRESS.includes(status)) {
+			const started = Date.now();
+			({ status, source_document: sourceDocument } = await waitForImport(
+				api,
+				imp.name,
+				["Review", "Failed"],
+				SOURCE_PARSE_TIMEOUT,
+			));
+			console.log(`[seed] waited ${seconds(started)} for the running parse ${imp.name}`);
+		}
+		if (samePdf && status === "Review" && sourceDocument) {
+			await renumberTree(api, sourceDocument);
+			const outline = await intactOutline(
+				api,
+				sourceDocument,
+				recorded?.import === imp.name ? recorded.outline : undefined,
+			);
+			if (outline) return { import: imp.name, sourceDocument, title: SOURCE_TITLE, outline };
+		}
+		await deleteImport(api, imp.name);
+	}
+
+	const started = Date.now();
+	const name = await startImport(api, { title: SOURCE_TITLE, project });
+	const { source_document: sourceDocument } = await waitForImport(
+		api,
+		name,
+		"Review",
+		SOURCE_PARSE_TIMEOUT,
+	);
+	console.log(`[seed] parsed ${FIXTURE_PDF} as ${name} in ${seconds(started)}`);
+	const outline = await intactOutline(api, sourceDocument);
+	if (!outline) throw new Error(`${name} parsed into an unusable section tree`);
+	return { import: name, sourceDocument, title: SOURCE_TITLE, outline };
+}
+
+async function seedClone(
+	api: Api,
+	project: string,
+	source: ImportFixture,
+	title: string,
+	recorded?: ImportFixture,
+): Promise<ImportFixture> {
 	const existing = await api.getList("Wikify Import", {
 		filters: { import_title: title, project },
 		fields: ["name", "status", "source_document"],
 	});
 	for (const imp of existing) {
-		if (
-			imp.status === "Review" &&
-			imp.source_document &&
-			(await isPristine(api, imp.source_document))
-		) {
-			return { import: imp.name, sourceDocument: imp.source_document, title };
-		}
-		if (IN_PROGRESS.includes(imp.status)) {
-			const done = await waitForImport(api, imp.name, ["Review", "Failed"]);
-			if (done.status === "Review" && (await isPristine(api, done.source_document))) {
-				return { import: imp.name, sourceDocument: done.source_document, title };
-			}
+		if (imp.status === "Review" && imp.source_document && imp.name === recorded?.import) {
+			const outline = await intactOutline(api, imp.source_document, recorded.outline);
+			if (outline)
+				return { import: imp.name, sourceDocument: imp.source_document, title, outline };
 		}
 		await deleteImport(api, imp.name);
 	}
-	const name = await startImport(api, { title, project });
-	const done = await waitForImport(api, name, "Review");
-	return { import: name, sourceDocument: done.source_document, title };
+
+	const started = Date.now();
+	const clone = await cloneImport(api, source.import, { title, project });
+	console.log(`[seed] cloned ${source.import} into ${clone.import} in ${seconds(started)}`);
+	const outline = await intactOutline(api, clone.sourceDocument);
+	if (!outline || withoutNames(outline) !== withoutNames(source.outline)) {
+		throw new Error(`${clone.import} does not have the outline of ${source.import}`);
+	}
+	return { ...clone, title, outline };
+}
+
+function seconds(since: number): string {
+	return `${Math.round((Date.now() - since) / 1000)}s`;
 }
 
 setup("seed the fixture project and imports", async () => {
-	setup.setTimeout(2 * PARSE_TIMEOUT + 120_000);
+	setup.setTimeout(SOURCE_PARSE_TIMEOUT + 900_000);
+	const pdf = fs.readFileSync(FIXTURE_PDF);
+	const digest = createHash("sha256").update(pdf).digest("hex");
+	if (digest !== FIXTURE_PDF_SHA256) {
+		throw new Error(`${FIXTURE_PDF} has sha256 ${digest}, expected ${FIXTURE_PDF_SHA256}`);
+	}
 	const api = await Api.create();
 	try {
-		const project =
-			(await findProject(api, PROJECT_NAME)) || (await createProject(api, PROJECT_NAME));
-		// One at a time: parallel inserts on a fresh site deadlock creating the IMP- naming series row.
-		const review = await seedImport(api, project, `${FIXTURE_PREFIX} review`);
-		const agent = await seedImport(api, project, `${FIXTURE_PREFIX} agent`);
-		const fixtures: Fixtures = { project, projectName: PROJECT_NAME, review, agent };
+		const previous = readPrevious();
+		const source = await seedSource(
+			api,
+			createHash("md5").update(pdf).digest("hex"),
+			previous.source,
+		);
+		const recorded = previous.source?.import === source.import ? previous : {};
+		const project = await findOrCreateProject(api, PROJECT_NAME);
+		const review = await seedClone(
+			api,
+			project,
+			source,
+			`${FIXTURE_PREFIX} review`,
+			recorded.review,
+		);
+		const agent = await seedClone(api, project, source, `${FIXTURE_PREFIX} agent`, recorded.agent);
+		const fixtures: Fixtures = { project, projectName: PROJECT_NAME, source, review, agent };
 		fs.mkdirSync(STATE_DIR, { recursive: true });
 		fs.writeFileSync(FIXTURES_FILE, JSON.stringify(fixtures, null, "\t"));
 	} finally {

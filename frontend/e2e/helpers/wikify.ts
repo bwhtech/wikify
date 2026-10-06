@@ -117,20 +117,23 @@ export async function pageRows(api: Api, sourceDocument: string): Promise<Row[]>
 	});
 }
 
-export const FIXTURE_ROOT = "What Wikify Is";
-export const FIXTURE_SECTIONS = [
-	"Where your documents live",
-	"How Wikify processes a PDF",
-	"Reading the page review",
-	"Sections and their labels",
-	"Finding content across documents",
-	"Generating the wiki",
-	"The assistant",
-	"Which AI service Wikify uses",
-];
+// move_section rebuilds lft/rgt for the whole document from sort_order.
+export async function renumberTree(api: Api, sourceDocument: string): Promise<void> {
+	const [firstRoot] = await api.getList("Source Section", {
+		filters: { source_document: sourceDocument, parent_source_section: ["is", "not set"] },
+		orderBy: "sort_order asc, lft asc",
+		limit: 1,
+	});
+	if (!firstRoot) return;
+	await api.call("wikify.api.sections.move_section", {
+		name: firstRoot.name,
+		new_parent: "",
+		new_index: 0,
+	});
+}
 
 // A REST save on a section with an empty old_parent runs NestedSet's move and scrambles lft, so
-// renumber the tree from sort_order afterwards (move_section rebuilds the whole document's tree).
+// renumber the tree afterwards.
 export async function setSectionMarkdown(
 	api: Api,
 	sourceDocument: string,
@@ -140,14 +143,153 @@ export async function setSectionMarkdown(
 	for (const { name, markdown } of updates) {
 		await api.setValue("Source Section", name, { markdown });
 	}
-	const [firstRoot] = (await sectionRows(api, sourceDocument))
-		.filter((row) => !row.parent_source_section)
-		.sort((a, b) => a.sort_order - b.sort_order);
-	await api.call("wikify.api.sections.move_section", {
-		name: firstRoot.name,
-		new_parent: "",
-		new_index: 0,
+	await renumberTree(api, sourceDocument);
+}
+
+const IMPORT_FIELDS = ["pdf", "page_count", "stage_label", "stage_progress", "started_at"];
+const DOCUMENT_FIELDS = [
+	"pdf",
+	"page_count",
+	"parser_used",
+	"mean_score",
+	"canonical_mean",
+	"llm_cost",
+	"status",
+];
+const PAGE_FIELDS = [
+	"page_no",
+	"kind",
+	"image",
+	"verdict",
+	"composite",
+	"text_recall",
+	"extra_ratio",
+	"table_score",
+	"judge_score",
+	"llm_cost",
+	"notes",
+	"baseline_markdown",
+	"remediation_method",
+	"remediation_adopted",
+	"remediation_composite",
+	"remediation_notes",
+	"remediation_markdown",
+	"canonical_source",
+	"canonical_composite",
+	"canonical_markdown",
+];
+const SECTION_FIELDS = [
+	"title",
+	"is_group",
+	"section_type",
+	"level",
+	"sort_order",
+	"page_start",
+	"page_end",
+	"include_in_wiki",
+	"hierarchy_path",
+	"markdown",
+];
+const REFERENCE_FIELDS = ["target_page", "anchor_text", "occurrences"];
+
+function pick(row: Row, fields: string[]): Row {
+	return Object.fromEntries(fields.map((field) => [field, row[field]]));
+}
+
+async function insertMany(api: Api, doctype: string, docs: Row[]): Promise<string[]> {
+	const names: string[] = [];
+	for (let start = 0; start < docs.length; start += 50) {
+		const batch = docs.slice(start, start + 50).map((doc) => ({ doctype, ...doc }));
+		names.push(...(await api.call<string[]>("frappe.client.insert_many", { docs: batch })));
+	}
+	return names;
+}
+
+export async function cloneImport(
+	api: Api,
+	sourceImport: string,
+	{ title, project }: { title: string; project: string },
+): Promise<{ import: string; sourceDocument: string }> {
+	const original = await api.getValue<Row>("Wikify Import", sourceImport, [
+		"source_document",
+		...IMPORT_FIELDS,
+	]);
+	const from = original.source_document;
+	const document = await api.getDoc("Source Document", from);
+	const sourceDocument: string = (
+		await api.call("frappe.client.insert", {
+			doc: { doctype: "Source Document", title, project, ...pick(document, DOCUMENT_FIELDS) },
+		})
+	).name;
+
+	const pages = await api.getList("Source Page", {
+		filters: { source_document: from },
+		fields: PAGE_FIELDS,
+		orderBy: "page_no asc",
 	});
+	await insertMany(
+		api,
+		"Source Page",
+		pages.map((page) => ({ ...page, source_document: sourceDocument })),
+	);
+
+	// A child needs its parent's new name, so each pass inserts the rows whose parent is already copied.
+	let pending = await api.getList("Source Section", {
+		filters: { source_document: from },
+		fields: ["name", "parent_source_section", ...SECTION_FIELDS],
+		orderBy: "lft asc",
+	});
+	const names = new Map<string, string>();
+	while (pending.length) {
+		const ready = pending.filter(
+			(row) => !row.parent_source_section || names.has(row.parent_source_section),
+		);
+		if (!ready.length) throw new Error(`Orphan sections in ${from}: ${JSON.stringify(pending)}`);
+		const inserted = await insertMany(
+			api,
+			"Source Section",
+			ready.map((row) => ({
+				...pick(row, SECTION_FIELDS),
+				source_document: sourceDocument,
+				parent_source_section: names.get(row.parent_source_section) ?? null,
+			})),
+		);
+		ready.forEach((row, index) => names.set(row.name, inserted[index]));
+		pending = pending.filter((row) => !names.has(row.name));
+	}
+	await renumberTree(api, sourceDocument);
+
+	const references = await api.getList("Section Reference", {
+		filters: { source_document: from },
+		fields: ["from_section", "to_section", ...REFERENCE_FIELDS],
+	});
+	await insertMany(
+		api,
+		"Section Reference",
+		references
+			.filter((row) => names.has(row.from_section) && names.has(row.to_section))
+			.map((row) => ({
+				...pick(row, REFERENCE_FIELDS),
+				from_section: names.get(row.from_section),
+				to_section: names.get(row.to_section),
+				source_document: sourceDocument,
+			})),
+	);
+
+	const importName: string = (
+		await api.call("frappe.client.insert", {
+			doc: {
+				doctype: "Wikify Import",
+				import_title: title,
+				project,
+				status: "Review",
+				source_document: sourceDocument,
+				...pick(original, IMPORT_FIELDS),
+			},
+		})
+	).name;
+	await api.setValue("Source Document", sourceDocument, { import: importName });
+	return { import: importName, sourceDocument };
 }
 
 export function escapeRegExp(text: string): string {
@@ -171,14 +313,19 @@ export async function propagationPending(api: Api, sourceDocument: string): Prom
 	return jobs.some((job) => JSON.parse(job.arguments).kwargs?.source_document === sourceDocument);
 }
 
-// A fresh parse runs LLM remediation, so heading text and image captions vary between parses.
-// Specs that parse their own import pick sections by position and figures by search.
+// Two parses of the same PDF differ in headings, captions and even tree shape, so specs pick
+// sections by position and figures by search, never by title or page number.
 export async function outline(api: Api, sourceDocument: string) {
 	const rows = await sectionRows(api, sourceDocument);
 	const topLevel = rows.filter((row) => !row.parent_source_section);
-	// Usually one title section holds the rest; a parse that misses the title heading comes out flat.
-	const root = topLevel.length === 1 ? topLevel[0] : undefined;
-	const children = root ? rows.filter((row) => row.parent_source_section === root.name) : topLevel;
+	const childrenOf = (parent: SectionRow) =>
+		rows.filter((row) => row.parent_source_section === parent.name);
+	const widest = topLevel.reduce<SectionRow | undefined>(
+		(best, row) => (!best || childrenOf(row).length > childrenOf(best).length ? row : best),
+		undefined,
+	);
+	const root = widest && childrenOf(widest).length >= 5 ? widest : undefined;
+	const children = root ? childrenOf(root) : topLevel;
 	if (children.length < 5) {
 		const shape = rows.map((row) => [row.title, row.parent_source_section]);
 		throw new Error(`Unexpected section tree for ${sourceDocument}: ${JSON.stringify(shape)}`);

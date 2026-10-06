@@ -5,12 +5,12 @@ import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor } from "../helpers/wait";
 import {
+	cloneImport,
 	createProject,
 	escapeRegExp,
 	findFigure,
 	outline,
 	sectionRows,
-	startImport,
 	waitForImport,
 	type SectionRow,
 } from "../helpers/wikify";
@@ -68,9 +68,10 @@ test.describe("publish", () => {
 	const stamp = Date.now();
 	const name = `${PREFIX} publish ${stamp}`;
 	const spaceRoute = `test-publish-${stamp}`;
-	const first = { import: "", sourceDocument: "" };
-	const second = { import: "" };
+	let first = { import: "", sourceDocument: "" };
+	let second = { import: "", sourceDocument: "" };
 	let sections: SectionRow[] = [];
+	let root: SectionRow | undefined;
 	let excluded: SectionRow;
 	let leafTitle = "";
 	let otherTitle = "";
@@ -78,24 +79,25 @@ test.describe("publish", () => {
 	let space = "";
 	let publishedDocuments: WikiDocument[] = [];
 
-	test.beforeAll(async ({ api }) => {
+	test.beforeAll(async ({ api, fixture }) => {
 		test.setTimeout(QUEUE_TIMEOUT + 1_200_000);
 		const project = await createProject(api, name);
-		first.import = await startImport(api, { title: name, project });
-		second.import = await startImport(api, { title: `${name} 2`, project });
-		first.sourceDocument = (
-			await waitForImport(api, first.import, "Review", QUEUE_TIMEOUT)
-		).source_document;
+		first = await cloneImport(api, fixture.source.import, { title: name, project });
+		second = await cloneImport(api, fixture.source.import, { title: `${name} 2`, project });
 
-		const { children } = await outline(api, first.sourceDocument);
+		let children: SectionRow[];
+		({ root, children } = await outline(api, first.sourceDocument));
 		excluded = children.at(-1)!;
 		leafTitle = children[0].title;
 		otherTitle = children[1].title;
 		await api.call("wikify.api.sections.toggle_include", { name: excluded.name, include: 0 });
 
-		// Page 3 on, not 1 or 2: a crop rebuilds every section covering the page from whole pages, and page 1
-		// holds the root's own text, which would then leak into its first child and hide bug #30.
-		const figure = await findFigure(api, first.sourceDocument, { fromPage: 3 });
+		// Past the first two children: a crop rebuilds every section covering the page from whole pages, so
+		// the root's own text would leak into its first child (hiding bug #30), and a shared page would put
+		// the second child's heading into the first child's page.
+		const figure = await findFigure(api, first.sourceDocument, {
+			fromPage: children[1].page_end + 1,
+		});
 		const result = await api.call("wikify.api.pages.crop_page_figure", {
 			source_document: first.sourceDocument,
 			page_no: figure.pageNo,
@@ -197,13 +199,8 @@ test.describe("publish", () => {
 		async ({ page }) => {
 			// known failure: #30. Remove test.fail() when the issue is closed.
 			test.fail();
-			const root = sections.find(
-				(row) =>
-					!row.parent_source_section &&
-					sections.some((child) => child.parent_source_section === row.name),
-			);
 			test.skip(!root, "this parse produced no parent section");
-			const parent = root!;
+			const parent = sections.find((row) => row.name === root!.name)!;
 			const paragraph = ownParagraph(parent.markdown);
 			expect(sections.filter((row) => row.markdown?.includes(paragraph))).toEqual([parent]);
 			const group = publishedDocuments.find((document) => document.name === parent.wiki_document)!;
@@ -260,12 +257,7 @@ test.describe("publish", () => {
 		{ tag: ["@functional", "@publish"] },
 		async ({ page, api }) => {
 			test.setTimeout(QUEUE_TIMEOUT * 2);
-			const { source_document: sourceDocument } = await waitForImport(
-				api,
-				second.import,
-				"Review",
-				QUEUE_TIMEOUT,
-			);
+			const { sourceDocument } = second;
 			const before = await wikiDocuments(api, spaceRoute);
 
 			await page.goto(`/wikify/import/${second.import}/tree`);
