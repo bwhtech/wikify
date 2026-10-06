@@ -3,7 +3,9 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import pairwise
 
+from wikify.engine.loader.cleanup import _SEP_ONLY
 from wikify.engine.loader.toc import correct_level
 
 MAX_TITLE_LENGTH = 140
@@ -17,10 +19,19 @@ _LEADING_NUM = re.compile(r"^(\d+)\b")
 _DOUBLE_NUM = re.compile(r"^\d+\.\s+\d")
 _GLUED_NUM = re.compile(r"^(\d+(?:\.\d+)+\.?)(?=[A-Z])")
 _BOLD_LINE = re.compile(r"^\*\*([^*]+)\*\*$")
+_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_CONTENTS_TITLE = re.compile(r"(?i)^(?:table of )?contents$|^index$")
+_TOC_ENTRY = re.compile(
+	r"^(?:[-*+]\s+)?\|?\s*\d+(?:\.\d+)*\.?\s*\|?\s*[A-Za-z(].*?(?:\.{3,}|\s[-\u2013\u2014]\s|\||<br>|\s)\s*(\d{1,4})\s*\|?$"
+)
+_TOC_LEADER = re.compile(r"[A-Za-z].*\.{4,}\s*(\d{1,4})$")
+TOC_MIN_ENTRIES = 5
+TOC_MIN_ENTRY_SHARE = 0.6
+TOC_MIN_ASCENDING_SHARE = 0.75
 
 
 def _clean_title(raw: str) -> str:
-	title = _GLUED_NUM.sub(r"\1 ", raw.strip().strip("*_").strip())
+	title = _GLUED_NUM.sub(r"\1 ", _LINK.sub(r"\1", raw.strip().strip("*_").strip()).strip())
 	if title.endswith(".") and not title.endswith(".."):
 		title = title[:-1].rstrip()
 	if len(title) <= MAX_TITLE_LENGTH:
@@ -35,6 +46,12 @@ def _infer_level(title: str, fallback: int) -> int:
 	if m:
 		return min(6, m.group(1).count(".") + 1)
 	return fallback
+
+
+def _is_label(title: str, level_map: dict[str, int]) -> bool:
+	return (
+		title not in level_map and not _NUM_RE.match(title) and (title[:1].islower() or title.endswith(":"))
+	)
 
 
 def _chapter_num(title: str) -> int | None:
@@ -92,6 +109,27 @@ def _promote_numbered_bold_line(line: str, last_number: tuple[int, ...]) -> str:
 	return f"{'#' * min(6, len(number))} {title}"
 
 
+def toc_end_line(lines: list[str]) -> int:
+	"""Index of the last table-of-contents entry when the page is a TOC page, else -1. TOC entries name
+	real headings, so reading them as headings opens phantom sections and advances chapter numbering."""
+	entries: list[tuple[int, int]] = []
+	content_lines = 0
+	for index, line in enumerate(lines):
+		text = line.strip()
+		if not text or _SEP_ONLY.match(text):
+			continue
+		content_lines += 1
+		entry = _TOC_ENTRY.match(text) or _TOC_LEADER.search(text)
+		if entry:
+			entries.append((index, int(entry.group(1))))
+	if len(entries) < TOC_MIN_ENTRIES or len(entries) < TOC_MIN_ENTRY_SHARE * content_lines:
+		return -1
+	ascending = sum(later >= earlier for (_, earlier), (_, later) in pairwise(entries))
+	if ascending < TOC_MIN_ASCENDING_SHARE * (len(entries) - 1):
+		return -1
+	return entries[-1][0]
+
+
 def running_header_titles(pages: list[tuple[int, str]]) -> set[str]:
 	occurrences: dict[str, list[int]] = defaultdict(list)
 	pages_seen: dict[str, set[int]] = defaultdict(set)
@@ -141,10 +179,31 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 			sections.append(current)
 
 	for page_no, md in pages:
-		for line in md.splitlines():
-			m = _HEADING_RE.match(_promote_numbered_bold_line(line, last_number))
+		lines = md.splitlines()
+		toc_end = toc_end_line(lines)
+		for line_index, line in enumerate(lines):
+			in_toc = line_index <= toc_end and bool(line.strip())
+			m = _HEADING_RE.match(line if in_toc else _promote_numbered_bold_line(line, last_number))
+			title = _clean_title(m.group(2)) if m else ""
+			if in_toc:
+				if not (current and _CONTENTS_TITLE.match(current.title)):
+					flush()
+					buf = []
+					contents_title = title if _CONTENTS_TITLE.match(title) else "Contents"
+					stack = [(1, contents_title, False)]
+					current = Section(
+						title=contents_title,
+						level=1,
+						hierarchy_path=[contents_title],
+						page_start=page_no,
+						page_end=page_no,
+					)
+					if contents_title == title:
+						continue
+				m = None
+			elif m and _is_label(title, level_map):
+				line, m = f"**{title}**", None
 			if m:
-				title = _clean_title(m.group(2))
 				if _repeats_open_section(title, stack):
 					if current is not None:
 						current.page_end = page_no

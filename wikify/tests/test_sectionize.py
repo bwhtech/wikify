@@ -332,6 +332,52 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("approved by committee", cleaned[1])
 		self.assertIn("|---|---|", cleaned[1])
 
+	def test_table_of_contents_is_one_section_that_never_opens_chapters(self):
+		table_rows = "\n".join(f"| 1.{n} | Scope of service {n} | {18 + n} |" for n in range(1, 7))
+		procedure_rows = "\n".join(f"| 5.{n} | Policies for topic {n} | {95 + n} |" for n in range(1, 7))
+		list_rows = "\n".join(f"  - 6.1.{n} Protocol {n} — {200 + n}" for n in range(1, 7))
+		pages = [
+			(1, "# PROCEDURE MANUAL\n\n## REVISION HISTORY\nrevisions"),
+			(2, f"## Contents\n\n| S.No | CONTENTS | Pg No |\n|---|---|---|\n{table_rows}"),
+			(
+				3,
+				f"## 5 Procedures for access of the patients\n\n| No. | Topic | Page |\n|---|---|---|\n{procedure_rows}",
+			),
+			(4, f"- 6.1 Protocols — 199\n{list_rows}\n\n**4**"),
+			(5, "# 1. PROFILE OF THE DEPARTMENT\n\n## Overview\nIn the year 1900 the institution began."),
+		]
+		secs = sectionize(pages)
+		self.assertEqual(
+			[(s.title, s.level) for s in secs],
+			[
+				("PROCEDURE MANUAL", 1),
+				("REVISION HISTORY", 2),
+				("Contents", 1),
+				("1. PROFILE OF THE DEPARTMENT", 1),
+				("Overview", 2),
+			],
+		)
+		contents = secs[2]
+		self.assertEqual((contents.page_start, contents.page_end), (2, 4))
+		self.assertIn("5 Procedures for access of the patients", contents.markdown)
+		self.assertIn("6.1.6 Protocol 6 — 206", contents.markdown)
+
+	def test_link_markup_is_stripped_from_heading_titles(self):
+		secs = sectionize([(1, "# [PROCEDURE MANUAL - NEPHROLOGY](#)\n\n## REVISION HISTORY\nrows")])
+		self.assertEqual(secs[0].title, "PROCEDURE MANUAL - NEPHROLOGY")
+
+	def test_lowercase_or_colon_heading_is_a_bold_label(self):
+		pages = [
+			(
+				1,
+				"# **IMMEDIATE PRE-OPERATIVE PROTOCOLS**\nintro\n# **are carried out as below:**\n"
+				"- PreHD: WBC\n# **Drug list:**\n- MMF 8 am\n# 5.1 Definitions:\nterms",
+			)
+		]
+		secs = sectionize(pages)
+		self.assertEqual([s.title for s in secs], ["IMMEDIATE PRE-OPERATIVE PROTOCOLS", "5.1 Definitions:"])
+		self.assertIn("**are carried out as below:**\n- PreHD: WBC\n**Drug list:**", secs[0].markdown)
+
 	def test_clean_pages_strips_signoff_footer_written_as_text(self):
 		pipes = "Prepared by: Dr. A, Dr. B | Issued by: QMC | Approved by: Dr. C"
 		merged = "**Prepared by: Dr. A, Dr. Issued by: QMC Approved by: Dr. C B** "
