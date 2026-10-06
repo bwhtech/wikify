@@ -82,11 +82,12 @@ const sections = computed(() => [{ label: "", items: destinations.value }]);
 // Ask owns its scrolling: the transcript scrolls, the composer under it does not.
 const FIXED_HEIGHT_ROUTES = ["Explore", "ProjectGraph", "ImportGraph", "AskWiki"];
 const pageScroll = computed(() => !FIXED_HEIGHT_ROUTES.includes(route.name));
-const pageKey = computed(() => `${String(route.name)}:${route.params.name ?? ""}`);
 const onAskPage = computed(() => route.name === "AskWiki");
 
 const collapsed = ref(localStorage.getItem("sidebar-collapsed") === "true");
 watch(collapsed, (v) => localStorage.setItem("sidebar-collapsed", v));
+
+const pageKey = computed(() => `${String(route.name)}:${route.params.name ?? ""}`);
 
 function runMenuItem(item) {
 	mobileMenuOpen.value = false;
