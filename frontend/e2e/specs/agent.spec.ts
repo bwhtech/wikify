@@ -486,6 +486,7 @@ test.describe("assistant", () => {
 				).toEqual([true]);
 				expect(await exists()).toBe(true);
 				await expect(panel.getByText("Confirm delete_section")).toBeVisible();
+				await expect(panel.getByText(`Delete section '${title}'.`, { exact: true })).toBeVisible();
 				await panel.getByRole("button", { name: "Cancel" }).click();
 				await expect(panel.getByText("Cancelled.")).toBeVisible();
 				expect(await exists()).toBe(true);
