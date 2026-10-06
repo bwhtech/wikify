@@ -8,14 +8,15 @@ on:
       days:
         description: Cover PRs merged in the last N days
         default: "7"
+      prs:
+        description: Cover these PR numbers instead, comma-separated (e.g. 105,101)
+        default: ""
+  pull_request_target:
+    types: [closed, labeled]
   pull_request:
     paths:
       - .github/workflows/e2e-generate.yml
       - .claude/skills/e2e-from-prs/**
-
-concurrency:
-  group: e2e-generate
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -33,6 +34,15 @@ jobs:
     name: Generate tests
     runs-on: ubuntu-latest
     timeout-minutes: 330
+    # pull_request_target: only merged PRs carrying the label, so the code is already on main.
+    if: >-
+      github.event_name != 'pull_request_target' || (github.event.pull_request.merged &&
+      contains(github.event.pull_request.labels.*.name, 'e2e-generate') &&
+      (github.event.action == 'closed' || github.event.label.name == 'e2e-generate'))
+    # Job-level, so the skipped runs from every other merged PR can't cancel a queued one.
+    concurrency:
+      group: e2e-generate
+      cancel-in-progress: false
     # Claude reads PR text written by others, so this job only gets a read token; publish pushes.
     permissions:
       contents: read
@@ -41,6 +51,7 @@ jobs:
       changed: ${{ steps.result.outputs.changed }}
       since: ${{ steps.prs.outputs.since }}
       run_date: ${{ steps.prs.outputs.run_date }}
+      targets: ${{ steps.prs.outputs.targets }}
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GH_TOKEN: ${{ github.token }}
@@ -73,26 +84,40 @@ jobs:
         id: prs
         env:
           DAYS: ${{ inputs.days || '7' }}
+          PRS: ${{ inputs.prs || github.event.pull_request.merged && github.event.pull_request.number || '' }}
         run: |
           [[ "$DAYS" =~ ^[0-9]+$ ]] || { echo "::error::days must be a whole number, got '$DAYS'"; exit 1; }
           since=$(date -u -d "-$DAYS days" +%Y-%m-%d)
           run_date=$(date -u +%Y-%m-%d)
           echo "since=$since" >> "$GITHUB_OUTPUT"
           echo "run_date=$run_date" >> "$GITHUB_OUTPUT"
+          echo "targets=$PRS" >> "$GITHUB_OUTPUT"
 
-          gh pr list --state merged --base main --search "merged:>=$since" --limit 200 \
-            --json number,title,author,files,headRefName,mergedAt > "$RUNNER_TEMP/merged.json"
+          if [ -n "$PRS" ]; then
+            [[ "$PRS" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "::error::prs must be comma-separated PR numbers, got '$PRS'"; exit 1; }
+            for pr in ${PRS//,/ }; do
+              gh pr view "$pr" --json number,title,author,files,headRefName,mergedAt
+            done | jq -s '[.[] | select(.mergedAt != null)]' > "$RUNNER_TEMP/merged.json"
+          else
+            gh pr list --state merged --base main --search "merged:>=$since" --limit 200 \
+              --json number,title,author,files,headRefName,mergedAt,labels \
+              | jq '[.[] | select([.labels[].name] | index("e2e-generate") | not)]' > "$RUNNER_TEMP/merged.json"
+          fi
           jq '[.[]
-              | select(.headRefName | startswith("e2e/weekly-") | not)
+              | select(.headRefName | test("^e2e/(weekly|pr)-") | not)
               | select([.files[].path | select(test("^(frontend/e2e/|\\.github/)") | not)] | length > 0)]
               | sort_by(.mergedAt)' "$RUNNER_TEMP/merged.json" > "$RUNNER_TEMP/eligible.json"
           jq -r ".[:$MAX_PRS][].number" "$RUNNER_TEMP/eligible.json" > "$RUNNER_TEMP/prs.txt"
 
           mkdir -p "$(dirname "$REPORT")"
           {
-            echo "## Weekly e2e generation, PRs merged since $since"
+            if [ -n "$PRS" ]; then
+              echo "## E2e generation for PRs $PRS"
+            else
+              echo "## Weekly e2e generation, PRs merged since $since"
+            fi
             echo
-            echo "Merged into main: $(jq length "$RUNNER_TEMP/merged.json"). Eligible: $(jq length "$RUNNER_TEMP/eligible.json") (e2e/weekly-* branches and PRs touching only frontend/e2e/ or .github/ are left out)."
+            echo "Merged into main: $(jq length "$RUNNER_TEMP/merged.json"). Eligible: $(jq length "$RUNNER_TEMP/eligible.json") (e2e/weekly-* and e2e/pr-* branches, PRs labelled e2e-generate, and PRs touching only frontend/e2e/ or .github/ are left out)."
             echo
             jq -r '.[] | "- #\(.number) \(.title) (@\(.author.login))"' <(jq ".[:$MAX_PRS]" "$RUNNER_TEMP/eligible.json")
             if [ "$(jq length "$RUNNER_TEMP/eligible.json")" -gt "$MAX_PRS" ]; then
@@ -288,6 +313,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SINCE: ${{ needs.generate.outputs.since }}
       RUN_DATE: ${{ needs.generate.outputs.run_date }}
+      TARGETS: ${{ needs.generate.outputs.targets }}
 
     steps:
       - name: Clone
@@ -307,8 +333,16 @@ jobs:
 
       - name: Commit, push and open the PR
         run: |
-          branch="e2e/weekly-$RUN_DATE"
-          title="test(e2e): tests for PRs merged week of $SINCE"
+          # e2e.yml runs the specs of the open e2e-weekly PR, so only the weekly PR carries that label.
+          label=()
+          if [ -n "$TARGETS" ]; then
+            branch="e2e/pr-${TARGETS//,/-}"
+            title="test(e2e): tests for #${TARGETS//,/, #}"
+          else
+            label=(--label e2e-weekly)
+            branch="e2e/weekly-$RUN_DATE"
+            title="test(e2e): tests for PRs merged week of $SINCE"
+          fi
           rm -rf frontend/e2e/specs
           cp -r "$RUNNER_TEMP/specs" frontend/e2e/specs
           git switch -c "$branch"
@@ -332,7 +366,8 @@ jobs:
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$number" -F "body=@$body" --silent
             echo "Updated #$number" >> "$GITHUB_STEP_SUMMARY"
           else
-            gh pr create --base main --head "$branch" --title "$title" --body-file "$body" --label e2e-weekly | tee -a "$GITHUB_STEP_SUMMARY"
+            gh pr create --base main --head "$branch" --title "$title" --body-file "$body" "${label[@]}" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
   report-failure:
