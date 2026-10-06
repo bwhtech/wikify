@@ -20,6 +20,7 @@ import { useSocket } from "@/socket";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
 import { statusTheme, isActive } from "@/utils/status";
+import { confirmDeleteDocument } from "@/utils/deleteDocument";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
 import { setDocument, setProject } from "@/data/agentContext";
@@ -84,7 +85,9 @@ const sortedLogs = computed(() =>
 );
 
 const status = computed(() => imp.doc?.status);
-const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
+const canRemediate = computed(
+	() => ["Review", "Failed"].includes(status.value) && !!imp.doc?.source_document
+);
 const canReclassify = computed(
 	() => !!imp.doc?.source_document && ["Review", "Graphed", "Stopped"].includes(status.value)
 );
@@ -93,6 +96,20 @@ const reclassify = useCall({
 	method: "POST",
 	immediate: false,
 });
+function confirmDelete() {
+	const project = imp.doc?.project;
+	confirmDeleteDocument({
+		title: imp.doc?.import_title || props.name,
+		deleteCall: imp.delete,
+		onDeleted: () =>
+			router.replace(
+				project
+					? { name: "ProjectDetail", params: { name: project } }
+					: { name: "Projects" }
+			),
+	});
+}
+
 function confirmReclassify() {
 	dialog.confirm({
 		title: "Reclassify sections",
@@ -317,6 +334,23 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 							v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
 							:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
 							:loading="remediate.loading"
+						/>
+					</Dropdown>
+					<Dropdown
+						v-if="imp.doc && !isActive(status)"
+						:options="[
+							{
+								label: 'Delete document',
+								icon: 'lucide-trash-2',
+								onClick: confirmDelete,
+							},
+						]"
+						placement="right"
+					>
+						<Button
+							variant="ghost"
+							icon="lucide-more-horizontal"
+							label="More actions"
 						/>
 					</Dropdown>
 				</div>

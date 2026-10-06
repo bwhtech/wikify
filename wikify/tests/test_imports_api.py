@@ -8,6 +8,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.api import imports as imports_api
+from wikify.jobs._util import import_job_id
 from wikify.seed import seed_uncategorized_project
 
 
@@ -56,6 +57,7 @@ class TestImportsApi(FrappeTestCase):
 			self.assertEqual(call.args[0], "wikify.jobs.parse.run")
 			self.assertEqual(call.kwargs["queue"], "long")
 			self.assertEqual(call.kwargs["import_name"], names[i])
+			self.assertEqual(call.kwargs["job_id"], import_job_id(names[i]))
 
 	def test_import_count_tracks_the_batch(self):
 		with patch.object(frappe, "enqueue"):
@@ -151,3 +153,76 @@ class TestImportsApi(FrappeTestCase):
 				imports_api.assert_readable_file(file_url)
 		finally:
 			frappe.set_user("Administrator")
+
+	def make_import(self, status: str, with_source_document: bool = True) -> str:
+		source_document = None
+		if with_source_document:
+			source_document = (
+				frappe.get_doc({"doctype": "Source Document", "title": "Retry Test"})
+				.insert(ignore_permissions=True)
+				.name
+			)
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Wikify Import",
+					"import_title": "Retry Test Import",
+					"project": self.project.name,
+					"pdf": "/private/files/x.pdf",
+					"source_document": source_document,
+					"status": status,
+					"error": "The background job stopped before finishing.",
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def test_remediation_retries_a_failed_import(self):
+		name = self.make_import("Failed")
+
+		with (
+			patch.object(imports_api, "is_job_enqueued", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+		):
+			imports_api.trigger_remediation(name, scope="all")
+
+		status, error = frappe.db.get_value("Wikify Import", name, ["status", "error"])
+		self.assertEqual(status, "Remediating")
+		self.assertFalse(error)
+		self.assertEqual(enqueue.call_args.args[0], "wikify.jobs.remediate.run")
+		self.assertEqual(enqueue.call_args.kwargs["job_id"], import_job_id(name))
+		self.assertEqual(enqueue.call_args.kwargs["timeout"], 6 * 60 * 60)
+
+	def test_remediation_rejects_a_failed_import_without_a_document(self):
+		name = self.make_import("Failed", with_source_document=False)
+
+		with patch.object(frappe, "enqueue") as enqueue, self.assertRaises(frappe.ValidationError):
+			imports_api.trigger_remediation(name)
+
+		enqueue.assert_not_called()
+
+	def test_remediation_rejects_an_import_that_is_not_in_review_or_failed(self):
+		for status in ("Parsing", "Remediating", "Graphed", "Completed"):
+			name = self.make_import(status)
+			with (
+				patch.object(imports_api, "is_job_enqueued", return_value=False),
+				patch.object(frappe, "enqueue") as enqueue,
+				self.assertRaises(frappe.ValidationError),
+			):
+				imports_api.trigger_remediation(name)
+			enqueue.assert_not_called()
+			self.assertEqual(frappe.db.get_value("Wikify Import", name, "status"), status)
+
+	def test_remediation_refuses_while_the_import_job_is_running(self):
+		name = self.make_import("Failed")
+
+		with (
+			patch.object(imports_api, "is_job_enqueued", return_value=True),
+			patch.object(frappe, "enqueue") as enqueue,
+			self.assertRaises(frappe.ValidationError),
+		):
+			imports_api.trigger_remediation(name)
+
+		enqueue.assert_not_called()
+		self.assertEqual(frappe.db.get_value("Wikify Import", name, "status"), "Failed")
