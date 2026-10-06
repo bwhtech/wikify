@@ -51,6 +51,11 @@ async function expectRoutesOpen(page: Page, documents: WikiDocument[]): Promise<
 	}
 }
 
+async function firstLeaf(api: Api, sourceDocument: string): Promise<SectionRow> {
+	const { rows, children } = await outline(api, sourceDocument);
+	return children.find((child) => !rows.some((row) => row.parent_source_section === child.name))!;
+}
+
 function ownParagraph(markdown: string): string {
 	const paragraph = markdown
 		.split(/\n\s*\n/)
@@ -84,18 +89,25 @@ test.describe("publish", () => {
 		first = await cloneImport(api, fixture.source.import, { title: name, project });
 		second = await cloneImport(api, fixture.source.import, { title: `${name} 2`, project });
 
+		let rows: SectionRow[];
 		let children: SectionRow[];
-		({ root, children } = await outline(api, first.sourceDocument));
-		excluded = children.at(-1)!;
-		leafTitle = children[0].title;
-		otherTitle = children[1].title;
+		({ rows, root, children } = await outline(api, first.sourceDocument));
+		// A group's wiki route opens its first child, so the pages checked by title must be leaves.
+		const leaves = children.filter(
+			(child) => !rows.some((row) => row.parent_source_section === child.name),
+		);
+		expect(leaves.length, "two top-level sections without children").toBeGreaterThanOrEqual(2);
+		const [leaf, other] = leaves;
+		excluded = children.findLast((child) => child !== leaf && child !== other)!;
+		leafTitle = leaf.title;
+		otherTitle = other.title;
 		await api.call("wikify.api.sections.toggle_include", { name: excluded.name, include: 0 });
 
-		// Past the first two children: a crop rebuilds every section covering the page from whole pages, so
-		// the root's own text would leak into its first child (hiding bug #30), and a shared page would put
-		// the second child's heading into the first child's page.
+		// Past the first two children and both leaves: a crop rebuilds every section covering the page from
+		// whole pages, so the root's own text would leak into its first child (hiding bug #30), and a shared
+		// page would put one section's heading into another's page.
 		const figure = await findFigure(api, first.sourceDocument, {
-			fromPage: children[1].page_end + 1,
+			fromPage: Math.max(children[1].page_end, leaf.page_end, other.page_end) + 1,
 		});
 		const result = await api.call("wikify.api.pages.crop_page_figure", {
 			source_document: first.sourceDocument,
@@ -305,9 +317,9 @@ test.describe("publish", () => {
 			);
 			await expectRoutesOpen(page, added);
 
-			const secondLeaf = (await outline(api, sourceDocument)).children[0];
-			const firstLeaf = (await outline(api, first.sourceDocument)).children[0];
-			for (const leaf of [secondLeaf, firstLeaf]) {
+			const secondLeaf = await firstLeaf(api, sourceDocument);
+			const leafOfFirst = await firstLeaf(api, first.sourceDocument);
+			for (const leaf of [secondLeaf, leafOfFirst]) {
 				const document = after.find((row) => row.name === leaf.wiki_document)!;
 				await page.goto(`/${document.route}`);
 				const main = page.getByRole("main");

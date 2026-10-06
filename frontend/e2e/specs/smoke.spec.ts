@@ -159,8 +159,12 @@ test.describe("smoke", () => {
 		async ({ page, api }) => {
 			const { rows: before, root, children: childRows } = await outline(api, run.sourceDocument);
 			const children = childRows.map((row) => row.name);
-			const renamed = childRows[2];
-			const excluded = childRows[3];
+			// S-08 opens the renamed section's wiki page, and a group's route opens its first child instead.
+			const renamed = childRows
+				.slice(0, -1)
+				.find((child) => !before.some((row) => row.parent_source_section === child.name))!;
+			expect(renamed, "a top-level section without children").toBeTruthy();
+			const excluded = [childRows[3], childRows[2]].find((row) => row.name !== renamed.name)!;
 			const moved = children.at(-1)!;
 			const newTitle = `${NAME} renamed`;
 

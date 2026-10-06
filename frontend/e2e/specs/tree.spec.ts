@@ -280,12 +280,21 @@ test.describe("tree", () => {
 		"F-TREE-06 preview a section in the Wiki tab",
 		{ tag: ["@functional", "@tree"] },
 		async ({ page, api, fixture }) => {
-			const { root, children } = fixture.review.outline;
-			const names = children.map((child) => child.name);
-			const section = (await sectionRows(api, fixture.review.sourceDocument)).find(
-				(row) => names.includes(row.name) && row.markdown?.match(IMAGE_TAG),
-			)!;
+			const names = fixture.review.outline.children.map((child) => child.name);
+			const rows = await sectionRows(api, fixture.review.sourceDocument);
+			const withFigure = rows.filter((row) => row.markdown?.match(IMAGE_TAG));
+			// Top-level sections of a long chapter are often groups whose figures sit in their children.
+			const section =
+				withFigure.find((row) => names.includes(row.name)) ??
+				withFigure.find((row) => row.parent_source_section)!;
 			expect(section, "a section with a figure").toBeTruthy();
+			const ancestors: string[] = [];
+			for (
+				let parent = section.parent_source_section;
+				parent;
+				parent = rows.find((row) => row.name === parent)!.parent_source_section
+			)
+				ancestors.unshift(rows.find((row) => row.name === parent)!.title);
 			const imageCount = section.markdown.match(IMAGE_TAG)!.length;
 			const documentTitle = await api.getValue(
 				"Source Document",
@@ -297,12 +306,7 @@ test.describe("tree", () => {
 			await sectionRow(page, section.name).getByText(section.title, { exact: true }).click();
 
 			await expect(page.getByRole("radio", { name: "Rendered" })).toBeChecked();
-			const crumbs = [
-				fixture.projectName,
-				documentTitle,
-				...(root ? [root.title] : []),
-				section.title,
-			];
+			const crumbs = [fixture.projectName, documentTitle, ...ancestors, section.title];
 			await expect(page.getByRole("navigation").filter({ hasText: documentTitle })).toHaveText(
 				new RegExp(
 					`^${crumbs.map((crumb) => crumb.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*›\\s*")}$`,
