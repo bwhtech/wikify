@@ -3,7 +3,13 @@ import fs from "node:fs";
 import { test as setup } from "@playwright/test";
 import { Api } from "../helpers/api";
 import { deleteImport } from "../helpers/cleanup";
-import { FIXTURE_PDF, FIXTURE_PDF_SHA256, FIXTURE_PREFIX, STATE_DIR } from "../helpers/env";
+import {
+	FIXTURE_PDF,
+	FIXTURE_PDF_OVERRIDDEN,
+	FIXTURE_PDF_SHA256,
+	FIXTURE_PREFIX,
+	STATE_DIR,
+} from "../helpers/env";
 import {
 	FIXTURES_FILE,
 	type FixtureOutline,
@@ -151,7 +157,9 @@ setup("seed the fixture project and imports", async () => {
 	setup.setTimeout(SOURCE_PARSE_TIMEOUT + 900_000);
 	const pdf = fs.readFileSync(FIXTURE_PDF);
 	const digest = createHash("sha256").update(pdf).digest("hex");
-	if (digest !== FIXTURE_PDF_SHA256) {
+	if (FIXTURE_PDF_OVERRIDDEN) {
+		console.log(`[seed] E2E_FIXTURE_PDF is set: using ${FIXTURE_PDF}, sha256 check skipped`);
+	} else if (digest !== FIXTURE_PDF_SHA256) {
 		throw new Error(`${FIXTURE_PDF} has sha256 ${digest}, expected ${FIXTURE_PDF_SHA256}`);
 	}
 	const api = await Api.create();
