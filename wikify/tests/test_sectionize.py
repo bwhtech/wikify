@@ -81,6 +81,51 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual(secs[0].page_end, 3)
 		self.assertIn("more on page two", secs[0].markdown)
 
+	def test_unnumbered_heading_stays_under_the_numbered_section(self):
+		pages = [
+			(1, "# 3. Job Descriptions\na\n## 3.6.1 Nursing Supervisor\nb\n# Research\nc"),
+			(2, "## 3.6.2 Charge Nurse\nd\n# Monday\ne\n# Tuesday\nf\n# 4. Records\ng"),
+		]
+		secs = sectionize(pages)
+		paths = {s.title: s.hierarchy_path for s in secs}
+		self.assertEqual(paths["Research"], ["3. Job Descriptions", "3.6.1 Nursing Supervisor", "Research"])
+		self.assertEqual(paths["3.6.2 Charge Nurse"], ["3. Job Descriptions", "3.6.2 Charge Nurse"])
+		self.assertEqual(paths["Tuesday"], ["3. Job Descriptions", "3.6.2 Charge Nurse", "Tuesday"])
+		self.assertEqual(paths["4. Records"], ["4. Records"])
+
+	def test_mixed_case_list_item_does_not_take_a_capitalised_chapter_number(self):
+		pages = [
+			(1, "# 3 JOB DESCRIPTIONS\na\n## 3.6.8 CAPD Nurse\nb\n# 4 Extra procedures\nc\n# 5 Teaching\nd"),
+			(2, "# 4 RECORDS MAINTAINED\ne\n# 5 PATIENT ACCESS\nf"),
+		]
+		secs = sectionize(pages)
+		paths = {s.title: s.hierarchy_path for s in secs}
+		self.assertEqual(paths["5 Teaching"], ["3 JOB DESCRIPTIONS", "3.6.8 CAPD Nurse", "5 Teaching"])
+		self.assertEqual(paths["4 RECORDS MAINTAINED"], ["4 RECORDS MAINTAINED"])
+		self.assertEqual(paths["5 PATIENT ACCESS"], ["5 PATIENT ACCESS"])
+
+	def test_number_continuing_a_nested_list_stays_in_the_list(self):
+		pages = [
+			(1, "# 1 SCOPE\na\n# 2 PROTOCOLS\nb\n# 1 HYPOTENSION\nc\n# 2 CRAMPS\nd\n# 3 HYPERKALEMIA\ne"),
+			(2, "# 3 MEDICATION\nf"),
+		]
+		secs = sectionize(pages)
+		paths = {s.title: s.hierarchy_path for s in secs}
+		self.assertEqual(paths["3 HYPERKALEMIA"], ["2 PROTOCOLS", "3 HYPERKALEMIA"])
+		self.assertEqual(paths["3 MEDICATION"], ["3 MEDICATION"])
+
+	def test_chapter_on_the_page_after_a_nested_list_is_not_demoted(self):
+		pages = [
+			(1, "# 1 SCOPE\na\n# 2 PROTOCOLS\nb\n# 1 HYPOTENSION\nc\n# 2 CRAMPS\nd"),
+			(2, "# 3 MEDICATION\ne"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(pages)}
+		self.assertEqual(paths["3 MEDICATION"], ["3 MEDICATION"])
+
+	def test_unnumbered_heading_before_any_number_keeps_its_level(self):
+		secs = sectionize([(1, "# Revision History\na\n# 1. Profile\nb")])
+		self.assertEqual([(s.title, s.level) for s in secs], [("Revision History", 1), ("1. Profile", 1)])
+
 	def test_content_before_any_heading_becomes_preamble(self):
 		secs = sectionize([(1, "just some text\nno headings here")])
 		self.assertEqual(len(secs), 1)

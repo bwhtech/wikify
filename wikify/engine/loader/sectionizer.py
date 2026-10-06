@@ -75,10 +75,12 @@ class Section:
 def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = None) -> list[Section]:
 	level_map = level_map or {}
 	sections: list[Section] = []
-	stack: list[tuple[int, str]] = []
+	stack: list[tuple[int, str, bool]] = []
 	current: Section | None = None
 	buf: list[str] = []
 	max_chapter = 0
+	capital_chapters = True
+	last_list_item = (0, 0)
 	running_headers = running_header_titles(pages)
 	opened_headers: set[str] = set()
 
@@ -101,20 +103,33 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 				flush()
 				buf = []
 				level = correct_level(title, _infer_level(title, len(m.group(1))), level_map)
+				demoted = False
 				if level == 1 and title not in level_map:
 					cnum = _chapter_num(title)
 					if cnum is not None:
-						if _looks_like_list_item(title) or cnum <= max_chapter:
+						if (
+							_looks_like_list_item(title)
+							or cnum <= max_chapter
+							or (max_chapter and capital_chapters and not title.isupper())
+							or (page_no, cnum - 1) == last_list_item
+						):
 							level = 2
+							demoted = True
+							last_list_item = (page_no, cnum)
 						else:
 							max_chapter = cnum
+							capital_chapters = capital_chapters and title.isupper()
+				if title not in level_map and (demoted or not _NUM_RE.match(title)):
+					anchor = next((lvl for lvl, _, numbered in reversed(stack) if numbered), None)
+					if anchor is not None:
+						level = min(6, max(level, anchor + 1))
 				while stack and stack[-1][0] >= level:
 					stack.pop()
-				stack.append((level, title))
+				stack.append((level, title, not demoted and bool(_NUM_RE.match(title))))
 				current = Section(
 					title=title,
 					level=level,
-					hierarchy_path=[t for _, t in stack],
+					hierarchy_path=[t for _, t, _ in stack],
 					page_start=page_no,
 					page_end=page_no,
 				)
