@@ -1,6 +1,8 @@
 # Copyright (c) 2026, BWH and contributors
 # For license information, please see license.txt
 
+import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
@@ -73,3 +75,43 @@ class TestClaudeCliMessages(FrappeTestCase):
 			"TOOL RESULT (call_1):\nrenamed\n\n"
 			"Continue as the ASSISTANT from here.",
 		)
+
+
+class TestClaudeCliNativeToolRetry(FrappeTestCase):
+	tools = [SimpleNamespace(name="read_tree", description="Read the tree", parameters={"type": "object"})]
+
+	def completed(self, native_tools, tool_calls):
+		events = [
+			{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": name}]}}
+			for name in [*native_tools, "StructuredOutput"]
+		]
+		events.append({"type": "result", "structured_output": {"text": "", "tool_calls": tool_calls}})
+		return SimpleNamespace(stdout="\n".join(json.dumps(event) for event in events), stderr="")
+
+	def tool_calls_of(self, chunks):
+		return [call.function.name for chunk in chunks for call in chunk.choices[0].delta.tool_calls]
+
+	def test_native_tool_call_is_retried_with_a_reminder(self):
+		replies = [
+			self.completed(["read_tree"], []),
+			self.completed([], [{"name": "read_tree", "arguments": {}}]),
+		]
+		with patch.object(claude_cli.subprocess, "run", side_effect=replies) as run:
+			chunks = list(
+				claude_cli.complete_with_tools([{"role": "user", "content": "Show the tree"}], self.tools)
+			)
+		self.assertEqual(run.call_count, 2)
+		retry_prompt = run.call_args_list[1].args[0][
+			run.call_args_list[1].args[0].index("--system-prompt") + 1
+		]
+		self.assertTrue(retry_prompt.endswith(claude_cli.NATIVE_CALL_RETRY))
+		self.assertEqual(self.tool_calls_of(chunks), ["read_tree"])
+
+	def test_structured_reply_runs_once(self):
+		reply = self.completed([], [{"name": "read_tree", "arguments": {}}])
+		with patch.object(claude_cli.subprocess, "run", return_value=reply) as run:
+			chunks = list(
+				claude_cli.complete_with_tools([{"role": "user", "content": "Show the tree"}], self.tools)
+			)
+		self.assertEqual(run.call_count, 1)
+		self.assertEqual(self.tool_calls_of(chunks), ["read_tree"])

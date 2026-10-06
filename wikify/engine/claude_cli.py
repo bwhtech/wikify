@@ -21,6 +21,10 @@ TOOL_PROTOCOL = (
 	"what you say to the user. The application runs them and sends the results back in the "
 	"transcript. Leave `tool_calls` empty only when you are done."
 )
+NATIVE_CALL_RETRY = (
+	"\n\nYour previous attempt called these tools directly and every call failed. Request each tool "
+	"you need in `tool_calls` instead."
+)
 
 
 def is_enabled() -> bool:
@@ -69,7 +73,10 @@ def complete_with_tools(messages: list, tools: list, *, stream: bool = True):
 		"required": ["text", "tool_calls"],
 	}
 	protocol = TOOL_PROTOCOL.format(tools=json.dumps(tool_specs, indent=1))
-	reply = run(messages, schema=schema, system_suffix=protocol)["structured_output"]
+	result = run(messages, schema=schema, system_suffix=protocol)
+	if result["native_tool_calls"]:
+		result = run(messages, schema=schema, system_suffix=protocol + NATIVE_CALL_RETRY)
+	reply = result["structured_output"]
 	return iter([stream_chunk(reply.get("text") or "", reply.get("tool_calls") or [])])
 
 
@@ -130,6 +137,14 @@ def run(messages: list, schema: dict | None = None, system_suffix: str = "", tim
 	if not result or result.get("is_error"):
 		detail = (result or {}).get("result") or completed.stderr.strip() or completed.stdout[-500:]
 		raise RuntimeError(f"claude CLI failed: {detail}")
+	# Sonnet sometimes calls the app's tools natively; the CLI rejects them and the reply asks for none.
+	result["native_tool_calls"] = [
+		block.get("name")
+		for event in events
+		if event.get("type") == "assistant"
+		for block in event.get("message", {}).get("content") or []
+		if block.get("type") == "tool_use" and block.get("name") != "StructuredOutput"
+	]
 	return result
 
 
