@@ -332,6 +332,23 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("approved by committee", cleaned[1])
 		self.assertIn("|---|---|", cleaned[1])
 
+	def test_clean_pages_strips_signoff_footer_written_as_text(self):
+		pipes = "Prepared by: Dr. A, Dr. B | Issued by: QMC | Approved by: Dr. C"
+		merged = "**Prepared by: Dr. A, Dr. Issued by: QMC Approved by: Dr. C B** "
+		paragraphs = "Prepared by: Dr. A, Dr. B\n\nIssued by: QMC\n\nApproved by: Dr. C"
+		pages = [
+			(1, f"## DONOR WITH OBESITY\nreal body\n\n{pipes}"),
+			(2, f"- more body\n\n{merged}\n"),
+			(3, f"## DIABETIC PATIENT\n\n{paragraphs}\n\nThe protocol is approved by the HOD."),
+		]
+		cleaned = dict(clean_pages(pages))
+		for md in cleaned.values():
+			self.assertNotIn("Prepared by", md)
+			self.assertNotIn("Issued by", md)
+		self.assertIn("real body", cleaned[1])
+		self.assertIn("- more body", cleaned[2])
+		self.assertIn("approved by the HOD", cleaned[3])
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):

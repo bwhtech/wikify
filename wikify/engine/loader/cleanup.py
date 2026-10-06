@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from itertools import groupby
 
 _NORM = re.compile(r"[#*_`>\-\s]+")
 _VARYING = [
@@ -31,6 +32,8 @@ _VARYING = [
 # carrying >=2 distinct sign-off phrases (a lone "approved by" in a data row is kept).
 _SEP_ONLY = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _SIGNOFF = ("prepared by", "issued by", "approved by", "reviewed by", "authorized by")
+_SIGNOFF_LABEL = re.compile(r"(?i)\b(prepared|issued|approved|reviewed|authori[sz]ed) by\s*[:\-\u2013]")
+_SIGNOFF_LINE = re.compile(r"(?i)^[*_\s]*(prepared|issued|approved|reviewed|authori[sz]ed) by\s*[:\-\u2013]")
 _PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
 _SENTENCE_START = re.compile(r"^[a-z]")
 # A sentence cut by a page break ran to the page edge, so its last line is never a short label.
@@ -47,15 +50,26 @@ def _norm(line: str) -> str:
 def _is_signoff_footer_row(line: str) -> bool:
 	s = line.strip()
 	if not (s.startswith("|") and s.endswith("|")):
-		return False
+		return len({label.lower() for label in _SIGNOFF_LABEL.findall(s)}) >= 2
 	low = s.lower()
 	return sum(kw in low for kw in _SIGNOFF) >= 2
+
+
+def _signoff_line_runs(lines: list[str]) -> set[int]:
+	"""Sign-off labels laid out one per paragraph, e.g. "Prepared by: …" then "Issued by: …"."""
+	drop: set[int] = set()
+	non_blank = [index for index, line in enumerate(lines) if line.strip()]
+	for is_signoff, group in groupby(non_blank, key=lambda index: bool(_SIGNOFF_LINE.match(lines[index]))):
+		run = list(group)
+		if is_signoff and len({_SIGNOFF_LINE.match(lines[index]).group(1).lower() for index in run}) >= 2:
+			drop.update(run)
+	return drop
 
 
 def _strip_footer_blocks(md: str) -> str:
 	"""Drop sign-off footer rows and any separator row orphaned next to them."""
 	lines = md.splitlines()
-	drop: set[int] = set()
+	drop = _signoff_line_runs(lines)
 	for i, line in enumerate(lines):
 		if _is_signoff_footer_row(line):
 			drop.add(i)
