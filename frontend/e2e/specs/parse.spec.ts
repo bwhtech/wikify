@@ -21,11 +21,14 @@ const QUEUE_WAIT = 1_200_000;
 const REMEDIATE_TIMEOUT = 1_200_000;
 
 async function logEntries(api: Api, importName: string) {
-	return api.getList("Import Log Entry", {
-		filters: { import: importName },
-		fields: ["name", "idx_seq", "stage", "message"],
-		orderBy: "idx_seq asc",
-	});
+	return api.getList<{ name: string; idx_seq: number; stage: string; message: string }>(
+		"Import Log Entry",
+		{
+			filters: { import: importName },
+			fields: ["name", "idx_seq", "stage", "message"],
+			orderBy: "idx_seq asc",
+		},
+	);
 }
 
 async function lastLogSeq(api: Api, importName: string): Promise<number> {
