@@ -33,9 +33,12 @@ function handleKeydown(event) {
 		@submit.prevent="ask"
 	>
 		<!-- Ghost ships no background of its own, so without bg-transparent the textarea
-		     falls back to the browser default and renders white in dark mode. -->
+		     falls back to the browser default and renders white in dark mode.
+		     Not v-model: Textarea also emits on `change`, which Chrome fires as the focused
+		     landing composer unmounts on send, writing the sent question back into the box. -->
 		<Textarea
-			v-model="question"
+			:model-value="question"
+			@input="question = $event.target.value"
 			:rows="1"
 			variant="ghost"
 			class="max-h-40 flex-1 resize-none bg-transparent"

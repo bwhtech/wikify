@@ -134,17 +134,24 @@ class TestPagePropagation(FrappeTestCase):
 
 		enqueue.assert_not_called()
 
-	def test_the_pass_rebuilds_every_section_covering_a_changed_page(self):
+	def test_the_pass_rebuilds_the_section_that_owns_a_changed_page_alone(self):
 		marker = "SURCHARGE-MARKER-42"
-		store.set_canonical_markdown(self.pages[3], f"canonical page 3 {marker}")
-		frappe.cache().hset(events.DIRTY_PAGES_HASH, f"{self.source_document.name}:3", 1)
+		store.set_canonical_markdown(self.pages[1], f"canonical page 1 {marker}")
+		frappe.cache().hset(events.DIRTY_PAGES_HASH, f"{self.source_document.name}:1", 1)
 
 		events.propagate_dirty_pages(self.source_document.name)
 
-		self.assertIn(marker, self.markdown_of("2. Beta"))
-		self.assertIn(marker, self.markdown_of("3. Gamma"))
-		self.assertNotIn(marker, self.markdown_of("1. Alpha"))
+		self.assertIn(marker, self.markdown_of("1. Alpha"))
+		self.assertNotIn(marker, self.markdown_of("2. Beta"))
 		self.assertEqual(events.take_dirty_pages(self.source_document.name), [])
+
+	def test_a_changed_page_shared_by_two_sections_keeps_each_sections_own_text(self):
+		store.set_canonical_markdown(self.pages[3], "canonical page 3 SURCHARGE-MARKER-42")
+
+		events.propagate_pages(self.source_document.name, [3])
+
+		self.assertEqual(self.markdown_of("2. Beta"), "stale beta body")
+		self.assertEqual(self.markdown_of("3. Gamma"), "stale gamma body")
 
 	def test_the_pass_clears_its_marker_before_working_so_a_mid_run_edit_is_never_lost(self):
 		frappe.cache().set_value(

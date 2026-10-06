@@ -176,3 +176,35 @@ class TestSectionEdits(FrappeTestCase):
 			api.delete_section(alpha)
 		with self.assertRaises(frappe.ValidationError):
 			api.build_graph(imp.name)
+
+	def test_completed_import_blocks_assistant_tree_edits(self):
+		self._import("Completed")
+		alpha, beta = self._name("1. Alpha"), self._name("2. Beta")
+		store.set_section_markdown(beta, "intro\n\n## Tail\n\nmore")
+
+		for edit in (
+			lambda: api.move_section(beta, new_parent=alpha),
+			lambda: api.set_section_type(alpha, None),
+			lambda: api.create_section(self.sd.name, "Gamma"),
+			lambda: api.split_section(beta, "Tail"),
+			lambda: api.merge_sections([alpha, beta]),
+		):
+			with self.assertRaisesRegex(frappe.ValidationError, "already been published"):
+				edit()
+		self.assertEqual(set(self._rows()), {"1. Alpha", "1.1 Alpha-One", "2. Beta"})
+		self.assertIn(self._rows()["2. Beta"].parent_source_section, (None, ""))
+
+	def test_unpublished_import_allows_assistant_tree_edits(self):
+		self._import("Review")
+		alpha, beta = self._name("1. Alpha"), self._name("2. Beta")
+		store.set_section_markdown(beta, "intro\n\n## Tail\n\nmore")
+
+		api.set_section_type(alpha, None)
+		api.create_section(self.sd.name, "Gamma")
+		split = api.split_section(beta, "Tail")
+		api.merge_sections([beta, split["new_name"]])
+		api.move_section(beta, new_parent=alpha)
+
+		rows = self._rows()
+		self.assertEqual(set(rows), {"1. Alpha", "1.1 Alpha-One", "2. Beta", "Gamma"})
+		self.assertEqual(rows["2. Beta"].parent_source_section, alpha)

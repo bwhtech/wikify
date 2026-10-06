@@ -36,14 +36,14 @@ def _propagate_page(source_document: str, page_no: int) -> str:
 			)
 		return " " + _(
 			"Propagated into section '{0}' ({1} chars) — the wiki preview now shows it. If this "
-			"document has a generated wiki, finish with sync_wiki_page on <{2}>."
+			"document has a generated wiki, finish with sync_wiki_page on `{2}`."
 		).format(res["title"], res["chars"], owners[0].name)
 	if not owners:
 		return " " + _(
 			"No section's page range covers this page, so the wiki preview is NOT updated. "
 			"Use edit_section_content on the right section if the fix must reach the wiki."
 		)
-	names = ", ".join(f"'{o.title}' <{o.name}>" for o in owners)
+	names = ", ".join(f"'{o.title}' `{o.name}`" for o in owners)
 	return " " + _(
 		"NOT yet visible in the wiki preview — this is a boundary page shared by {0}. "
 		"Run rebuild_section_from_pages or edit_section_content on the right one, then "
@@ -52,28 +52,55 @@ def _propagate_page(source_document: str, page_no: int) -> str:
 
 
 def _use_page_image(ctx: Ctx, args: dict) -> str:
+	from wikify.agent.tools.content import _edit_section_content
 	from wikify.engine import embed_page_image
 
 	source_document = ctx.default_document(args.get("source_document"))
 	page_no = _page_no(args)
 	caption = (args.get("caption") or "").strip() or None
+	section = args.get("section")
 	if not source_document:
 		return _("No document specified. Open a document or pass `source_document`.")
 	if page_no is None:
 		return _("Provide the `page_no` to embed as an image.")
+	if bool(caption) == bool(section):
+		return _(
+			"Pass exactly one of `section` (add the page image to the end of that section) or "
+			"`caption` (replace that image tag on the page). Nothing was changed."
+		)
+	if section:
+		section_row = frappe.db.get_value(
+			"Source Section", section, ["source_document", "markdown"], as_dict=True
+		)
+		if not section_row or section_row.source_document != source_document:
+			return _("Section {0} not found in {1}.").format(section, source_document)
+		image_url = frappe.db.get_value(
+			"Source Page", {"source_document": source_document, "page_no": page_no}, "image"
+		)
+		if not image_url:
+			return _("Page {0} has no rendered image to embed.").format(page_no)
+		markdown = (section_row.markdown or "").rstrip()
+		return (
+			_edit_section_content(
+				ctx,
+				{
+					"name": section,
+					"mode": "replace",
+					"content": f"{markdown}\n\n![Page {page_no}]({image_url})".lstrip(),
+				},
+			)
+			+ " "
+			+ _("Page {0} itself is unchanged.").format(page_no)
+		)
 	try:
 		embed_page_image(source_document, page_no, caption)
 	except (ValueError, RuntimeError) as e:
 		return _("Couldn't embed the page image: {0}").format(str(e))
-	if caption:
-		return _(
-			"Replaced the '{0}' image tag on page {1} with the full page photo — the rest of "
-			"the page's content is untouched. The user can crop the figure out of it later on "
-			"the wiki."
-		).format(caption, page_no) + _propagate_page(source_document, page_no)
-	return _("Page {0} now embeds its rendered image as canonical markdown (no re-parse).").format(
-		page_no
-	) + _propagate_page(source_document, page_no)
+	return _(
+		"Replaced the '{0}' image tag on page {1} with the full page photo — the rest of "
+		"the page's content is untouched. The user can crop the figure out of it later on "
+		"the wiki."
+	).format(caption, page_no) + _propagate_page(source_document, page_no)
 
 
 def _reparse_page(ctx: Ctx, args: dict) -> str:
@@ -133,27 +160,29 @@ TOOLS = [
 		side="server",
 		# nosemgrep
 		description=(
-			"Deterministically embed a page's rendered photo (no LLM, no cropping). Omit "
-			"`caption` to replace the WHOLE page's canonical markdown with just the image — "
-			"use when the user wants the page shown as an image rather than transcribed. Pass "
-			"`caption` to instead replace ONLY that one existing `![caption](...)` image tag "
-			"with the full page photo, leaving the rest of the page's content untouched — use "
-			"this when a figure/screenshot placeholder needs a real image and precise cropping "
-			"isn't reliable; the user can crop the exact figure out of the full page photo "
-			"themselves later, in the wiki. `caption` must exactly match the alt text of an "
-			"existing tag on that page, as seen via read_page. Defaults to the attached document."
+			"Deterministically embed a page's rendered photo (no LLM, no cropping). Pass "
+			"`section` to add the full page photo to the END of that section; the page's own "
+			"text is kept — use this when the user asks to add/show page N as an image in a "
+			"section. Pass `caption` instead to replace ONLY that one existing `![caption](...)` "
+			"image tag on the page with the full page photo, leaving the rest of the page's "
+			"content untouched — use this when a figure/screenshot placeholder needs a real image "
+			"and precise cropping isn't reliable; the user can crop the exact figure out of the "
+			"full page photo themselves later, in the wiki. `caption` must exactly match the alt "
+			"text of an existing tag on that page, as seen via read_page. Pass exactly one of "
+			"`section` or `caption`. Defaults to the attached document."
 		),
 		parameters={
 			"type": "object",
 			"properties": {
 				"source_document": {"type": "string", "description": "Omit to use the attached document."},
 				"page_no": {"type": "integer", "description": "1-based page number."},
+				"section": {
+					"type": "string",
+					"description": "Source Section id to append the page image to.",
+				},
 				"caption": {
 					"type": "string",
-					"description": (
-						"Omit to replace the whole page. Otherwise the exact alt text of the "
-						"existing image tag to replace with the full page photo."
-					),
+					"description": "Exact alt text of the existing image tag on the page to replace.",
 				},
 			},
 			"required": ["page_no"],

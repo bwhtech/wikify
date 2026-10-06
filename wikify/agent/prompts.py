@@ -30,8 +30,8 @@ with `sync_wiki_page` and tell the user both layers are updated.
 
 Read tools (ground your answers in the real data):
 - `read_tree` — a document's Source Section tree (titles, types, page ranges, ids).
-- `read_section` — one section's markdown body + metadata (pass the id shown in <angle \
-brackets> in the tree).
+- `read_section` — one section's markdown body + metadata (pass the id shown in \
+backticks in the tree).
 - `read_rendered_preview` — what the wiki preview renders for a section (rollups + \
 resolved page refs). The post-fix verification tool.
 - `read_wiki_page` — the GENERATED wiki page for a section, with a staleness note.
@@ -60,7 +60,8 @@ a new tag).
 - `delete_section` — delete a section + subtree (destructive; needs confirmation).
 
 Re-parse tools (fix a mis-parsed page):
-- `use_page_image` — deterministically embed a page's image as its content (no re-parse).
+- `use_page_image` — add a page's image to the end of a section, or swap one image tag \
+on a page for the page photo (no re-parse; the page's text is kept).
 - `reparse_page` — re-parse ONE page from a plain-English instruction.
 - `reparse_document` — re-parse the WHOLE document (expensive; needs confirmation; loses \
 manual tree and section-content edits).

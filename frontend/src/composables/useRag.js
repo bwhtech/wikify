@@ -151,6 +151,7 @@ function newTurn(text) {
 		tookMs: null,
 		usage: null,
 		errorText: "",
+		connectionDropped: false,
 		streaming: true,
 	};
 }
@@ -249,6 +250,7 @@ async function ask() {
 		});
 		if (askCall.error) {
 			turn.errorText = errorMessage(askCall.error);
+			turn.connectionDropped = askCall.error.name !== "FrappeResponseError";
 			return;
 		}
 		if (!response) return;

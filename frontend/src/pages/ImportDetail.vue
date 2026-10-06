@@ -10,6 +10,7 @@ import {
 	TabButtons,
 	Tabs,
 	dayjs,
+	toast,
 	useCall,
 	useDoc,
 	useList,
@@ -131,7 +132,9 @@ const socket = useSocket();
 function onProgress(payload) {
 	if (payload.import !== props.name || !imp.doc) return;
 	const wasRemediating = imp.doc.status === "Remediating";
+	const statusChanged = payload.status && payload.status !== imp.doc.status;
 	imp.doc.stage_progress = payload.percent;
+	imp.doc.stage_label = payload.stage_label;
 	if (payload.status) imp.doc.status = payload.status;
 	// Terminal transitions carry fields set server-side (source_document, wiki_space, error).
 	if (["Review", "Failed", "Completed", "Graphed", "Stopped"].includes(payload.status)) {
@@ -145,6 +148,8 @@ function onProgress(payload) {
 		// mounted tree still holds the pre-publish (empty) values until refetched.
 		if (payload.status === "Completed") sectionTree.value?.reload();
 		sdStats.reload();
+	} else if (statusChanged) {
+		imp.reload();
 	}
 }
 function onLog(payload) {
@@ -171,15 +176,27 @@ function onAgentMutation(payload) {
 	sectionTree.value?.reload();
 	sdStats.reload();
 }
+function onClassifyDone(payload) {
+	if (payload.import !== props.name) return;
+	if (payload.error) {
+		toast.error("Reclassification failed");
+		return;
+	}
+	toast.success("Sections reclassified");
+	sectionTree.value?.reload();
+	sdStats.reload();
+}
 onMounted(() => {
 	socket?.on("wikify_import_progress", onProgress);
 	socket?.on("wikify_import_log", onLog);
 	socket?.on("wikify_agent_mutation", onAgentMutation);
+	socket?.on("wikify_classify_done", onClassifyDone);
 });
 onUnmounted(() => {
 	socket?.off("wikify_import_progress", onProgress);
 	socket?.off("wikify_import_log", onLog);
 	socket?.off("wikify_agent_mutation", onAgentMutation);
+	socket?.off("wikify_classify_done", onClassifyDone);
 });
 
 const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "text-ink-red-6" };

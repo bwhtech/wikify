@@ -6,12 +6,14 @@ import frappe
 import frappe.model.document
 from frappe.tests.utils import FrappeTestCase
 
+from wikify.agent import session
 from wikify.agent.context import Ctx
 from wikify.agent.registry import build_default_registry
 from wikify.agent.tools import tree as tt
 from wikify.api import sections as api
 from wikify.engine import store
 from wikify.engine.loader.sectionizer import Section
+from wikify.tests import _cleanup
 
 
 def _sec(title, level, path, p_start, p_end, markdown=None):
@@ -135,6 +137,33 @@ class TestSectionSurgery(FrappeTestCase):
 		res = api.split_section(self._name("1. Alpha"), "## Part Two", new_title="Custom")
 		self.assertEqual(res["new_title"], "Custom")
 
+	def test_split_at_paragraph_start_when_section_has_no_headings(self):
+		gamma = self._name("3. Gamma")
+		store.set_section_markdown(
+			gamma, "Intro paragraph.\n\nFig. 2 shows the spicule\nforest at the limb.\n\nClosing paragraph."
+		)
+		res = api.split_section(gamma, "  fig. 2 SHOWS the spicule forest ")
+		rows = self._rows()
+		new_title = res["new_title"]
+		self.assertEqual(rows["3. Gamma"].markdown, "Intro paragraph.")
+		self.assertEqual(
+			rows[new_title].markdown, "Fig. 2 shows the spicule\nforest at the limb.\n\nClosing paragraph."
+		)
+		self.assertEqual(rows[new_title].parent_source_section, rows["3. Gamma"].parent_source_section)
+		self.assertLess(rows["3. Gamma"].rgt, rows[new_title].lft)
+		self._assert_tree_invariants()
+
+	def test_split_refuses_ambiguous_paragraph_start(self):
+		gamma = self._name("3. Gamma")
+		markdown = "Intro.\n\nFig. 2 left panel.\n\nFig. 2 right panel."
+		store.set_section_markdown(gamma, markdown)
+		before = set(self._rows())
+		with self.assertRaises(frappe.ValidationError) as cm:
+			api.split_section(gamma, "Fig. 2")
+		self.assertIn("2 paragraphs", str(cm.exception))
+		self.assertEqual(set(self._rows()), before)
+		self.assertEqual(self._rows()["3. Gamma"].markdown, markdown)
+
 	def test_merge_rejects_non_siblings(self):
 		with self.assertRaises(frappe.ValidationError):
 			api.merge_sections([self._name("1.1 Child"), self._name("2. Beta")])
@@ -170,6 +199,19 @@ class TestSectionSurgery(FrappeTestCase):
 		self.assertIn("Merged 1 section(s) into '2. Beta'", out)
 		out = tt._delete_section(self.ctx, {"name": self._name("5. Epsilon")})
 		self.assertIn("Deleted '5. Epsilon'", out)
+
+	def test_new_section_ids_survive_saving_the_tool_message(self):
+		agent_session = session.get_or_create(None, user="Administrator")
+		with patch("frappe.model.naming.get_trace_id", return_value="p"):
+			created = tt._create_section(self.ctx, {"title": "5. Epsilon"})
+			split = tt._split_section(self.ctx, {"name": self._name("1. Alpha"), "at_heading": "Part Two"})
+		for out, title, tool_name in (
+			(created, "5. Epsilon", "create_section"),
+			(split, "Part Two", "split_section"),
+		):
+			message = session.append_message(agent_session.name, "tool", out, tool_name=tool_name)
+			stored = frappe.db.get_value("Wikify Agent Message", message.name, "content")
+			self.assertIn(self._name(title), stored)
 
 
 class TestReplaceSectionsIsAtomic(FrappeTestCase):
@@ -222,3 +264,46 @@ class TestReplaceSectionsIsAtomic(FrappeTestCase):
 			[_sec("A. New", 1, ["A. New"], 1, 1), _sec("B. New", 1, ["B. New"], 2, 2)],
 		)
 		self.assertEqual(self.titles(), ["A. New", "B. New"])
+
+
+class TestReplaceSectionsAfterDeadlock(FrappeTestCase):
+	def setUp(self):
+		self.source_document = frappe.get_doc(
+			{"doctype": "Source Document", "title": "Deadlocked Rebuild"}
+		).insert(ignore_permissions=True)
+		store.replace_sections(
+			self.source_document.name,
+			[_sec("1. Alpha", 1, ["1. Alpha"], 1, 1), _sec("2. Beta", 1, ["2. Beta"], 2, 2)],
+		)
+		# nosemgrep
+		frappe.db.commit()
+		self.addCleanup(_cleanup.delete_document, self.source_document.name)
+
+	def test_a_deadlocked_insert_retries_and_replaces_the_tree(self):
+		replacement = [
+			_sec("A. New", 1, ["A. New"], 1, 1),
+			_sec("A.1 Child", 2, ["A. New", "A.1 Child"], 1, 1),
+			_sec("B. New", 1, ["B. New"], 2, 2),
+		]
+		real_insert = frappe.model.document.Document.insert
+		deadlocked_titles = []
+
+		def insert_but_deadlock_once(document, *args, **kwargs):
+			if document.doctype == "Source Section" and document.title == "B. New" and not deadlocked_titles:
+				deadlocked_titles.append(document.title)
+				frappe.db.sql("rollback")
+				raise frappe.QueryDeadlockError("Deadlock found when trying to get lock")
+			return real_insert(document, *args, **kwargs)
+
+		with patch.object(frappe.model.document.Document, "insert", insert_but_deadlock_once):
+			store.replace_sections(self.source_document.name, replacement)
+
+		rows = frappe.get_all(
+			"Source Section",
+			filters={"source_document": self.source_document.name},
+			fields=["name", "title", "parent_source_section"],
+			order_by="lft asc",
+		)
+		self.assertEqual(deadlocked_titles, ["B. New"])
+		self.assertEqual([row.title for row in rows], ["A. New", "A.1 Child", "B. New"])
+		self.assertEqual([row.parent_source_section for row in rows], [None, rows[0].name, None])

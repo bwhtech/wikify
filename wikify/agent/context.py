@@ -61,7 +61,16 @@ def _truncate(text: str) -> str:
 def _tree_outline(source_document: str) -> str:
 	from wikify.agent.tools.read import render_tree
 
-	return render_tree(source_document)
+	wiki_space = frappe.db.get_value("Source Document", source_document, "wiki_space")
+	space = wiki_space and frappe.db.get_value(
+		"Wiki Space", wiki_space, ["space_name", "route"], as_dict=True
+	)
+	wiki = (
+		f"Wiki: generated into wiki space {space.space_name} at /{space.route}."
+		if space
+		else "Wiki: not generated yet."
+	)
+	return f"{wiki}\n{render_tree(source_document)}"
 
 
 def resolve_attachments(attachments: list[dict] | None) -> ResolvedContext:
@@ -130,7 +139,7 @@ def _render_document(name: str) -> str:
 	if title is None:
 		return ""
 	outline = _tree_outline(name)
-	return f"## Document: {title or name} <{name}>\n{outline}"
+	return f"## Document: {title or name} `{name}`\n{outline}"
 
 
 def _render_page(name: str) -> tuple[str, str | None]:

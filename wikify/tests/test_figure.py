@@ -4,6 +4,8 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.engine import figure, store
+from wikify.engine.loader.sectionizer import Section
+from wikify.rag import events
 from wikify.tests._figures import PNG, add_document_with_pdf
 
 
@@ -87,3 +89,29 @@ class TestFigureCrop(FrappeTestCase):
 			figure.crop_page_figure(
 				self.sd.name, 1, "Diagram", 0, {"x0": 0.1, "y0": 0.1, "x1": 0.1001, "y1": 0.1001}
 			)
+
+	def test_a_crop_on_a_shared_page_reaches_only_the_section_holding_that_image(self):
+		self._add_page("Alpha tail.\n\n## Beta\n\n![Diagram](image1.png)")
+		store.replace_sections(
+			self.sd.name,
+			[
+				Section("Alpha", 1, ["Alpha"], 1, 1, "Alpha tail."),
+				Section("Beta", 1, ["Beta"], 1, 1, "## Beta\n\n![Diagram](image1.png)"),
+			],
+		)
+
+		result = figure.crop_page_figure(
+			self.sd.name, 1, "Diagram", 0, {"x0": 0.1, "y0": 0.1, "x1": 0.4, "y1": 0.4}
+		)
+		events.propagate_pages(self.sd.name, [1])
+
+		markdown = dict(
+			frappe.get_all(
+				"Source Section",
+				filters={"source_document": self.sd.name},
+				fields=["title", "markdown"],
+				as_list=True,
+			)
+		)
+		self.assertEqual(markdown["Alpha"], "Alpha tail.")
+		self.assertEqual(markdown["Beta"], f"## Beta\n\n![Diagram]({result['image_url']})")

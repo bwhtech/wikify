@@ -118,7 +118,8 @@ class AgentRunner:
 		frappe.publish_realtime(f"{event}:{self.session_id}", payload, user=self.user)
 
 	def _cancelled(self) -> bool:
-		return bool(frappe.cache().get_value(cancel_key(self.session_id)))
+		# Stop is set by a web request; the job's request-local cache would keep the first read.
+		return bool(frappe.cache().get_value(cancel_key(self.session_id), use_local_cache=False))
 
 	def _clear_cancel(self) -> None:
 		frappe.cache().delete_value(cancel_key(self.session_id))

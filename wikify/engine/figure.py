@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import fitz
+import frappe
 
 from wikify.engine import pdf_utils, store
+from wikify.engine.sectionize import sections_covering_page
 from wikify.engine.tags import find_tag_spans
 
 # Sharper than the cached page thumbnail (settings.render_dpi) so a small figure isn't a blurry upscale.
@@ -47,6 +49,20 @@ def crop_page_figure(source_document: str, page_no: int, caption: str, occurrenc
 		crop_png = pdf_utils.render_png(pdf_page, dpi=_CROP_DPI, clip=clip)
 
 	file_doc = store.save_crop_file(page.name, page_no, crop_png)
-	new_markdown = old_markdown[:start] + f"![{caption}]({file_doc.file_url})" + old_markdown[end:]
-	store.set_canonical_markdown(page.name, new_markdown, keep_audit=True)
+	old_tag = old_markdown[start:end]
+	new_tag = f"![{caption}]({file_doc.file_url})"
+	store.set_canonical_markdown(
+		page.name, old_markdown[:start] + new_tag + old_markdown[end:], keep_audit=True
+	)
+
+	owners = sections_covering_page(source_document, page_no)
+	if len(owners) > 1:
+		sections = frappe.get_all(
+			"Source Section",
+			filters={"name": ["in", [owner.name for owner in owners]]},
+			fields=["name", "markdown"],
+		)
+		holders = [section for section in sections if old_tag in (section.markdown or "")]
+		if len(holders) == 1 and holders[0].markdown.count(old_tag) == 1:
+			store.set_section_markdown(holders[0].name, holders[0].markdown.replace(old_tag, new_tag))
 	return {"page_no": page_no, "image_url": file_doc.file_url}
