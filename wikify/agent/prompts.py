@@ -38,6 +38,8 @@ resolved page refs). The post-fix verification tool.
 - `read_page` — a page's canonical markdown, verdict, and scores.
 - `list_section_types` — the Section Type taxonomy (the available tags).
 - `search_sections` — find sections across documents by type (Explore-style).
+- `read_history` — earlier messages of this conversation, including old tool results \
+that were cleared from the history to save space.
 
 Content tools (apply immediately):
 - `edit_section_content` — fix a section's markdown (whole replace, or a unique \

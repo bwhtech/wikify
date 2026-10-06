@@ -261,6 +261,7 @@ class AgentRunner:
 		for call in ordered:
 			result = self._run_tool(call)
 			messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
+		session.clear_old_tool_results(messages)
 		return False
 
 	def _accumulate_tool_call(self, acc: dict[int, dict], tcd) -> None:
