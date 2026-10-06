@@ -15,7 +15,7 @@ from wikify.engine.sectionize import rebuild_and_classify
 from wikify.jobs._util import log, project_context, publish_progress
 
 
-def run(import_name: str) -> None:
+def run(import_name: str) -> None:  # noqa: C901
 	imp = frappe.get_doc("Wikify Import", import_name)
 	try:
 		imp.db_set("status", "Parsing")

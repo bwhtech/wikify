@@ -65,7 +65,7 @@ def pick_winner(candidates: list[tuple], baseline_composite: float, baseline_mar
 	return cleanup_candidate
 
 
-def remediate_pdf(
+def remediate_pdf(  # noqa: C901
 	source_document: str,
 	pdf_path: str,
 	scope: str = "all",

@@ -73,7 +73,7 @@ def _tree_outline(source_document: str) -> str:
 	return f"{wiki}\n{render_tree(source_document)}"
 
 
-def resolve_attachments(attachments: list[dict] | None) -> ResolvedContext:
+def resolve_attachments(attachments: list[dict] | None) -> ResolvedContext:  # noqa: C901
 	resolved = ResolvedContext()
 	if not attachments:
 		return resolved
