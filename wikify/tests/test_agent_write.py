@@ -108,15 +108,43 @@ class TestAgentWrite(FrappeTestCase):
 		self.assertIn("Excluded", out)
 		self.assertEqual(frappe.db.get_value("Source Section", secs[0].name, "include_in_wiki"), 0)
 
-	def test_use_page_image_embeds_deterministically(self):
-		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "baseline body")
-		out = rep._use_page_image(self.ctx, {"page_no": 1})
-		self.assertIn("embeds its rendered image", out)
-		row = frappe.db.get_value(
-			"Source Page", page_name, ["canonical_source", "canonical_markdown"], as_dict=True
+	def test_use_page_image_adds_page_to_one_section_and_keeps_page_text(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha, alpha_one = self._sections()[:2]
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
+		self.assertIn("1.1 Alpha-One", out)
+		page = frappe.db.get_value(
+			"Source Page", page_name, ["image", "canonical_markdown", "baseline_markdown"], as_dict=True
 		)
-		self.assertEqual(row.canonical_source, "image")
-		self.assertTrue(row.canonical_markdown.startswith("![Page 1]("))
+		self.assertEqual(page.canonical_markdown or page.baseline_markdown, "page one text")
+		self.assertEqual(
+			frappe.db.get_value("Source Section", alpha_one.name, "markdown"),
+			f"body of 1.1 Alpha-One\n\n![Page 1]({page.image})",
+		)
+		self.assertEqual(frappe.db.get_value("Source Section", alpha.name, "markdown"), "body of 1. Alpha")
+
+	def test_use_page_image_rejects_a_section_from_another_document(self):
+		store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		other = frappe.get_doc({"doctype": "Source Document", "title": "Other Doc"}).insert(
+			ignore_permissions=True
+		)
+		self.addCleanup(_cleanup.delete_document, other.name)
+		store.replace_sections(other.name, [_sec("Other", 1, ["Other"], 1, 1)])
+		other_section = frappe.get_all("Source Section", filters={"source_document": other.name})[0]
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": other_section.name})
+		self.assertIn("not found", out)
+		self.assertEqual(
+			frappe.db.get_value("Source Section", other_section.name, "markdown"), "body of Other"
+		)
+
+	def test_use_page_image_without_section_or_caption_changes_nothing(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		out = rep._use_page_image(self.ctx, {"page_no": 1})
+		self.assertIn("`section`", out)
+		page = frappe.db.get_value(
+			"Source Page", page_name, ["canonical_markdown", "baseline_markdown"], as_dict=True
+		)
+		self.assertEqual(page.canonical_markdown or page.baseline_markdown, "page one text")
 
 	def test_use_page_image_with_caption_replaces_only_that_tag(self):
 		baseline = "# Heading\n\nSome body text.\n\n![Figure 1.1](image1.png)\n\nMore text after."
