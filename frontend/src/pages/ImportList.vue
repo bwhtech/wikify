@@ -1,11 +1,12 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, Button, Progress, Skeleton, toast, useList } from "frappe-ui";
+import { Badge, Button, Dropdown, Progress, Skeleton, toast, useList } from "frappe-ui";
 import { useSocket } from "@/socket";
 import { usePdfUpload } from "@/composables/usePdfUpload";
 import UploadQueue from "@/components/UploadQueue.vue";
 import { statusTheme, isActive } from "@/utils/status";
+import { confirmDeleteDocument } from "@/utils/deleteDocument";
 
 // Project-scoped imports list, embedded in ProjectDetail. The header + New Import
 // button live in the parent; this owns the list body, its empty state, and realtime.
@@ -184,34 +185,67 @@ function pageLabel(row) {
 				<span class="w-40 shrink-0">Status</span>
 				<span class="w-16 shrink-0 text-right">Pages</span>
 				<span class="w-44 shrink-0 text-right">Updated</span>
+				<span class="w-6 shrink-0" />
 			</div>
-			<button
+			<div
 				v-for="row in imports.data"
 				:key="row.name"
-				class="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-outline-gray-1 px-4 py-2.5 text-left last:border-b-0 hover:bg-surface-gray-2 sm:flex-nowrap"
-				@click="openImport(row.name)"
+				class="group flex items-center border-b border-outline-gray-1 pr-3 last:border-b-0 hover:bg-surface-gray-2"
 			>
-				<span class="w-full truncate text-base text-ink-gray-8 sm:w-auto sm:flex-1">{{
-					row.import_title
-				}}</span>
-				<span class="flex shrink-0 items-center gap-2 sm:w-40">
-					<Badge :label="row.status" :theme="statusTheme(row.status)" variant="subtle" />
-					<Progress
-						v-if="isActive(row.status)"
-						:value="row.stage_progress || 0"
-						size="sm"
-						class="w-16"
-					/>
-				</span>
-				<span class="shrink-0 text-sm text-ink-gray-6 sm:w-16 sm:text-right">
-					<span class="sm:hidden">{{ pageLabel(row) }}</span>
-					<span class="hidden sm:inline">{{ row.page_count || "—" }}</span>
-				</span>
-				<span
-					class="ml-auto shrink-0 truncate text-sm text-ink-gray-5 sm:ml-0 sm:w-44 sm:text-right"
-					>{{ fmtDate(row.modified) }}</span
+				<button
+					class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5 text-left sm:flex-nowrap"
+					@click="openImport(row.name)"
 				>
-			</button>
+					<span class="w-full truncate text-base text-ink-gray-8 sm:w-auto sm:flex-1">{{
+						row.import_title
+					}}</span>
+					<span class="flex shrink-0 items-center gap-2 sm:w-40">
+						<Badge
+							:label="row.status"
+							:theme="statusTheme(row.status)"
+							variant="subtle"
+						/>
+						<Progress
+							v-if="isActive(row.status)"
+							:value="row.stage_progress || 0"
+							size="sm"
+							class="w-16"
+						/>
+					</span>
+					<span class="shrink-0 text-sm text-ink-gray-6 sm:w-16 sm:text-right">
+						<span class="sm:hidden">{{ pageLabel(row) }}</span>
+						<span class="hidden sm:inline">{{ row.page_count || "—" }}</span>
+					</span>
+					<span
+						class="ml-auto shrink-0 truncate text-sm text-ink-gray-5 sm:ml-0 sm:w-44 sm:text-right"
+						>{{ fmtDate(row.modified) }}</span
+					>
+				</button>
+				<!-- A running job is still writing this document's rows; the server refuses the delete. -->
+				<Dropdown
+					:options="[
+						{
+							label: 'Delete',
+							icon: 'lucide-trash-2',
+							onClick: () =>
+								confirmDeleteDocument({
+									title: row.import_title,
+									deleteCall: imports.delete,
+									params: { name: row.name },
+								}),
+						},
+					]"
+					placement="right"
+				>
+					<button
+						class="shrink-0 rounded p-1 text-ink-gray-5 hover:bg-surface-gray-3 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 sm:aria-expanded:opacity-100"
+						:class="{ invisible: isActive(row.status) }"
+						aria-label="Document actions"
+					>
+						<span class="lucide-more-horizontal size-4" aria-hidden="true" />
+					</button>
+				</Dropdown>
+			</div>
 		</div>
 	</div>
 </template>
