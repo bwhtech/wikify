@@ -42,5 +42,11 @@ doc_events = {
 	},
 }
 
+scheduler_events = {
+	"cron": {
+		"*/10 * * * *": ["wikify.jobs.stalled.fail_stalled_imports"],
+	},
+}
+
 export_python_type_annotations = True
 require_type_annotated_api_methods = True

@@ -7,7 +7,7 @@ from frappe.utils.background_jobs import is_job_enqueued
 from wikify.api.sections import assert_not_published
 from wikify.engine import preview_wiki as _preview_wiki
 from wikify.jobs import generate as generate_job
-from wikify.jobs._util import log, publish_progress
+from wikify.jobs._util import IMPORT_JOB_TIMEOUT, import_job_id, log, publish_progress
 from wikify.seed import seed_uncategorized_project
 
 MAX_BATCH = 25
@@ -30,7 +30,8 @@ def _create_import(pdf_file_url: str, title: str, project: str) -> str:
 	frappe.enqueue(
 		"wikify.jobs.parse.run",
 		queue="long",
-		timeout=3600,
+		timeout=IMPORT_JOB_TIMEOUT,
+		job_id=import_job_id(imp.name),
 		import_name=imp.name,
 	)
 	return imp.name
@@ -69,14 +70,17 @@ def trigger_remediation(import_name: str, scope: str = "flagged") -> str:
 	imp = frappe.get_doc("Wikify Import", import_name)
 	if not imp.source_document:
 		frappe.throw(_("Nothing to remediate — parse hasn't produced a document yet."))
-	if imp.status != "Review":
-		frappe.throw(f"Can only remediate from Review (current status: {imp.status}).")
+	if imp.status not in ("Review", "Failed"):
+		frappe.throw(f"Can only remediate from Review or Failed (current status: {imp.status}).")
+	if is_job_enqueued(import_job_id(import_name)):
+		frappe.throw(_("This import is still being processed. Try again once it finishes."))
 
-	imp.db_set("status", "Remediating")
+	imp.db_set({"status": "Remediating", "error": None})
 	frappe.enqueue(
 		"wikify.jobs.remediate.run",
 		queue="long",
-		timeout=3600,
+		timeout=IMPORT_JOB_TIMEOUT,
+		job_id=import_job_id(import_name),
 		import_name=import_name,
 		scope=scope,
 	)
