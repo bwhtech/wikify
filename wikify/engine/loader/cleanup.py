@@ -33,6 +33,8 @@ _SEP_ONLY = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _SIGNOFF = ("prepared by", "issued by", "approved by", "reviewed by", "authorized by")
 _PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
 _SENTENCE_START = re.compile(r"^[a-z]")
+# A sentence cut by a page break ran to the page edge, so its last line is never a short label.
+_MIN_BROKEN_LINE_LENGTH = 40
 
 
 def _norm(line: str) -> str:
@@ -109,7 +111,11 @@ def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> li
 
 def _ends_mid_sentence(line: str) -> bool:
 	text = line.strip()
-	return bool(text) and text[0] not in "#|<" and (text[-1].isalnum() or text[-1] == ",")
+	return (
+		len(text) >= _MIN_BROKEN_LINE_LENGTH
+		and text[0] not in "#|<"
+		and (text[-1].isalnum() or text[-1] == ",")
+	)
 
 
 def join_page_breaks(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
