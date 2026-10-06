@@ -188,24 +188,22 @@ function bodyOnlyWord(sections: SectionRow[]): { word: string; owner: SectionRow
 	}
 }
 
-// A figure whose tag points at its page image, embedded in one of the outline's sections.
-async function pageImageFigure(
-	api: Api,
-	sourceDocument: string,
-	sections: SectionRow[],
-	{ children }: FixtureOutline,
-) {
-	for (const child of children) {
-		const owner = sections.find((row) => row.name === child.name)!;
-		const figure = await findFigure(api, sourceDocument, {
-			fromPage: owner.page_start,
-			toPage: owner.page_end,
-			plainCaption: true,
-		}).catch(() => undefined);
-		if (!figure) continue;
-		const image: string = await api.getValue("Source Page", figure.page, "image");
-		if (figure.url === image && owner.markdown.includes(`![${figure.caption}](${image})`))
-			return { owner, image, ...figure };
+// A figure whose tag points at its page image and that exactly one section embeds.
+async function pageImageFigure(api: Api, sourceDocument: string, sections: SectionRow[]) {
+	const pages = await api.getList("Source Page", {
+		filters: { source_document: sourceDocument },
+		fields: ["name", "page_no", "image", "canonical_markdown"],
+		orderBy: "page_no asc",
+	});
+	for (const page of pages) {
+		for (const [tag, caption, url] of (page.canonical_markdown || "").matchAll(
+			/!\[([^\]]*)\]\(([^)]*)\)/g,
+		)) {
+			if (!caption || caption.includes('"') || url !== page.image) continue;
+			const owners = sections.filter((row) => row.markdown?.includes(tag));
+			if (owners.length === 1)
+				return { owner: owners[0], page: page.name, pageNo: page.page_no, caption, image: url };
+		}
 	}
 }
 
@@ -319,10 +317,11 @@ test.describe("assistant", () => {
 			const movedIndex = 3;
 			const [renamed, retyped, moved] = [children[1], children[2], children[movedIndex]].map(row);
 			const newTitle = `${PREFIX} agent renamed ${stamp}`;
-			const newType =
-				retyped.section_type === "training_and_education"
-					? "quality_and_audits"
-					: "training_and_education";
+			// Section types are per project, so pick another one this document already uses.
+			const newType = before
+				.map((section) => section.section_type)
+				.find((type) => type && type !== retyped.section_type);
+			test.skip(!newType, "this parse uses a single section type");
 			const prompt =
 				`${PREFIX} agent ${stamp} Do three things: 1) move the section '${moved.title}' (currently under '${root!.title}') to the top level of the tree; ` +
 				`2) rename the section '${renamed.title}' to '${newTitle}'; 3) set the section type of '${retyped.title}' to '${newType}'.`;
@@ -683,8 +682,8 @@ test.describe("assistant", () => {
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const found = await pageImageFigure(api, sourceDocument, before, fixture.agent.outline);
-			test.skip(!found, "no top-level section embeds a page-image figure with a plain caption");
+			const found = await pageImageFigure(api, sourceDocument, before);
+			test.skip(!found, "no section embeds a page-image figure with a plain caption");
 			const { owner, pageNo, caption, image } = found!;
 			const target = pagesBefore.find((row) => row.page_no === pageNo)!;
 			const placeholder = `/files/test-placeholder-${stamp}.png`;
@@ -795,12 +794,18 @@ test.describe("assistant", () => {
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const inlineCode = /`[^`\n]+`/;
-			const found = pagesBefore.find((row) => inlineCode.test(row.canonical_markdown));
-			test.skip(!found, "no page of this parse has inline code");
-			const target = found!;
+			const markers = [
+				{ span: /`[^`\n]+`/g, name: "inline code span", mark: "backticks", word: /backtick/i },
+				{ span: /\*\*[^*\n]+\*\*/g, name: "bold span", mark: "asterisks", word: /asterisk/i },
+			];
+			const marker = markers.find((entry) =>
+				pagesBefore.some((row) => row.canonical_markdown?.match(entry.span)),
+			);
+			test.skip(!marker, "no page of this parse has inline code or bold text");
+			const { span, name: spanName, mark, word } = marker!;
+			const target = pagesBefore.find((row) => row.canonical_markdown?.match(span))!;
 			const pageNo: number = target.page_no;
-			const kept = plainPhrase(target.canonical_markdown.replace(/`[^`\n]+`/g, ""), 2);
+			const kept = plainPhrase(target.canonical_markdown.replace(span, ""), 2);
 			const reparseFields = [
 				"canonical_source",
 				"remediation_method",
@@ -813,7 +818,7 @@ test.describe("assistant", () => {
 			const meanBefore = await api.getValue("Source Document", sourceDocument, "canonical_mean");
 			const prompt =
 				`${PREFIX} agent ${stamp} Re-parse page ${pageNo} with the VLM, instruction: ` +
-				`"write every inline code span as plain text, without backticks".`;
+				`"write every ${spanName} as plain text, without ${mark}".`;
 			let sessionId = "";
 			try {
 				const panel = await openAssistant(page, fixture.agent.import);
@@ -826,7 +831,7 @@ test.describe("assistant", () => {
 				expect(reparses.length).toBeGreaterThan(0);
 				const args = toolArgs(reparses.at(-1)!);
 				expect(args).toMatchObject({ page_no: pageNo, method: "vlm" });
-				expect(args.instruction).toMatch(/backtick/i);
+				expect(args.instruction).toMatch(word);
 				expect(reparses.at(-1)!.content).toContain(`Re-parsed page ${pageNo} via vlm`);
 
 				const reparsed: string = await api.getValue(
@@ -836,7 +841,7 @@ test.describe("assistant", () => {
 				);
 				expect(reparsed).not.toBe(target.canonical_markdown);
 				if (kept) expect(reparsed).toContain(kept);
-				expect(reparsed).not.toMatch(inlineCode);
+				expect(reparsed).not.toMatch(span);
 
 				await page.goto(`/wikify/import/${fixture.agent.import}/pages?page=${pageNo}`);
 				if (kept) await expect(page.getByText(kept).first()).toBeVisible();

@@ -381,11 +381,15 @@ test.describe("crop", () => {
 						owners[0].name === name
 					);
 				});
-			const found = fixture.review.outline.children.find(
-				(child) => ownedFigurePages(child.name).length,
-			);
-			test.skip(!found, "no top-level section of this parse alone owns a page with a figure");
-			const section = found!;
+			const name = [
+				...fixture.review.outline.children.map((child) => child.name),
+				...before.sections.map((row) => row.name),
+			].find((candidate) => ownedFigurePages(candidate).length);
+			test.skip(!name, "no section of this parse alone owns a page with a figure");
+			const section = {
+				name: name!,
+				title: await api.getValue<string>("Source Section", name!, "title"),
+			};
 			const crops: { caption: string; url: string }[] = [];
 			for (const { page_no: pageNo, canonical_markdown } of ownedFigurePages(section.name).slice(
 				0,
