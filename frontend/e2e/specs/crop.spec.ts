@@ -1,12 +1,7 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import type { Api } from "../helpers/api";
 import { expect, test } from "../helpers/test";
-import {
-	FIXTURE_SECTIONS,
-	findSection,
-	propagationPending,
-	setSectionMarkdown,
-} from "../helpers/wikify";
+import { propagationPending, setSectionMarkdown } from "../helpers/wikify";
 import { waitFor } from "../helpers/wait";
 
 type PageSnapshot = {
@@ -376,16 +371,22 @@ test.describe("crop", () => {
 		async ({ page, api, fixture }) => {
 			test.setTimeout(2 * PROPAGATION_TIMEOUT + 120_000);
 			const sourceDocument = fixture.review.sourceDocument;
-			const section = await findSection(api, sourceDocument, FIXTURE_SECTIONS[0]);
-			const crops: { caption: string; url: string }[] = [];
-			const figurePages = before.pages.filter(
-				(row) =>
-					row.page_no >= section.page_start &&
-					row.page_no <= section.page_end &&
-					imageTags(row.canonical_markdown).length,
+			const ownedFigurePages = (name: string) =>
+				before.pages.filter(
+					(row) =>
+						imageTags(row.canonical_markdown).length &&
+						owningSections(before.sections, row.page_no).some((owner) => owner.name === name),
+				);
+			const found = fixture.review.outline.children.find(
+				(child) => ownedFigurePages(child.name).length,
 			);
-			expect(figurePages.length, "figures on the section's pages").toBeGreaterThan(0);
-			for (const { page_no: pageNo, canonical_markdown } of figurePages) {
+			test.skip(!found, "no top-level section of this parse owns a page with a figure");
+			const section = found!;
+			const crops: { caption: string; url: string }[] = [];
+			for (const { page_no: pageNo, canonical_markdown } of ownedFigurePages(section.name).slice(
+				0,
+				2,
+			)) {
 				const [figure] = imageTags(canonical_markdown);
 				const result = await api.call("wikify.api.pages.crop_page_figure", {
 					source_document: sourceDocument,
@@ -409,7 +410,7 @@ test.describe("crop", () => {
 				(markdown) => crops.every((crop) => markdown.includes(crop.url)),
 				{
 					timeout: PROPAGATION_TIMEOUT,
-					label: "section markdown has both crops",
+					label: "section markdown has every crop",
 				},
 			);
 

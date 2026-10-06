@@ -90,7 +90,8 @@ test.describe("ask", () => {
 			{ tag: ["@functional", "@llm", "@ask"] },
 			async ({ page, api, fixture }) => {
 				test.setTimeout(ANSWER_TIMEOUT + 60_000);
-				const question = `${AREA_PREFIX} Which AI service does Wikify use?`;
+				const topic = fixture.review.outline.children[1].title;
+				const question = `${AREA_PREFIX} What does the document say about "${topic}"?`;
 
 				await page.goto("/wikify/ask");
 				await pickProject(page, fixture.projectName);
@@ -145,7 +146,8 @@ test.describe("ask", () => {
 				// known failure: #53. Remove test.fail() when the issue is closed.
 				test.fail();
 				test.setTimeout(ANSWER_TIMEOUT + 60_000);
-				const question = `${AREA_PREFIX} What do the page review badges mean?`;
+				const topic = fixture.review.outline.children[2].title;
+				const question = `${AREA_PREFIX} What does the document say about "${topic}"?`;
 				const countBefore = await api.call("frappe.client.get_count", {
 					doctype: "Wikify Ask Session",
 					filters: { project: fixture.project },
