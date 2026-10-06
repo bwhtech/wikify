@@ -25,6 +25,9 @@ export const WHAT_IS_WIKIFY_PDF = path.resolve(
 	import.meta.dirname,
 	"../../../docs/what-is-wikify.pdf",
 );
-export const FIXTURE_PDF = WHAT_IS_WIKIFY_PDF;
+export const FIXTURE_PDF = path.resolve(
+	import.meta.dirname,
+	"../fixtures/openstax-anatomy-ch24-25.pdf",
+);
 export const FIXTURE_PDF_SHA256 =
-	"ad23468830e90fc535623d6aab92d92bf64207bfb2178ab8e4a09c0b7d3352ad";
+	"62d650cf40e02faea4395dc2301891c9e5165f88630713d4d92b7f704d0d6fcf";

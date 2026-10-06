@@ -1,0 +1,1 @@
+Adapted from *Anatomy and Physiology*, J. Gordon Betts et al., OpenStax (2013), pp. 1155–1252, CC BY 4.0, https://openstax.org/details/books/anatomy-and-physiology. Changes: page range extracted; three University of Michigan micrographs (CC BY-NC-SA) removed.
