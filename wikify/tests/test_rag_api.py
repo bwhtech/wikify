@@ -427,7 +427,7 @@ class TestRagAgentTool(FrappeTestCase):
 		with patch.object(api_rag, "search", return_value=payload) as search:
 			output = retrieve.semantic_search(Ctx(session="s", user="Administrator"), {"query": "roles"})
 		self.assertFalse(search.call_args.kwargs["use_router"])
-		self.assertIn("<sec-Backend Engineer>", output)
+		self.assertIn("`sec-Backend Engineer`", output)
 
 
 class TestReindexHook(FrappeTestCase):

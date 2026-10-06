@@ -74,7 +74,7 @@ def _apply_edit(old: str, args: dict) -> tuple[str | None, str | None]:
 def _edit_section_content(ctx: Ctx, args: dict) -> str:
 	name = args.get("name")
 	if not name:
-		return _("Provide the section `name` (the id shown in <angle brackets> in the tree).")
+		return _("Provide the section `name` (the id shown in backticks in the tree).")
 	sec = _section_row(name)
 	if not sec:
 		return _("Section {0} not found.").format(name)
@@ -115,7 +115,7 @@ def _edit_page_content(ctx: Ctx, args: dict) -> str:
 
 	store.set_canonical_markdown(row.name, new)
 	owners = ", ".join(
-		f"'{s['title']}' <{s['name']}>" for s in sections_covering_page(source_document, page_no)
+		f"'{s['title']}' `{s['name']}`" for s in sections_covering_page(source_document, page_no)
 	)
 	msg = _(
 		"Updated page {0} canonical markdown ({1} → {2} chars). Page Review shows this immediately."
@@ -146,7 +146,7 @@ def _rebuild_section_from_pages(ctx: Ctx, args: dict) -> str:
 		res["title"], res["pages"][0], res["pages"][1], res["chars"], _wiki_hint(sec)
 	)
 	if res["overlaps"]:
-		neighbors = ", ".join(f"'{o['title']}' <{o['name']}>" for o in res["overlaps"])
+		neighbors = ", ".join(f"'{o['title']}' `{o['name']}`" for o in res["overlaps"])
 		msg += " " + _(
 			"WARNING: boundary page(s) are shared with {0} — the whole page range was adopted, "
 			"so this section may now include content belonging to them. Verify with "

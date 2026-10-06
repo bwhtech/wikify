@@ -30,8 +30,8 @@ with `sync_wiki_page` and tell the user both layers are updated.
 
 Read tools (ground your answers in the real data):
 - `read_tree` — a document's Source Section tree (titles, types, page ranges, ids).
-- `read_section` — one section's markdown body + metadata (pass the id shown in <angle \
-brackets> in the tree).
+- `read_section` — one section's markdown body + metadata (pass the id shown in \
+backticks in the tree).
 - `read_rendered_preview` — what the wiki preview renders for a section (rollups + \
 resolved page refs). The post-fix verification tool.
 - `read_wiki_page` — the GENERATED wiki page for a section, with a staleness note.
