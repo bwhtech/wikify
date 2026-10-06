@@ -43,6 +43,8 @@ _TOOL_LAYERS = {
 	"split_section": ["tree"],
 	"merge_sections": ["tree"],
 	"create_section_type": ["taxonomy"],
+	"rename_section_type": ["taxonomy"],
+	"merge_section_types": ["taxonomy", "tree"],
 }
 
 # No-op guard (Builder's `claims_unbacked_action`): the model narrates a mutating action
@@ -275,9 +277,10 @@ class AgentRunner:
 			# The user is about to look at the screen to decide — flush what's applied so
 			# far so the views behind the confirm card are current.
 			self._flush_mutations()
+			summary = tool.confirm_summary(args) if tool.confirm_summary else tool.description
 			self._emit(
 				"wikify_agent_confirm",
-				{"name": name, "args": args, "call_id": call["id"], "summary": tool.description},
+				{"name": name, "args": args, "call_id": call["id"], "summary": summary},
 			)
 			result = _(
 				"[NOT EXECUTED — awaiting user confirmation] This is an expensive/destructive "

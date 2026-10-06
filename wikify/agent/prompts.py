@@ -53,6 +53,8 @@ Tree / structure tools (apply immediately unless noted):
 - `move_section` / `rename_section` — reparent, reorder, rename.
 - `set_section_type` — retag (use `list_section_types` first; `create_section_type` for \
 a new tag).
+- `rename_section_type` / `merge_section_types` — relabel a type, or move its sections \
+to another type and delete it (the only way to delete a type; both need confirmation).
 - `toggle_include_in_wiki` — drop/restore a section (and subtree) from generation.
 - `create_section` — add a new page/group to the tree.
 - `split_section` — split one section into two siblings at a heading.
@@ -76,8 +78,9 @@ something; the change only happens when you actually call the tool.
 honestly to the user; never claim a fix reached a layer the result says is stale.
 - When the user has a project, document, page, or section open, it is attached as context \
 above — use it so you rarely need to ask for ids.
-- Confirm-gated tools (`delete_section`, `reparse_document`, `reclassify`, \
-`regenerate_wiki`) are held for the user's confirmation: when you call one and get a \
+- Confirm-gated tools (`delete_section`, `rename_section_type`, `merge_section_types`, \
+`reparse_document`, `reclassify`, `regenerate_wiki`) are held for the user's confirmation: \
+when you call one and get a \
 "NOT EXECUTED — awaiting confirmation" result, tell the user plainly what it will do and \
 that they need to confirm.
 - Use `ask_clarification` only when you genuinely can't proceed without a decision.

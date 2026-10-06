@@ -90,6 +90,116 @@ class TestAgentWrite(FrappeTestCase):
 		r2 = tax._create_section_type(self.ctx, {"type_name": "surgical procedures"})
 		self.assertIn("already exists", r2)
 
+	def add_tagged_types(self):
+		for type_name in ("zz_merge_source", "zz_merge_target"):
+			tax.sections.create_section_type(type_name, label=type_name.replace("_", " ").title())
+			self.addCleanup(_cleanup.delete_section_type, type_name)
+		source_sections = self._sections()
+		for section, type_name in zip(
+			source_sections, ("zz_merge_source", "zz_merge_source", "zz_merge_target"), strict=True
+		):
+			frappe.db.set_value("Source Section", section.name, "section_type", type_name)
+		return source_sections
+
+	def get_section_types(self, source_sections):
+		return [
+			frappe.db.get_value("Source Section", section.name, "section_type") for section in source_sections
+		]
+
+	def test_rename_section_type_keeps_its_sections(self):
+		source_sections = self.add_tagged_types()
+		result = tax.rename_section_type(
+			self.ctx, {"type_name": "zz_merge_source", "new_label": "Zz Renamed Source"}
+		)
+		self.assertIn("Zz Renamed Source", result)
+		self.assertEqual(frappe.db.get_value("Section Type", "zz_merge_source", "label"), "Zz Renamed Source")
+		self.assertEqual(
+			self.get_section_types(source_sections), ["zz_merge_source", "zz_merge_source", "zz_merge_target"]
+		)
+
+	def test_merge_section_types_moves_sections_and_deletes_source(self):
+		source_sections = self.add_tagged_types()
+		result = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_merge_target"})
+		self.assertIn("Moved 2 section(s)", result)
+		self.assertFalse(frappe.db.exists("Section Type", "zz_merge_source"))
+		self.assertEqual(self.get_section_types(source_sections), ["zz_merge_target"] * 3)
+
+	def test_merge_section_types_refuses_itself_unknown_and_catch_all_types(self):
+		source_sections = self.add_tagged_types()
+		same = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_merge_source"})
+		self.assertIn("two different", same)
+		unknown = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_nope"})
+		self.assertIn("Unknown Section Type zz_nope", unknown)
+		catch_all = tax.merge_section_types(self.ctx, {"source": "other", "target": "zz_merge_target"})
+		self.assertIn("catch-all", catch_all)
+		self.assertTrue(frappe.db.exists("Section Type", "zz_merge_source"))
+		self.assertTrue(frappe.db.exists("Section Type", "other"))
+		self.assertEqual(
+			self.get_section_types(source_sections), ["zz_merge_source", "zz_merge_source", "zz_merge_target"]
+		)
+
+	def test_section_type_edits_need_permission(self):
+		source_sections = self.add_tagged_types()
+		desk_user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": f"desk-{frappe.generate_hash(length=6)}@example.com",
+				"first_name": "Desk",
+				"roles": [{"role": "Desk User"}],
+			}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.delete_doc, "User", desk_user.name, force=True)
+		frappe.set_user(desk_user.name)
+		self.addCleanup(frappe.set_user, "Administrator")
+		merged = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_merge_target"})
+		renamed = tax.rename_section_type(self.ctx, {"type_name": "zz_merge_source", "new_label": "Zz Desk"})
+		frappe.set_user("Administrator")
+		self.assertIn("Couldn't merge", merged)
+		self.assertIn("Couldn't rename", renamed)
+		self.assertEqual(frappe.db.get_value("Section Type", "zz_merge_source", "label"), "Zz Merge Source")
+		self.assertEqual(
+			self.get_section_types(source_sections), ["zz_merge_source", "zz_merge_source", "zz_merge_target"]
+		)
+
+	def test_merge_section_types_waits_for_confirmation(self):
+		source_sections = self.add_tagged_types()
+		arguments = '{"source": "zz_merge_source", "target": "zz_merge_target"}'
+		held_session = self._make_session()
+		held_llm = FakeLLM(
+			[
+				[_tool_chunk(0, "c1", "merge_section_types", arguments)],
+				[_text_chunk("Confirm the merge?")],
+			]
+		)
+		events = []
+		with (
+			patch("wikify.agent.llm.complete_with_tools", held_llm),
+			patch(
+				"frappe.publish_realtime",
+				lambda event, payload=None, *a, **k: events.append((event, payload)),
+			),
+		):
+			AgentRunner(held_session.name, "Administrator").run()
+		confirm = next(payload for event, payload in events if event.startswith("wikify_agent_confirm"))
+		self.assertEqual(
+			confirm["summary"],
+			"Move 2 section(s) from Section Type 'zz_merge_source' to 'zz_merge_target', "
+			"then delete 'zz_merge_source'.",
+		)
+		self.assertTrue(frappe.db.exists("Section Type", "zz_merge_source"))
+
+		approved_session = self._make_session()
+		approved_llm = FakeLLM(
+			[
+				[_tool_chunk(0, "c2", "merge_section_types", arguments)],
+				[_text_chunk("Merged.")],
+			]
+		)
+		with patch("wikify.agent.llm.complete_with_tools", approved_llm):
+			AgentRunner(approved_session.name, "Administrator", approved_tools=["merge_section_types"]).run()
+		self.assertFalse(frappe.db.exists("Section Type", "zz_merge_source"))
+		self.assertEqual(self.get_section_types(source_sections), ["zz_merge_target"] * 3)
+
 	def test_move_section_reparents_and_guards_cycles(self):
 		secs = self._sections()
 		out = tt._move_section(self.ctx, {"name": secs[2].name, "new_parent": secs[0].name})
