@@ -184,12 +184,15 @@ test.describe("ask", () => {
 				await confirm.getByRole("button", { name: /Delete/ }).click();
 
 				await expect(row).toHaveCount(0);
-				expect(
-					await api.call("frappe.client.get_count", {
-						doctype: "Wikify Ask Session",
-						filters: { project: fixture.project },
-					}),
-				).toBe(countBefore);
+				// The row leaves the list before the delete request returns.
+				await expect
+					.poll(() =>
+						api.call("frappe.client.get_count", {
+							doctype: "Wikify Ask Session",
+							filters: { project: fixture.project },
+						}),
+					)
+					.toBe(countBefore);
 				expect(
 					await api.call("frappe.client.get_count", {
 						doctype: "Wikify Ask Message",

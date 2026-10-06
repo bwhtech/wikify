@@ -204,7 +204,7 @@ test.describe("parse", () => {
 			const seqBefore = await lastLogSeq(api, importName);
 			await page.goto(`/wikify/import/${importName}`);
 			await expect(page.getByRole("heading", { name: title })).toBeVisible();
-			await page.getByRole("button", { name: "Actions" }).click();
+			await page.getByRole("button", { name: "Actions", exact: true }).click();
 			await page.getByRole("menuitem", { name: menuItem }).click();
 			await waitForValue(api, "Wikify Import", importName, "status", "Remediating", {
 				timeout: 30_000,
@@ -329,7 +329,7 @@ test.describe("parse", () => {
 
 				await page.goto(`/wikify/import/${importName}`);
 				await expect(page.getByRole("heading", { name: title })).toBeVisible();
-				await page.getByRole("button", { name: "Actions" }).click();
+				await page.getByRole("button", { name: "Actions", exact: true }).click();
 				await page.getByRole("menuitem", { name: "Reclassify sections" }).click();
 				const confirm = page.getByRole("dialog");
 				await expect(confirm.getByText("Reclassify sections", { exact: true })).toBeVisible();
