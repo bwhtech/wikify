@@ -9,6 +9,7 @@ import {
 	Progress,
 	TabButtons,
 	Tabs,
+	dialog,
 	dayjs,
 	useCall,
 	useDoc,
@@ -82,6 +83,30 @@ const sortedLogs = computed(() =>
 
 const status = computed(() => imp.doc?.status);
 const canRemediate = computed(() => status.value === "Review" && !!imp.doc?.source_document);
+const canReclassify = computed(
+	() => !!imp.doc?.source_document && ["Review", "Graphed", "Stopped"].includes(status.value)
+);
+const reclassify = useCall({
+	url: "/api/v2/method/wikify.api.imports.reclassify",
+	method: "POST",
+	immediate: false,
+});
+function confirmReclassify() {
+	dialog.confirm({
+		title: "Reclassify sections",
+		message:
+			"Reclassify all sections? This runs the AI on every section and uses API credits.",
+		confirmLabel: "Reclassify",
+		async onConfirm() {
+			await reclassify.submit({ import_name: props.name });
+			if (reclassify.error) {
+				throw new Error(
+					reclassify.error?.messages?.[0] || "Could not start reclassification"
+				);
+			}
+		},
+	});
+}
 
 // Attach the document (with its project) as the agent's default context. Keyed on the
 // source_document id so reloads (progress ticks) don't reset a page/section selection.
@@ -236,16 +261,29 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 					:route="{ name: 'ImportGraph', params: { name: props.name } }"
 				/>
 				<Dropdown
-					v-if="canRemediate"
+					v-if="canRemediate || canReclassify"
 					:options="[
-						{ label: 'Remediate flagged', onClick: () => runRemediation('flagged') },
-						{ label: 'Remediate all pages', onClick: () => runRemediation('all') },
+						{
+							label: 'Remediate flagged',
+							onClick: () => runRemediation('flagged'),
+							condition: () => canRemediate,
+						},
+						{
+							label: 'Remediate all pages',
+							onClick: () => runRemediation('all'),
+							condition: () => canRemediate,
+						},
+						{
+							label: 'Reclassify sections',
+							onClick: confirmReclassify,
+							condition: () => canReclassify,
+						},
 					]"
 				>
 					<Button
 						variant="solid"
 						theme="gray"
-						v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Remediate')"
+						v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
 						:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
 						:loading="remediate.loading"
 					/>
