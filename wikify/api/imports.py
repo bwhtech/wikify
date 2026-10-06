@@ -8,9 +8,12 @@ from wikify.api.sections import assert_not_published
 from wikify.engine import preview_wiki as _preview_wiki
 from wikify.jobs import generate as generate_job
 from wikify.jobs._util import log, publish_progress
+from wikify.jobs.parse import job_id as parse_job_id
+from wikify.jobs.remediate import job_id as remediate_job_id
 from wikify.seed import seed_uncategorized_project
 
 MAX_BATCH = 25
+RESUMABLE_STATUSES = ("Parsing", "Remediating")
 
 
 def assert_readable_file(file_url: str) -> None:
@@ -27,13 +30,27 @@ def _create_import(pdf_file_url: str, title: str, project: str) -> str:
 	imp.status = "Queued"
 	imp.insert()
 
+	enqueue_parse(imp.name)
+	return imp.name
+
+
+def enqueue_parse(import_name: str) -> None:
 	frappe.enqueue(
 		"wikify.jobs.parse.run",
 		queue="long",
 		timeout=3600,
-		import_name=imp.name,
+		job_id=parse_job_id(import_name),
+		deduplicate=True,
+		import_name=import_name,
 	)
-	return imp.name
+
+
+def is_stuck(import_doc) -> bool:
+	return (
+		import_doc.status in RESUMABLE_STATUSES
+		and not is_job_enqueued(parse_job_id(import_doc.name))
+		and not is_job_enqueued(remediate_job_id(import_doc.name))
+	)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -77,9 +94,31 @@ def trigger_remediation(import_name: str, scope: str = "flagged") -> str:
 		"wikify.jobs.remediate.run",
 		queue="long",
 		timeout=3600,
+		job_id=remediate_job_id(import_name),
 		import_name=import_name,
 		scope=scope,
 	)
+	return import_name
+
+
+@frappe.whitelist()
+def can_resume_import(import_name: str) -> bool:
+	import_doc = frappe.get_doc("Wikify Import", import_name)
+	return import_doc.has_permission("write") and is_stuck(import_doc)
+
+
+@frappe.whitelist(methods=["POST"])
+def resume_import(import_name: str) -> str:
+	import_doc = frappe.get_doc("Wikify Import", import_name)
+	import_doc.check_permission("write")
+	if not is_stuck(import_doc):
+		frappe.throw(
+			_("Only a stopped parse or remediation can be resumed (current status: {0}).").format(
+				import_doc.status
+			)
+		)
+
+	enqueue_parse(import_name)
 	return import_name
 
 

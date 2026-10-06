@@ -15,6 +15,10 @@ from wikify.engine.sectionize import rebuild_and_classify
 from wikify.jobs._util import log, project_context, publish_progress
 
 
+def job_id(import_name: str) -> str:
+	return f"wikify_parse:{import_name}"
+
+
 def run(import_name: str) -> None:
 	imp = frappe.get_doc("Wikify Import", import_name)
 	try:
