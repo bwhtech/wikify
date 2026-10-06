@@ -158,6 +158,26 @@ class TestAgent(FrappeTestCase):
 		self.assertNotIn("should not finish", answers)
 		self.assertFalse(frappe.cache().get_value(cancel_key(sess.name)))
 
+	def test_cancel_from_another_process_stops_the_tool_loop(self):
+		sess = self._make_session()
+
+		def tool_round_then_cancel():
+			yield _tool_chunk(0, "call_1", "read_tree", "{}")
+			with patch.dict(frappe.local.cache):
+				request_cancel(sess.name)
+
+		fake = FakeLLM(
+			[tool_round_then_cancel()]
+			+ [[_tool_chunk(0, f"call_{i}", "read_tree", "{}")] for i in range(2, 30)]
+		)
+		with patch("wikify.agent.llm.complete_with_tools", fake):
+			AgentRunner(sess.name, "Administrator").run()
+
+		self.assertEqual(len(fake.calls), 1)
+		tool_rows = frappe.get_all("Wikify Agent Message", filters={"session": sess.name, "role": "tool"})
+		self.assertEqual(tool_rows, [])
+		self.assertEqual(frappe.db.get_value("Wikify Agent Session", sess.name, "is_running"), 0)
+
 	def test_run_rejects_when_already_running(self):
 		sess = session.get_or_create(None, user="Administrator", scope="global")
 		session.set_running(sess.name, True)

@@ -238,7 +238,6 @@ export function useAgentChat() {
 	async function cancel() {
 		if (!sessionId.value) return;
 		await call("wikify.api.agent.cancel", { session_id: sessionId.value });
-		isRunning.value = false;
 		dropThinking();
 	}
 
