@@ -2,7 +2,7 @@
 // The /ask conversation list, as a rail beside the transcript rather than a dropdown:
 // these titles are whole questions, and picking a thread back up means reading them, not
 // recognising one from six truncated characters.
-import { Button, Spinner, dayjs } from "frappe-ui";
+import { Button, Spinner, dayjs, dialog } from "frappe-ui";
 
 defineProps({
 	sessions: { type: Array, default: () => [] },
@@ -10,7 +10,20 @@ defineProps({
 	errorText: { type: String, default: "" },
 	activeId: { type: String, default: "" },
 });
-defineEmits(["select", "delete", "close"]);
+const emit = defineEmits(["select", "delete", "close"]);
+
+function confirmDelete(row) {
+	dialog.danger({
+		title: "Delete conversation",
+		message: `Delete "${
+			row.title || "Untitled conversation"
+		}" and its answers? This can't be undone.`,
+		confirmLabel: "Delete",
+		onConfirm() {
+			emit("delete", row.name);
+		},
+	});
+}
 
 function askedAt(row) {
 	return row.modified ? dayjs(row.modified).format("D MMM, h:mm a") : "";
@@ -69,8 +82,8 @@ function questionCount(row) {
 					<Button
 						variant="ghost"
 						icon="lucide-trash-2"
-						:aria-label="`Delete conversation: ${row.title || row.name}`"
-						@click="$emit('delete', row.name)"
+						:label="`Delete conversation: ${row.title || row.name}`"
+						@click="confirmDelete(row)"
 					/>
 				</li>
 			</ul>
