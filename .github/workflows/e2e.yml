@@ -9,6 +9,10 @@ on:
       - .github/workflows/e2e.yml
       - .github/actions/e2e-site/**
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   playwright:
     name: Playwright

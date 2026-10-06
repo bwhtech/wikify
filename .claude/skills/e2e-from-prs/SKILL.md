@@ -31,8 +31,7 @@ or code the e2e user cannot reach. Also skip when an existing test already asser
 
 ## 3. Write at most 3 tests
 
-1. Read `references/playwright.md` (next to this file), every file in `e2e/helpers/`, and the whole
-   target spec before you write anything.
+1. Read every file in `e2e/helpers/` and the whole target spec before you write anything.
 2. Pick the spec by area: `agent`, `ask`, `tree` (sections), `crop` (figures, pages), `publish`
    (wiki), `upload`, `parse` (import, sectionize, jobs). Never add to `smoke.spec.ts`. Create
    `e2e/specs/<area>.spec.ts` only if no area fits.
@@ -50,6 +49,7 @@ Rules:
 - Data you create is titled `` `${PREFIX} <area> W<n> ${Date.now()}` `` and deleted in `afterAll`
   (`deleteByPrefix`, `deleteTestProjects`, `deleteImport`). Never delete `[fixture]` records. A test
   that changes a fixture restores it in `afterEach` (see `restoreTree` in `tree.spec.ts`).
+- Make test data in code (`helpers/pdf.ts`, API calls); never add files.
 - Wait on database state with `waitForValue` or `waitFor` through `api`. Never wait on UI progress
   text, and never use `page.waitForTimeout`.
 - `@llm` tests: `test.describe.configure({ retries: 1 })`, assert records through `api`, never the
