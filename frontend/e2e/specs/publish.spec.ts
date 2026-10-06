@@ -103,12 +103,16 @@ test.describe("publish", () => {
 		otherTitle = other.title;
 		await api.call("wikify.api.sections.toggle_include", { name: excluded.name, include: 0 });
 
-		// Past the first two children and both leaves: a crop rebuilds every section covering the page from
-		// whole pages, so the root's own text would leak into its first child (hiding bug #30), and a shared
-		// page would put one section's heading into another's page.
-		const figure = await findFigure(api, first.sourceDocument, {
-			fromPage: Math.max(children[1].page_end, leaf.page_end, other.page_end) + 1,
+		// Past the first two children and off both leaves' pages: a crop rebuilds every section covering the
+		// page from whole pages, so the root's own text would leak into its first child (hiding bug #30), and
+		// a shared page would put another section's heading into a leaf's page.
+		const onLeafPage = (pageNo: number) =>
+			[leaf, other].some((row) => row.page_start <= pageNo && pageNo <= row.page_end);
+		let figure = await findFigure(api, first.sourceDocument, {
+			fromPage: children[1].page_end + 1,
 		});
+		while (onLeafPage(figure.pageNo))
+			figure = await findFigure(api, first.sourceDocument, { fromPage: figure.pageNo + 1 });
 		const result = await api.call("wikify.api.pages.crop_page_figure", {
 			source_document: first.sourceDocument,
 			page_no: figure.pageNo,
