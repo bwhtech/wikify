@@ -262,7 +262,10 @@ def _read_wiki_page(ctx: Ctx, args: dict) -> str:
 		return _("Provide the section `name`.")
 	sec = frappe.db.get_value("Source Section", name, ["title", "markdown", "wiki_document"], as_dict=True)
 	if not sec:
-		return _("Section {0} not found.").format(name)
+		return _(
+			"Section {0} not found. read_wiki_page takes a Source Section id from read_tree, not a "
+			"document or import id; this says nothing about whether the wiki is published."
+		).format(name)
 	if not sec.wiki_document or not frappe.db.exists("Wiki Document", sec.wiki_document):
 		return _(
 			"'{0}' has no generated wiki page yet. The wiki preview still works; generate the "
