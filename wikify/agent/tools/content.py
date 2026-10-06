@@ -58,10 +58,16 @@ def _unchanged_page_hint(ctx: Ctx, sec) -> str:
 	for attachment in ctx.attachments:
 		if attachment.get("type") != "page" or not attachment.get("name"):
 			continue
-		page_no = frappe.db.get_value(
-			"Source Page", {"name": attachment["name"], "source_document": sec.source_document}, "page_no"
+		page = frappe.db.get_value(
+			"Source Page",
+			{"name": attachment["name"], "source_document": sec.source_document},
+			["page_no", "modified"],
+			as_dict=True,
 		)
-		if page_no and (sec.page_start or 0) <= page_no <= (sec.page_end or 0):
+		if not page or page.modified >= ctx.turn_started:
+			continue
+		page_no = page.page_no
+		if (sec.page_start or 0) <= page_no <= (sec.page_end or 0):
 			return " " + _(
 				"The user is looking at page {0} in Page Review, and page {0} is UNCHANGED: this edit "
 				"only reached the section. Make the same change on the page with edit_page_content "

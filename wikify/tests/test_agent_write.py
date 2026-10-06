@@ -262,6 +262,21 @@ class TestAgentWrite(FrappeTestCase):
 		)
 		self.assertIn("page 1 is UNCHANGED", out)
 
+	def test_section_edit_is_silent_once_the_page_was_edited_this_turn(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha_one = self._sections()[1]
+		ctx = Ctx(
+			session="x",
+			user="Administrator",
+			source_document=self.sd.name,
+			attachments=[{"type": "page", "name": page_name}],
+		)
+		ct._edit_page_content(ctx, {"page_no": 1, "mode": "replace", "content": "page one edited"})
+		out = ct._edit_section_content(
+			ctx, {"name": alpha_one.name, "mode": "replace", "content": "new body"}
+		)
+		self.assertNotIn("UNCHANGED", out)
+
 	def test_section_edit_is_silent_about_pages_outside_the_section(self):
 		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
 		beta = self._sections()[2]

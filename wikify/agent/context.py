@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import frappe
+from frappe.utils import now_datetime
 
 _BODY_LIMIT = 4000
 
@@ -15,6 +17,7 @@ class Ctx:
 	source_document: str | None = None
 	attachments: list[dict] = field(default_factory=list)
 	approved: set[str] = field(default_factory=set)
+	turn_started: datetime = field(default_factory=now_datetime)
 
 	def default_document(self, explicit: str | None = None) -> str | None:
 		if explicit and frappe.db.exists("Source Document", explicit):
