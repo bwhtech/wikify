@@ -11,6 +11,7 @@ from wikify.jobs._util import IMPORT_JOB_TIMEOUT, import_job_id, log, publish_pr
 from wikify.seed import seed_uncategorized_project
 
 MAX_BATCH = 25
+RESUMABLE_STATUSES = ("Parsing", "Remediating")
 
 
 def assert_readable_file(file_url: str) -> None:
@@ -27,14 +28,23 @@ def _create_import(pdf_file_url: str, title: str, project: str) -> str:
 	imp.status = "Queued"
 	imp.insert()
 
+	enqueue_parse(imp.name)
+	return imp.name
+
+
+def enqueue_parse(import_name: str) -> None:
 	frappe.enqueue(
 		"wikify.jobs.parse.run",
 		queue="long",
 		timeout=IMPORT_JOB_TIMEOUT,
-		job_id=import_job_id(imp.name),
-		import_name=imp.name,
+		job_id=import_job_id(import_name),
+		deduplicate=True,
+		import_name=import_name,
 	)
-	return imp.name
+
+
+def is_stuck(import_doc) -> bool:
+	return import_doc.status in RESUMABLE_STATUSES and not is_job_enqueued(import_job_id(import_doc.name))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -84,6 +94,27 @@ def trigger_remediation(import_name: str, scope: str = "flagged") -> str:
 		import_name=import_name,
 		scope=scope,
 	)
+	return import_name
+
+
+@frappe.whitelist()
+def can_resume_import(import_name: str) -> bool:
+	import_doc = frappe.get_doc("Wikify Import", import_name)
+	return import_doc.has_permission("write") and is_stuck(import_doc)
+
+
+@frappe.whitelist(methods=["POST"])
+def resume_import(import_name: str) -> str:
+	import_doc = frappe.get_doc("Wikify Import", import_name)
+	import_doc.check_permission("write")
+	if not is_stuck(import_doc):
+		frappe.throw(
+			_("Only a stopped parse or remediation can be resumed (current status: {0}).").format(
+				import_doc.status
+			)
+		)
+
+	enqueue_parse(import_name)
 	return import_name
 
 
