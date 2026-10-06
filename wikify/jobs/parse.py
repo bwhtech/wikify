@@ -51,7 +51,8 @@ def run(import_name: str) -> None:  # noqa: C901
 
 		# Parse + score only; the tree is built after remediation (below) so it's built once,
 		# over the cleaned canonical markdown rather than the raw baseline.
-		source_document = parse_pdf(
+		resuming = bool(imp.source_document)
+		source_document = imp.source_document or parse_pdf(
 			pdf_path,
 			title=imp.import_title,
 			import_name=import_name,
@@ -101,6 +102,7 @@ def run(import_name: str) -> None:  # noqa: C901
 				progress_cb=rem_progress_cb,
 				page_cb=rem_page_cb,
 				stage_cb=stage_cb,
+				resume=resuming,
 			)
 			if result.get("cost"):
 				log(

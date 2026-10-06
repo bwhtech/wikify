@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import fitz
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -145,6 +146,59 @@ class TestRemediatePipeline(FrappeTestCase):
 			remediate_pdf(sd, path, scope="all")
 		total = frappe.db.count("Source Page", {"source_document": sd})
 		self.assertEqual(vlm_mock.call_count, total)
+
+	def test_killed_run_keeps_saved_batches_and_resume_skips_them(self):
+		path = Path(tempfile.mkdtemp()) / "long.pdf"
+		pdf = fitz.open()
+		for page_no in range(1, 26):
+			pdf.new_page().insert_text((72, 90), f"Chapter {page_no}\n\nBody text of page {page_no}.")
+		pdf.save(str(path))
+		pdf.close()
+		with patch("wikify.engine.llm.has_openrouter", return_value=False):
+			sd = parse_pdf(str(path), title="Resume Test")
+
+		class WorkerKilled(BaseException):
+			pass
+
+		vlm_calls = []
+
+		def parse_page_image(data_url, **kwargs):
+			vlm_calls.append(data_url)
+			if len(vlm_calls) == 18:
+				raise WorkerKilled
+			return "vlm page"
+
+		def canonical_sources():
+			return frappe.get_all(
+				"Source Page",
+				filters={"source_document": sd},
+				fields=["page_no", "canonical_source"],
+				order_by="page_no asc",
+			)
+
+		with (
+			patch("frappe.db.commit") as commit_mock,
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+			patch(
+				"wikify.engine.remediate.clean_markdown",
+				side_effect=lambda md, model=None, project_context="", instruction="": md,
+			),
+			patch("wikify.engine.remediate.vlm.parse_page_image", side_effect=parse_page_image),
+		):
+			with self.assertRaises(WorkerKilled):
+				remediate_pdf(sd, str(path), scope="all")
+
+			self.assertEqual(commit_mock.call_count, 1)
+			saved = [row.page_no for row in canonical_sources() if row.canonical_source]
+			self.assertEqual(saved, list(range(1, 11)))
+
+			with patch("wikify.engine.remediate.vlm.parse_page_image", return_value="vlm page") as vlm_mock:
+				result = remediate_pdf(sd, str(path), scope="all", resume=True)
+
+		self.assertEqual(vlm_mock.call_count, 15)
+		self.assertEqual(result["targets"], 25)
+		self.assertTrue(all(row.canonical_source for row in canonical_sources()))
 
 	def test_vlm_failure_falls_back_to_cleanup_with_note(self):
 		sd, path = self._parse()
