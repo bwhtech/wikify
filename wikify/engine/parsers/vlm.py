@@ -41,6 +41,7 @@ def parse_page_image(
 	project_context: str = "",
 	instruction: str = "",
 	shape_hint: str = "",
+	figure_hint: str = "",
 ) -> str:
 	preamble = context_block(project_context) + instruction_block(instruction) + shape_hint
 	resp = llm.chat_completion(
@@ -49,7 +50,7 @@ def parse_page_image(
 			{
 				"role": "user",
 				"content": [
-					{"type": "text", "text": preamble + _PROMPT},
+					{"type": "text", "text": preamble + _PROMPT + figure_hint},
 					{"type": "image_url", "image_url": {"url": image_data_url}},
 				],
 			}

@@ -3,11 +3,16 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import fitz
+import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from wikify.engine import images
+from wikify.engine import images, parse_pdf, remediate_pdf
+from wikify.engine import settings as engine_settings
+from wikify.tests import _cleanup
+from wikify.tests.test_remediate_pipeline import _fake_chat
 
 CHART_RECT = fitz.Rect(100, 300, 400, 500)
 TEXT_BEFORE = "Admissions rose steadily over the decade."
@@ -114,3 +119,61 @@ class TestFigurePlacement(FrappeTestCase):
 		markdown = f"{TEXT_BEFORE}\n\n![Admissions per year](/private/files/chart.png)\n\n{TEXT_AFTER}"
 
 		self.assertEqual(images.place_figures(markdown, [chart_figure()], 2), markdown)
+
+
+class TestFigureRemediation(FrappeTestCase):
+	def setUp(self):
+		real_get = engine_settings.get
+		patcher = patch(
+			"wikify.engine.settings.get",
+			side_effect=lambda field: 0 if field == "judge_all_pages" else real_get(field),
+		)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def test_remediation_keeps_the_chart_as_its_crop_instead_of_a_transcription(self):
+		path = Path(tempfile.mkdtemp()) / "report.pdf"
+		make_report_pdf(str(path))
+		vlm_markdown = f"{TEXT_BEFORE}\n\n[[FIGURE 1: Admissions per year]]\n\n{TEXT_AFTER}"
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+		):
+			source_document = parse_pdf(str(path), title="Figure Remediation Test")
+			self.addCleanup(_cleanup.delete_document, source_document)
+			with (
+				patch("wikify.engine.remediate.clean_markdown", side_effect=RuntimeError("offline")),
+				patch(
+					"wikify.engine.remediate.vlm.parse_page_image", return_value=vlm_markdown
+				) as parse_page_image,
+			):
+				remediate_pdf(source_document, str(path), scope="all")
+
+		hints = [call.kwargs["figure_hint"] for call in parse_page_image.call_args_list]
+		self.assertEqual([bool(hint) for hint in hints], [False, True, False])
+		self.assertIn("this page has 1 picture(s)", hints[1])
+		self.assertIn("[[FIGURE 1]]", hints[1])
+		self.assertIn("Never turn its bars, lines, axis ticks, legend or data labels into a table", hints[1])
+
+		page = frappe.db.get_value(
+			"Source Page",
+			{"source_document": source_document, "page_no": 2},
+			["name", "image", "remediation_method", "remediation_markdown", "canonical_markdown"],
+			as_dict=True,
+		)
+		crop_urls = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "Source Page",
+				"attached_to_name": page.name,
+				"file_url": ["!=", page.image],
+			},
+			pluck="file_url",
+		)
+		self.assertEqual(len(crop_urls), 1)
+		self.assertEqual(page.remediation_method, "vlm")
+		self.assertEqual(
+			page.remediation_markdown,
+			f"{TEXT_BEFORE}\n\n![Admissions per year]({crop_urls[0]})\n\n{TEXT_AFTER}",
+		)
+		self.assertEqual(page.canonical_markdown.count(crop_urls[0]), 1)
