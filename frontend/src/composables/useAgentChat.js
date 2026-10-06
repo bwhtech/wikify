@@ -117,7 +117,7 @@ export function useAgentChat() {
 			onError: ({ message }) => {
 				isRunning.value = false;
 				dropThinking();
-				errorText.value = message;
+				errorText.value = message.split("\n")[0];
 				messages.value.push({
 					id: `err-${Date.now()}`,
 					role: "assistant",
@@ -238,7 +238,6 @@ export function useAgentChat() {
 	async function cancel() {
 		if (!sessionId.value) return;
 		await call("wikify.api.agent.cancel", { session_id: sessionId.value });
-		isRunning.value = false;
 		dropThinking();
 	}
 

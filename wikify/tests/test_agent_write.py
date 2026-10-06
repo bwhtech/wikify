@@ -9,6 +9,7 @@ from frappe.tests.utils import FrappeTestCase
 from wikify.agent import session
 from wikify.agent.context import Ctx
 from wikify.agent.loop import AgentRunner
+from wikify.agent.tools import content as ct
 from wikify.agent.tools import pipeline as pl
 from wikify.agent.tools import reparse as rep
 from wikify.agent.tools import taxonomy as tax
@@ -90,6 +91,116 @@ class TestAgentWrite(FrappeTestCase):
 		r2 = tax._create_section_type(self.ctx, {"type_name": "surgical procedures"})
 		self.assertIn("already exists", r2)
 
+	def add_tagged_types(self):
+		for type_name in ("zz_merge_source", "zz_merge_target"):
+			tax.sections.create_section_type(type_name, label=type_name.replace("_", " ").title())
+			self.addCleanup(_cleanup.delete_section_type, type_name)
+		source_sections = self._sections()
+		for section, type_name in zip(
+			source_sections, ("zz_merge_source", "zz_merge_source", "zz_merge_target"), strict=True
+		):
+			frappe.db.set_value("Source Section", section.name, "section_type", type_name)
+		return source_sections
+
+	def get_section_types(self, source_sections):
+		return [
+			frappe.db.get_value("Source Section", section.name, "section_type") for section in source_sections
+		]
+
+	def test_rename_section_type_keeps_its_sections(self):
+		source_sections = self.add_tagged_types()
+		result = tax.rename_section_type(
+			self.ctx, {"type_name": "zz_merge_source", "new_label": "Zz Renamed Source"}
+		)
+		self.assertIn("Zz Renamed Source", result)
+		self.assertEqual(frappe.db.get_value("Section Type", "zz_merge_source", "label"), "Zz Renamed Source")
+		self.assertEqual(
+			self.get_section_types(source_sections), ["zz_merge_source", "zz_merge_source", "zz_merge_target"]
+		)
+
+	def test_merge_section_types_moves_sections_and_deletes_source(self):
+		source_sections = self.add_tagged_types()
+		result = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_merge_target"})
+		self.assertIn("Moved 2 section(s)", result)
+		self.assertFalse(frappe.db.exists("Section Type", "zz_merge_source"))
+		self.assertEqual(self.get_section_types(source_sections), ["zz_merge_target"] * 3)
+
+	def test_merge_section_types_refuses_itself_unknown_and_catch_all_types(self):
+		source_sections = self.add_tagged_types()
+		same = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_merge_source"})
+		self.assertIn("two different", same)
+		unknown = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_nope"})
+		self.assertIn("Unknown Section Type zz_nope", unknown)
+		catch_all = tax.merge_section_types(self.ctx, {"source": "other", "target": "zz_merge_target"})
+		self.assertIn("catch-all", catch_all)
+		self.assertTrue(frappe.db.exists("Section Type", "zz_merge_source"))
+		self.assertTrue(frappe.db.exists("Section Type", "other"))
+		self.assertEqual(
+			self.get_section_types(source_sections), ["zz_merge_source", "zz_merge_source", "zz_merge_target"]
+		)
+
+	def test_section_type_edits_need_permission(self):
+		source_sections = self.add_tagged_types()
+		desk_user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": f"desk-{frappe.generate_hash(length=6)}@example.com",
+				"first_name": "Desk",
+				"roles": [{"role": "Desk User"}],
+			}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.delete_doc, "User", desk_user.name, force=True)
+		frappe.set_user(desk_user.name)
+		self.addCleanup(frappe.set_user, "Administrator")
+		merged = tax.merge_section_types(self.ctx, {"source": "zz_merge_source", "target": "zz_merge_target"})
+		renamed = tax.rename_section_type(self.ctx, {"type_name": "zz_merge_source", "new_label": "Zz Desk"})
+		frappe.set_user("Administrator")
+		self.assertIn("Couldn't merge", merged)
+		self.assertIn("Couldn't rename", renamed)
+		self.assertEqual(frappe.db.get_value("Section Type", "zz_merge_source", "label"), "Zz Merge Source")
+		self.assertEqual(
+			self.get_section_types(source_sections), ["zz_merge_source", "zz_merge_source", "zz_merge_target"]
+		)
+
+	def test_merge_section_types_waits_for_confirmation(self):
+		source_sections = self.add_tagged_types()
+		arguments = '{"source": "zz_merge_source", "target": "zz_merge_target"}'
+		held_session = self._make_session()
+		held_llm = FakeLLM(
+			[
+				[_tool_chunk(0, "c1", "merge_section_types", arguments)],
+				[_text_chunk("Confirm the merge?")],
+			]
+		)
+		events = []
+		with (
+			patch("wikify.agent.llm.complete_with_tools", held_llm),
+			patch(
+				"frappe.publish_realtime",
+				lambda event, payload=None, *a, **k: events.append((event, payload)),
+			),
+		):
+			AgentRunner(held_session.name, "Administrator").run()
+		confirm = next(payload for event, payload in events if event.startswith("wikify_agent_confirm"))
+		self.assertEqual(
+			confirm["summary"],
+			"Move 2 section(s) from Section Type 'zz_merge_source' to 'zz_merge_target', "
+			"then delete 'zz_merge_source'.",
+		)
+		self.assertTrue(frappe.db.exists("Section Type", "zz_merge_source"))
+
+		approved_session = self._make_session()
+		approved_llm = FakeLLM(
+			[
+				[_tool_chunk(0, "c2", "merge_section_types", arguments)],
+				[_text_chunk("Merged.")],
+			]
+		)
+		with patch("wikify.agent.llm.complete_with_tools", approved_llm):
+			AgentRunner(approved_session.name, "Administrator", approved_tools=["merge_section_types"]).run()
+		self.assertFalse(frappe.db.exists("Section Type", "zz_merge_source"))
+		self.assertEqual(self.get_section_types(source_sections), ["zz_merge_target"] * 3)
+
 	def test_move_section_reparents_and_guards_cycles(self):
 		secs = self._sections()
 		out = tt._move_section(self.ctx, {"name": secs[2].name, "new_parent": secs[0].name})
@@ -108,15 +219,87 @@ class TestAgentWrite(FrappeTestCase):
 		self.assertIn("Excluded", out)
 		self.assertEqual(frappe.db.get_value("Source Section", secs[0].name, "include_in_wiki"), 0)
 
-	def test_use_page_image_embeds_deterministically(self):
-		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "baseline body")
-		out = rep._use_page_image(self.ctx, {"page_no": 1})
-		self.assertIn("embeds its rendered image", out)
-		row = frappe.db.get_value(
-			"Source Page", page_name, ["canonical_source", "canonical_markdown"], as_dict=True
+	def test_use_page_image_adds_page_image_to_the_page_and_one_section(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha, alpha_one = self._sections()[:2]
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
+		self.assertIn("1.1 Alpha-One", out)
+		image = frappe.db.get_value("Source Page", page_name, "image")
+		self.assertEqual(
+			frappe.db.get_value("Source Page", page_name, "canonical_markdown"),
+			f"page one text\n\n![Page 1]({image})",
 		)
-		self.assertEqual(row.canonical_source, "image")
-		self.assertTrue(row.canonical_markdown.startswith("![Page 1]("))
+		self.assertEqual(
+			frappe.db.get_value("Source Section", alpha_one.name, "markdown"),
+			f"body of 1.1 Alpha-One\n\n![Page 1]({image})",
+		)
+		self.assertEqual(frappe.db.get_value("Source Section", alpha.name, "markdown"), "body of 1. Alpha")
+
+	def test_use_page_image_twice_adds_the_image_once(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha_one = self._sections()[1]
+		rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
+		self.assertIn("Nothing was added", out)
+		self.assertEqual(
+			frappe.db.get_value("Source Page", page_name, "canonical_markdown").count("![Page 1]"), 1
+		)
+		self.assertEqual(
+			frappe.db.get_value("Source Section", alpha_one.name, "markdown").count("![Page 1]"), 1
+		)
+
+	def test_section_edit_says_the_page_in_view_is_unchanged(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha_one = self._sections()[1]
+		ctx = Ctx(
+			session="x",
+			user="Administrator",
+			source_document=self.sd.name,
+			attachments=[{"type": "page", "name": page_name}],
+		)
+		out = ct._edit_section_content(
+			ctx, {"name": alpha_one.name, "mode": "replace", "content": "new body"}
+		)
+		self.assertIn("page 1 is UNCHANGED", out)
+
+	def test_section_edit_is_silent_about_pages_outside_the_section(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		beta = self._sections()[2]
+		ctx = Ctx(
+			session="x",
+			user="Administrator",
+			source_document=self.sd.name,
+			attachments=[{"type": "page", "name": page_name}],
+		)
+		out = ct._edit_section_content(ctx, {"name": beta.name, "mode": "replace", "content": "new body"})
+		self.assertNotIn("UNCHANGED", out)
+		out = ct._edit_section_content(
+			self.ctx, {"name": beta.name, "mode": "replace", "content": "newer body"}
+		)
+		self.assertNotIn("UNCHANGED", out)
+
+	def test_use_page_image_rejects_a_section_from_another_document(self):
+		store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		other = frappe.get_doc({"doctype": "Source Document", "title": "Other Doc"}).insert(
+			ignore_permissions=True
+		)
+		self.addCleanup(_cleanup.delete_document, other.name)
+		store.replace_sections(other.name, [_sec("Other", 1, ["Other"], 1, 1)])
+		other_section = frappe.get_all("Source Section", filters={"source_document": other.name})[0]
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": other_section.name})
+		self.assertIn("not found", out)
+		self.assertEqual(
+			frappe.db.get_value("Source Section", other_section.name, "markdown"), "body of Other"
+		)
+
+	def test_use_page_image_without_section_or_caption_changes_nothing(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		out = rep._use_page_image(self.ctx, {"page_no": 1})
+		self.assertIn("`section`", out)
+		page = frappe.db.get_value(
+			"Source Page", page_name, ["canonical_markdown", "baseline_markdown"], as_dict=True
+		)
+		self.assertEqual(page.canonical_markdown or page.baseline_markdown, "page one text")
 
 	def test_use_page_image_with_caption_replaces_only_that_tag(self):
 		baseline = "# Heading\n\nSome body text.\n\n![Figure 1.1](image1.png)\n\nMore text after."
@@ -196,6 +379,29 @@ class TestAgentWrite(FrappeTestCase):
 		enq2.assert_called_once()
 		self.assertEqual(enq2.call_args.args[0], "wikify.jobs.remediate.run")
 
+	def test_delete_confirm_names_the_section(self):
+		alpha = self._sections()[0].name
+		sess = self._make_session()
+		fake = FakeLLM(
+			[
+				[_tool_chunk(0, "c1", "delete_section", f'{{"name": "{alpha}"}}')],
+				[_text_chunk("Confirm the delete?")],
+			]
+		)
+		events = []
+		with (
+			patch("wikify.agent.llm.complete_with_tools", fake),
+			patch(
+				"frappe.publish_realtime",
+				lambda event, payload=None, *a, **k: events.append((event, payload)),
+			),
+		):
+			AgentRunner(sess.name, "Administrator").run()
+		confirm = next(payload for event, payload in events if event.startswith("wikify_agent_confirm"))
+		self.assertIn("'1. Alpha'", confirm["summary"])
+		self.assertIn("1 subsection", confirm["summary"])
+		self.assertTrue(frappe.db.exists("Source Section", alpha))
+
 	def test_ask_clarification_ends_turn(self):
 		sess = self._make_session()
 		fake = FakeLLM(
@@ -271,3 +477,48 @@ class TestAgentWrite(FrappeTestCase):
 		complete = next(e for e in events if e[0].startswith("wikify_agent_complete"))
 		self.assertEqual(complete[1]["mutation_count"], 2)
 		self.assertEqual(complete[1]["mutated_tools"], ["rename_section", "rename_section"])
+
+	def test_round_limit_reports_what_was_done(self):
+		sess = self._make_session()
+		secs = self._sections()
+		fake = FakeLLM(
+			[
+				[
+					_tool_chunk(
+						0,
+						"c1",
+						"move_section",
+						f'{{"name": "{secs[2].name}", "new_parent": "{secs[0].name}"}}',
+					)
+				],
+				[_tool_chunk(0, "c2", "read_tree", "{}")],
+				[_tool_chunk(0, "c3", "move_section", f'{{"name": "{secs[1].name}"}}')],
+				[
+					_tool_chunk(
+						0,
+						"c4",
+						"move_section",
+						f'{{"name": "{secs[0].name}", "new_parent": "{secs[0].name}"}}',
+					)
+				],
+			]
+		)
+		with (
+			patch("wikify.agent.loop.MAX_ROUNDS", 4),
+			patch("wikify.agent.llm.complete_with_tools", fake),
+		):
+			AgentRunner(sess.name, "Administrator").run()
+		final = frappe.get_all(
+			"Wikify Agent Message",
+			filters={"session": sess.name, "role": "assistant"},
+			fields=["content", "status"],
+			order_by="creation desc",
+			limit=1,
+		)[0]
+		self.assertEqual(final.status, "error")
+		self.assertIn("I stopped after 4 steps before finishing.", final.content)
+		self.assertIn("Moved '2. Beta' under 1. Alpha.", final.content)
+		self.assertIn("Moved '1.1 Alpha-One' to the top level.", final.content)
+		self.assertIn("Couldn't move section: Can't move a section into its own subtree.", final.content)
+		self.assertIn("Read-only lookups: 1.", final.content)
+		self.assertIn("Ask me to continue for the rest.", final.content)

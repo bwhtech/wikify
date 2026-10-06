@@ -15,7 +15,7 @@ def _title(name: str) -> str:
 def _move_section(ctx: Ctx, args: dict) -> str:
 	name = args.get("name")
 	if not name:
-		return _("Provide the section `name` (the id shown in <angle brackets> in the tree).")
+		return _("Provide the section `name` (the id shown in backticks in the tree).")
 	new_parent = args.get("new_parent") or None
 	new_index = args.get("new_index")
 	try:
@@ -82,7 +82,7 @@ def _create_section(ctx: Ctx, args: dict) -> str:
 	except frappe.ValidationError as e:
 		return _("Couldn't create section: {0}").format(str(e))
 	return _(
-		"Created section '{0}' <{1}>. It appears in the wiki preview now; run regenerate_wiki "
+		"Created section '{0}' `{1}`. It appears in the wiki preview now; run regenerate_wiki "
 		"to project it into a generated wiki (sync_wiki_page can't create pages)."
 	).format(args["title"].strip(), res["name"])
 
@@ -102,6 +102,18 @@ def _delete_section(ctx: Ctx, args: dict) -> str:
 	).format(title, res["deleted"])
 
 
+def summarize_delete_section(tool_args: dict) -> str:
+	name = tool_args.get("name")
+	try:
+		names = sections._subtree_names(name)[1]
+	except frappe.ValidationError:
+		return _("Delete section {0} and its whole subtree.").format(name)
+	subsections = len(names) - 1
+	if not subsections:
+		return _("Delete section '{0}'.").format(_title(name))
+	return _("Delete section '{0}' and its {1} subsection(s).").format(_title(name), subsections)
+
+
 def _split_section(ctx: Ctx, args: dict) -> str:
 	name, at_heading = args.get("name"), args.get("at_heading")
 	if not name or not (at_heading or "").strip():
@@ -111,7 +123,7 @@ def _split_section(ctx: Ctx, args: dict) -> str:
 	except frappe.ValidationError as e:
 		return _("Couldn't split: {0}").format(str(e))
 	return _(
-		"Split '{0}' — new sibling '{1}' <{2}> holds the content from '{3}' down. Both keep "
+		"Split '{0}' — new sibling '{1}' `{2}` holds the content from '{3}' down. Both keep "
 		"the original page range. Preview shows both now; regenerate_wiki is needed to give "
 		"the new page a generated wiki page."
 	).format(_title(name), res["new_title"], res["new_name"], at_heading)
@@ -129,7 +141,7 @@ def _merge_sections(ctx: Ctx, args: dict) -> str:
 	return _(
 		"Merged {0} section(s) into '{1}' (content concatenated in tree order, children "
 		"reparented). Deleted pages' generated wiki pages are swept on the next "
-		"regenerate_wiki; run sync_wiki_page on <{2}> to update its own wiki page."
+		"regenerate_wiki; run sync_wiki_page on `{2}` to update its own wiki page."
 	).format(res["merged"], survivor_title, names[0])
 
 
@@ -255,6 +267,7 @@ TOOLS = [
 		handler=_delete_section,
 		mutates=True,
 		confirm=True,
+		confirm_summary=summarize_delete_section,
 	),
 	Tool(
 		name="split_section",
@@ -264,7 +277,7 @@ TOOLS = [
 			"Split one section into two sibling pages at a markdown heading inside its body. "
 			"The original keeps everything above the heading; a new sibling right after it "
 			"gets the heading and everything below. at_heading matches the heading text (with "
-			"or without #s); fails loudly if not found."
+			"or without #s), else the opening text of exactly one paragraph; fails loudly otherwise."
 		),
 		parameters={
 			"type": "object",

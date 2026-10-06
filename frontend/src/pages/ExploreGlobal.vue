@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Badge, FormControl, PageHeader, useCall, useList } from "frappe-ui";
+import { Badge, FormControl, useCall, useList } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import SectionRoute from "@/components/SectionRoute.vue";
 
 const router = useRouter();
@@ -64,19 +65,25 @@ function pageRange(s) {
 
 <template>
 	<div class="flex h-full flex-col">
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-3">
 				<h1 class="shrink-0 text-md text-ink-gray-9">Explore</h1>
 				<span class="hidden truncate text-sm text-ink-gray-5 lg:block"
 					>Sections by type across documents</span
 				>
 			</div>
-			<!-- FormControl puts its class on an inner element, so the width lives on a
-			     wrapper — without it the select takes the whole header row. -->
-			<div class="w-36 shrink-0 sm:w-48">
-				<FormControl v-model="selectedProject" type="select" :options="projectOptions" />
-			</div>
-		</PageHeader>
+			<template #actions>
+				<!-- FormControl puts its class on an inner element, so the width lives on a
+				     wrapper — without it the select takes the whole header row. -->
+				<div class="w-36 shrink-0 sm:w-48">
+					<FormControl
+						v-model="selectedProject"
+						type="select"
+						:options="projectOptions"
+					/>
+				</div>
+			</template>
+		</AppPageHeader>
 
 		<!-- Empty state: nothing classified anywhere yet -->
 		<div

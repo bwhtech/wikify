@@ -1,17 +1,17 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
 	Badge,
 	Button,
 	Dialog,
 	ErrorMessage,
 	FormControl,
-	PageHeader,
 	Skeleton,
 	useCall,
 	useList,
 } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { actionButtonProps } from "@/utils/actionButton";
 import { clear as clearAgentContext } from "@/data/agentContext";
@@ -42,6 +42,18 @@ const archivedCount = computed(
 );
 
 const showNew = ref(false);
+const route = useRoute();
+
+watch(
+	() => route.query.new,
+	(isNew) => {
+		if (!isNew) return;
+		showNew.value = true;
+		const { new: _, ...query } = route.query;
+		router.replace({ query });
+	},
+	{ immediate: true }
+);
 const newName = ref("");
 const newDescription = ref("");
 
@@ -74,30 +86,32 @@ function openProject(name) {
 
 <template>
 	<div>
-		<PageHeader>
+		<AppPageHeader>
 			<h1 class="text-md text-ink-gray-9">Projects</h1>
-			<div class="flex shrink-0 items-center gap-2 pl-2">
-				<Button
-					v-if="archivedCount"
-					variant="ghost"
-					theme="gray"
-					v-bind="
-						actionButtonProps(
-							isMobile,
-							'lucide-archive',
-							showArchived ? 'Hide archived' : `Show archived (${archivedCount})`
-						)
-					"
-					@click="showArchived = !showArchived"
-				/>
-				<Button
-					variant="solid"
-					theme="gray"
-					v-bind="actionButtonProps(isMobile, 'lucide-plus', 'New Project')"
-					@click="showNew = true"
-				/>
-			</div>
-		</PageHeader>
+			<template #actions>
+				<div class="flex shrink-0 items-center gap-2 pl-2">
+					<Button
+						v-if="archivedCount"
+						variant="ghost"
+						theme="gray"
+						v-bind="
+							actionButtonProps(
+								isMobile,
+								'lucide-archive',
+								showArchived ? 'Hide archived' : `Show archived (${archivedCount})`
+							)
+						"
+						@click="showArchived = !showArchived"
+					/>
+					<Button
+						variant="solid"
+						theme="gray"
+						v-bind="actionButtonProps(isMobile, 'lucide-plus', 'New Project')"
+						@click="showNew = true"
+					/>
+				</div>
+			</template>
+		</AppPageHeader>
 
 		<div class="body-container pt-5 pb-40">
 			<!-- Loading skeleton (first load only — reloads keep the cards) -->

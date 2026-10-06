@@ -15,7 +15,7 @@ def format_hits(hits: list[dict], mode: str) -> str:
 		type_label = f" ({hit['section_type']})" if hit.get("section_type") else ""
 		lines.append(
 			f"\n[{position}] {rag_search.crumb(hit)}{type_label} [{rag_search.page_label(hit)}] "
-			f"<{hit['section']}> score={hit['score']:.4f}"
+			f"`{hit['section']}` score={hit['score']:.4f}"
 		)
 		text = hit.get("text") or ""
 		lines.append(text if len(text) <= EXCERPT_LIMIT else text[:EXCERPT_LIMIT] + "…")

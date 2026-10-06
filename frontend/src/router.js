@@ -1,5 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { session } from "@/data/session";
+import {
+	DEFAULT_SETTINGS_TAB,
+	SETTINGS_ROUTE_NAME,
+	attachSettingsRouter,
+	isSettingsTab,
+} from "@/data/settingsRoute";
 
 const routes = [
 	{
@@ -59,9 +65,17 @@ const routes = [
 		name: "Explore",
 		component: () => import("@/pages/ExploreGlobal.vue"),
 	},
-	// Settings moved from a page to a dialog (opened from the sidebar header menu);
-	// keep the old URL working for bookmarks.
-	{ path: "/settings", redirect: { name: "Projects" } },
+	// No component: the page the dialog was opened over stays mounted behind it.
+	{ path: "/settings", redirect: `/settings/${DEFAULT_SETTINGS_TAB}` },
+	{
+		path: "/settings/:tab",
+		name: SETTINGS_ROUTE_NAME,
+		beforeEnter: (to) =>
+			isSettingsTab(to.params.tab) || {
+				path: `/settings/${DEFAULT_SETTINGS_TAB}`,
+				replace: true,
+			},
+	},
 ];
 
 // __FRONTEND_ROUTE__ is injected by the frappe-ui vite plugin (= '/wikify').
@@ -78,5 +92,7 @@ router.beforeEach((to, from, next) => {
 	}
 	next();
 });
+
+attachSettingsRouter(router);
 
 export default router;

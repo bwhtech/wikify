@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import math
 
 import frappe
 from frappe.utils import now_datetime
 
-HISTORY_LIMIT = 40
+# About 40k and 10k tokens at ~4 chars a token. The cutoff moves a whole step at a time so the
+# history prefix, and the prompt cache on it, stays the same across a turn's rounds.
+TOOL_RESULT_BUDGET_CHARS = 160_000
+TOOL_RESULT_CLEAR_STEP_CHARS = 40_000
 
 TITLE_CHARS = 120
 
@@ -82,12 +86,8 @@ def history_messages(session: str) -> list[dict]:
 		"Wikify Agent Message",
 		filters={"session": session},
 		fields=["role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
-		order_by="creation desc",
-		limit=HISTORY_LIMIT,
+		order_by="creation asc",
 	)
-	rows.reverse()
-	while rows and rows[0].role == "tool":
-		rows.pop(0)
 	messages: list[dict] = []
 	for r in rows:
 		if r.status in ("error", "clarification"):
@@ -113,7 +113,31 @@ def history_messages(session: str) -> list[dict]:
 			messages.append(
 				{"role": "tool", "tool_call_id": r.tool_call_id or "", "content": r.content or ""}
 			)
+	clear_old_tool_results(messages)
 	return messages
+
+
+def clear_old_tool_results(messages: list[dict]) -> None:
+	tool_indexes = [index for index, message in enumerate(messages) if message["role"] == "tool"]
+	overflow = sum(len(messages[index]["content"]) for index in tool_indexes) - TOOL_RESULT_BUDGET_CHARS
+	if overflow <= 0:
+		return
+	to_clear = math.ceil(overflow / TOOL_RESULT_CLEAR_STEP_CHARS) * TOOL_RESULT_CLEAR_STEP_CHARS
+	for index in tool_indexes:
+		if to_clear <= 0:
+			break
+		message = messages[index]
+		note = cleared_result_note(message["tool_call_id"])
+		if message["content"] != note:
+			to_clear -= len(message["content"])
+			messages[index] = {**message, "content": note}
+
+
+def cleared_result_note(call_id: str) -> str:
+	return (
+		f"[Result cleared to save space. Call the tool again, or call read_history with "
+		f'call_id "{call_id}" to see it.]'
+	)
 
 
 def set_running(session: str, value: bool) -> None:

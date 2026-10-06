@@ -6,7 +6,8 @@
 // you doubt it.
 import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Button, FormControl, PageHeader } from "frappe-ui";
+import { Button, FormControl } from "frappe-ui";
+import AppPageHeader from "@/components/AppPageHeader.vue";
 import AnswerTurn from "@/components/rag/AnswerTurn.vue";
 import AskComposer from "@/components/rag/AskComposer.vue";
 import AskHistory from "@/components/rag/AskHistory.vue";
@@ -169,33 +170,35 @@ watch(
 
 <template>
 	<div class="flex h-full flex-col">
-		<PageHeader>
+		<AppPageHeader>
 			<div class="flex min-w-0 items-center gap-3">
 				<h1 class="shrink-0 text-md text-ink-gray-9">Ask</h1>
 				<span class="hidden truncate text-sm text-ink-gray-5 lg:inline">
 					Answers grounded in your indexed documents
 				</span>
 			</div>
-			<div class="flex shrink-0 items-center gap-2">
-				<Button
-					v-if="hasTurns"
-					variant="ghost"
-					icon-left="lucide-plus"
-					label="New chat"
-					:disabled="streaming"
-					@click="newConversation"
-				/>
-				<div class="w-32 sm:w-44">
-					<FormControl v-model="project" type="select" :options="projectOptions" />
+			<template #actions>
+				<div class="flex shrink-0 items-center gap-2">
+					<Button
+						v-if="hasTurns"
+						variant="ghost"
+						icon-left="lucide-plus"
+						label="New chat"
+						:disabled="streaming"
+						@click="newConversation"
+					/>
+					<div class="w-32 sm:w-44">
+						<FormControl v-model="project" type="select" :options="projectOptions" />
+					</div>
+					<Button
+						variant="ghost"
+						icon="lucide-history"
+						:aria-label="historyOpen ? 'Hide history' : 'Show history'"
+						@click="historyOpen = !historyOpen"
+					/>
 				</div>
-				<Button
-					variant="ghost"
-					icon="lucide-history"
-					:aria-label="historyOpen ? 'Hide history' : 'Show history'"
-					@click="historyOpen = !historyOpen"
-				/>
-			</div>
-		</PageHeader>
+			</template>
+		</AppPageHeader>
 
 		<div class="flex min-h-0 flex-1">
 			<div class="flex min-w-0 flex-1 flex-col">
