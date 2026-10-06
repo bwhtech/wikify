@@ -24,7 +24,7 @@ from wikify.engine import store
 from wikify.engine.classify import classify_document
 from wikify.engine.lint import fix_table_separators
 from wikify.engine.loader.cleanup import clean_pages
-from wikify.engine.loader.sectionizer import sectionize
+from wikify.engine.loader.sectionizer import _HEADING_RE, _clean_title, sectionize
 from wikify.engine.loader.toc import toc_level_map
 
 
@@ -154,6 +154,10 @@ def rebuild_section_markdown(section_name: str) -> dict:
 
 	cleaned = clean_pages(pages)
 	markdown = fix_table_separators("\n\n".join(md.strip() for _, md in cleaned if md.strip()))
+	first_line, _, body = markdown.partition("\n")
+	heading = _HEADING_RE.match(first_line)
+	if heading and _clean_title(heading.group(2)) == sec.title:
+		markdown = body.strip()
 	overlaps = overlapping_sections(section_name)
 	store.set_section_markdown(section_name, markdown)
 	return {

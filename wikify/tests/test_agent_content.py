@@ -204,6 +204,12 @@ class TestAgentContent(FrappeTestCase):
 		after = {t: (r.lft, r.rgt, r.level) for t, r in self._rows().items()}
 		self.assertEqual(before, after)  # tree untouched
 
+	def test_rebuild_drops_the_section_own_heading(self):
+		store.set_canonical(self.pages[1], "# **1. Alpha**\n\nalpha intro", 0.9, "cleanup")
+		rebuild_section_markdown(self._name("1. Alpha"))
+		md = self._rows()["1. Alpha"].markdown
+		self.assertEqual(md, "alpha intro\n\ncanonical page 2")
+
 	def test_rebuild_reports_boundary_overlap(self):
 		res = rebuild_section_markdown(self._name("3. Gamma"))
 		self.assertEqual([o["title"] for o in res["overlaps"]], ["2. Beta"])
