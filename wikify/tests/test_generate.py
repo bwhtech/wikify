@@ -6,10 +6,11 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.nestedset import get_descendants_of
+from wiki.frappe_wiki.doctype.wiki_document.wiki_document import get_landing_page_for_route
 
 from wikify.api import imports as imports_api
 from wikify.engine import generate_wiki, preview_wiki, store
-from wikify.engine.generate import DATA_MAX_LENGTH
+from wikify.engine.generate import DATA_MAX_LENGTH, sync_section
 from wikify.engine.loader.sectionizer import Section
 from wikify.engine.loader.wiki import rewrite_page_refs, slugify
 from wikify.jobs import generate as generate_job
@@ -205,6 +206,38 @@ class TestWikiGenerate(FrappeTestCase):
 		self.assertIn("1.1 Goals", docs)
 		self.assertTrue(docs["1.1 Goals"].route.endswith(f"{slugify('1.1 Goals')}-{purpose}"))
 
+	def test_group_body_shows_as_its_first_page(self):
+		res = self._generate()
+		docs = self._by_title(res["root_group"])
+		intro, overview = docs["1. Intro"], docs["Overview"]
+		self.assertEqual(intro.content, "")
+		self.assertEqual(overview.is_group, 0)
+		self.assertEqual(overview.parent_wiki_document, intro.name)
+		self.assertEqual(overview.content, "overview")
+		self.assertLess(overview.sort_order, docs["1.1 Purpose"].sort_order)
+		self.assertEqual(get_landing_page_for_route(intro.route)["route"], overview.route)
+
+		intro_section = frappe.db.get_value(
+			"Source Section", {"title": "1. Intro", "source_document": self.sd.name}, "name"
+		)
+		frappe.db.set_value("Source Section", intro_section, "markdown", "edited overview")
+		self.assertTrue(sync_section(intro_section)["synced"])
+		self.assertEqual(frappe.db.get_value("Wiki Document", overview.name, "content"), "edited overview")
+
+	def test_regenerate_keeps_the_overview_and_drops_it_once_the_group_body_is_gone(self):
+		res = self._generate()
+		overview = self._by_title(res["root_group"])["Overview"].name
+		generate_wiki(self.sd.name, wiki_space=res["space"])
+		self.assertEqual(self._by_title(res["root_group"])["Overview"].name, overview)
+
+		frappe.db.set_value(
+			"Source Section", {"title": "1. Intro", "source_document": self.sd.name}, "markdown", ""
+		)
+		generate_wiki(self.sd.name, wiki_space=res["space"])
+		docs = self._by_title(res["root_group"])
+		self.assertNotIn("Overview", docs)
+		self.assertIn("## Contents", docs["1. Intro"].content)
+
 	def test_data_max_length_matches_the_column_width(self):
 		self.assertEqual(DATA_MAX_LENGTH, frappe.db.VARCHAR_LEN)
 
@@ -216,7 +249,7 @@ class TestWikiGenerate(FrappeTestCase):
 		res = self._generate()
 
 		docs = self._docs_under(res["root_group"])
-		self.assertEqual(len(docs), len(titles) + 1)
+		self.assertEqual(len(docs), 2 * len(titles))
 		self.assertTrue(all(len(doc.route) <= DATA_MAX_LENGTH for doc in docs.values()))
 		self.assertEqual(len({doc.route for doc in docs.values()}), len(docs))
 

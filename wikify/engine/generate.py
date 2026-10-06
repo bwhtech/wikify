@@ -32,6 +32,7 @@ from wikify.engine.loader.wiki import rewrite_page_refs, slugify
 from wikify.engine.refs import smallest_covering
 
 DATA_MAX_LENGTH = 140
+OVERVIEW_TITLE = "Overview"
 
 
 def _upsert_wiki_document(
@@ -92,6 +93,14 @@ def bounded_route(prefix: str, title: str, identifier: str) -> tuple[str, str]:
 	return f"{prefix}/{slug}", slug
 
 
+def overview_route(prefix: str, section_name: str) -> tuple[str, str]:
+	return bounded_route(prefix, OVERVIEW_TITLE, section_name)
+
+
+def has_own_body(section: dict) -> bool:
+	return bool(section["is_group"] and (section["markdown"] or "").strip())
+
+
 class _WikiGenerator:
 	"""Projects one approved Source Document tree into a Wiki Space (see module doc)."""
 
@@ -113,6 +122,8 @@ class _WikiGenerator:
 		self.included = [s for s in self.sections if s["include_in_wiki"]]
 		self.wiki_name: dict[str, str] = {}  # section name → wiki document name
 		self.wiki_route: dict[str, str] = {}  # section name → wiki route
+		self.page_name: dict[str, str] = {}  # section name → wiki document showing its content
+		self.page_route: dict[str, str] = {}
 		self.content: dict[str, str] = {}  # section name → content written
 		self.deleted = 0
 		self.links = 0
@@ -153,6 +164,17 @@ class _WikiGenerator:
 		"""
 		kept = {self.root_group.name}
 		kept |= {s["wiki_document"] for s in self.included if s["wiki_document"]}
+		overview_routes = [
+			overview_route(self.root_group.route, s["name"])[0] for s in self.included if has_own_body(s)
+		]
+		if overview_routes:
+			kept |= set(
+				frappe.get_all(
+					"Wiki Document",
+					filters={"route": ["in", overview_routes], "is_group": 0},
+					pluck="name",
+				)
+			)
 		descendants = get_descendants_of("Wiki Document", self.root_group.name, ignore_permissions=True)
 		stale = (
 			frappe.get_all(
@@ -200,7 +222,7 @@ class _WikiGenerator:
 			doc = _upsert_wiki_document(
 				s["wiki_document"],
 				title=s["title"],
-				content=content,
+				content="" if has_own_body(s) else content,
 				is_group=bool(s["is_group"]),
 				parent=parent_name,
 				route=route,
@@ -209,10 +231,33 @@ class _WikiGenerator:
 			)
 			self.wiki_name[s["name"]] = doc.name
 			self.wiki_route[s["name"]] = doc.route
+			self.page_name[s["name"]] = doc.name
+			self.page_route[s["name"]] = doc.route
 			self.content[s["name"]] = content
+			if has_own_body(s):
+				self._add_overview(s, doc)
+				sort_counter[doc.name] = 1
 			store.set_section_wiki_document(s["name"], doc.name)
 			if self.progress_cb:
 				self.progress_cb(i + 1, total)
+
+	def _add_overview(self, section: dict, group) -> None:
+		"""The live wiki redirects a group to its first page, so a group's own text would
+		never be shown; it goes on an Overview page sorted first instead."""
+		route, slug = overview_route(self.root_group.route, section["name"])
+		existing = frappe.db.get_value("Wiki Document", {"route": route, "is_group": 0}, "name")
+		doc = _upsert_wiki_document(
+			existing,
+			title=OVERVIEW_TITLE,
+			content=self.content[section["name"]],
+			is_group=False,
+			parent=group.name,
+			route=route,
+			slug=slug,
+			sort_order=0,
+		)
+		self.page_name[section["name"]] = doc.name
+		self.page_route[section["name"]] = doc.route
 
 	def _rollup_empty_groups(self) -> None:
 		"""Give container pages (groups with no own body) a Contents list linking to their
@@ -249,11 +294,11 @@ class _WikiGenerator:
 				self.content[s["name"]],
 				page_count,
 				self._route_for_page,
-				current_route=self.wiki_route[s["name"]],
+				current_route=self.page_route[s["name"]],
 			)
 			if links:
 				frappe.db.set_value(
-					"Wiki Document", self.wiki_name[s["name"]], "content", new_md, update_modified=False
+					"Wiki Document", self.page_name[s["name"]], "content", new_md, update_modified=False
 				)
 				self.links += links
 
@@ -340,11 +385,16 @@ def sync_section(section_name: str) -> dict:
 		best = smallest_covering(routed, n)
 		return routes[best["name"]] if best else None
 
-	own_route = routes.get(section_name)
+	target, own_route = sec.wiki_document, routes.get(section_name)
+	if has_own_body(sec):
+		own_route = overview_route(own_route.rpartition("/")[0], section_name)[0]
+		target = frappe.db.get_value("Wiki Document", {"route": own_route, "is_group": 0}, "name")
+		if not target:
+			return {"synced": False, "reason": "needs_regenerate"}
 	page_count = frappe.db.get_value("Source Document", sec.source_document, "page_count")
 	content, links = rewrite_page_refs(content, page_count or 10**9, route_for_page, current_route=own_route)
 
-	frappe.db.set_value("Wiki Document", sec.wiki_document, "content", content, update_modified=False)
+	frappe.db.set_value("Wiki Document", target, "content", content, update_modified=False)
 	return {"synced": True, "chars": len(content), "links": links, "route": own_route}
 
 
