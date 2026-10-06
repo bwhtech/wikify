@@ -155,9 +155,20 @@ class AgentRunner:
 				blocks.append(_("Read-only lookups: {0}.").format(self._turn_read_count))
 			blocks.append(_("Ask me to continue for the rest."))
 			self._emit_error("\n\n".join(blocks))
-		except Exception:
+		except Exception as exception:
 			frappe.log_error(title="Wikify agent run failed")
-			self._emit_error(_("The assistant hit an error. Please try again."))
+			frappe.db.delete(
+				"Wikify Agent Message",
+				{"session": self.session_id, "role": "assistant", "status": "streaming"},
+			)
+			if getattr(exception, "status_code", None) == 402:
+				self._emit_error(
+					_(
+						"The model provider refused the request: not enough API credits. Add credits and try again."
+					)
+				)
+			else:
+				self._emit_error(_("The assistant hit an error. Please try again."))
 		finally:
 			session.set_running(self.session_id, False)
 
