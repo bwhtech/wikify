@@ -220,6 +220,7 @@ jobs:
           git status --porcelain=v1 --untracked-files=all | cut -c4- > "$RUNNER_TEMP/baseline.txt"
           source "$RUNNER_TEMP/claude-args.sh"
           mkdir -p "$RUNNER_TEMP/claude"
+          failed=0
           while read -r PR; do
             echo "::group::PR #$PR"
             prompt=$(sed "s/{PR}/$PR/" "$RUNNER_TEMP/prompt.txt")
@@ -227,14 +228,25 @@ jobs:
             (cd frontend && timeout 40m claude -p "$prompt" "${claude_args[@]}" \
               < /dev/null > "$RUNNER_TEMP/claude/pr-$PR.jsonl") || status=$?
             jq -r 'select(.type == "result") | .result // .subtype' "$RUNNER_TEMP/claude/pr-$PR.jsonl" || true
+            # claude exits 0 on API errors such as a rejected token; only the result line says so.
+            error=$(jq -r 'select(.type == "result" and .is_error) | .result' "$RUNNER_TEMP/claude/pr-$PR.jsonl" || true)
             if [ "$status" = "124" ]; then
               echo "- PR #$PR: claude timed out after 40 min" >> "$REPORT"
+              failed=$((failed + 1))
             elif [ "$status" != "0" ]; then
               echo "- PR #$PR: claude exited with $status" >> "$REPORT"
+              failed=$((failed + 1))
+            elif [ -n "$error" ]; then
+              echo "- PR #$PR: claude failed: $error" >> "$REPORT"
+              failed=$((failed + 1))
             fi
             "$RUNNER_TEMP/guard.sh" "$RUNNER_TEMP/baseline.txt" "PR #$PR"
             echo "::endgroup::"
           done < "$RUNNER_TEMP/prs.txt"
+          if [ "$failed" = "$(wc -l < "$RUNNER_TEMP/prs.txt" | tr -d ' ')" ]; then
+            echo "::error::claude failed on every PR; check CLAUDE_CODE_OAUTH_TOKEN and the report."
+            exit 1
+          fi
 
       - name: Run the new tests once
         id: result
