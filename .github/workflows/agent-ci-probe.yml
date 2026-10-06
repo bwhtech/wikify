@@ -1,0 +1,48 @@
+name: Agent CI probe
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/agent-ci-probe.yml
+      - wikify/agent_ci_probe.py
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    services:
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/e2e-site
+      - name: Direct turn
+        shell: bash
+        working-directory: /home/runner/frappe-bench
+        run: bench --site wikify.localhost execute wikify.agent_ci_probe.direct
+      - name: Worker turn
+        if: always()
+        shell: bash
+        working-directory: /home/runner/frappe-bench
+        run: |
+          bench --site wikify.localhost execute wikify.agent_ci_probe.worker
+          echo "----- worker log tail"
+          tail -n 80 logs/e2e-worker.log
