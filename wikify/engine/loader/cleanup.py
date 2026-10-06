@@ -31,6 +31,8 @@ _VARYING = [
 # carrying >=2 distinct sign-off phrases (a lone "approved by" in a data row is kept).
 _SEP_ONLY = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _SIGNOFF = ("prepared by", "issued by", "approved by", "reviewed by", "authorized by")
+_PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
+_SENTENCE_START = re.compile(r"^[a-z]")
 
 
 def _norm(line: str) -> str:
@@ -60,6 +62,25 @@ def _strip_footer_blocks(md: str) -> str:
 	return "\n".join(line for k, line in enumerate(lines) if k not in drop)
 
 
+def _is_table_row(line: str) -> bool:
+	return line.strip().startswith("|")
+
+
+def _strip_page_residue(md: str) -> str:
+	"""Drop separator rows left headless by a stripped header box, and the closing page number."""
+	lines = md.splitlines()
+	kept = [
+		line
+		for index, line in enumerate(lines)
+		if not (_SEP_ONLY.match(line) and "-" in line and not (index and _is_table_row(lines[index - 1])))
+	]
+	while kept and not kept[-1].strip():
+		kept.pop()
+	if kept and _PAGE_NUMBER.match(kept[-1]):
+		kept.pop()
+	return "\n".join(kept)
+
+
 def find_boilerplate(pages: list[tuple[int, str]]) -> set[str]:
 	"""Normalized lines that recur on a large fraction of pages."""
 	counts: Counter[str] = Counter()
@@ -82,12 +103,33 @@ def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> li
 			for line in md.splitlines()
 			if not (_norm(line) and _norm(line) in boilerplate) and not _is_varying(line)
 		]
-		out.append((pno, _strip_footer_blocks("\n".join(kept))))
+		out.append((pno, _strip_page_residue(_strip_footer_blocks("\n".join(kept)))))
 	return out
 
 
+def _ends_mid_sentence(line: str) -> bool:
+	text = line.strip()
+	return bool(text) and text[0] not in "#|<" and (text[-1].isalnum() or text[-1] == ",")
+
+
+def join_page_breaks(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+	"""Rejoin a sentence the PDF split across a page break onto the page it started on."""
+	page_lines = [md.splitlines() for _, md in pages]
+	for index in range(len(pages) - 1):
+		if pages[index + 1][0] != pages[index][0] + 1:
+			continue
+		lines, next_lines = page_lines[index], page_lines[index + 1]
+		last = next((i for i in range(len(lines) - 1, -1, -1) if lines[i].strip()), None)
+		first = next((i for i, line in enumerate(next_lines) if line.strip()), None)
+		if last is None or first is None:
+			continue
+		if _ends_mid_sentence(lines[last]) and _SENTENCE_START.match(next_lines[first].strip()):
+			lines[last] = f"{lines[last].rstrip()} {next_lines.pop(first).strip()}"
+	return [(page_no, "\n".join(lines)) for (page_no, _), lines in zip(pages, page_lines, strict=True)]
+
+
 def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
-	return strip_boilerplate(pages, find_boilerplate(pages))
+	return join_page_breaks(strip_boilerplate(pages, find_boilerplate(pages)))
 
 
 def strip_outer_markdown_fence(text: str) -> str:

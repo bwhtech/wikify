@@ -161,6 +161,38 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("real body", cleaned[1])
 		self.assertIn("more body", cleaned[2])
 
+	def test_clean_pages_strips_page_numbers_and_headless_separator_rows(self):
+		header = "NEPHROLOGY MANUAL\n\n| MAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398 |\n|---|---|---|"
+		table = "| Health worker | Action |\n|---|---|\n| Antibody 100 | Reassure |"
+		pages = [
+			(1, header.format(page=121) + f"\n\n## 5.7 Billing\n\n- Pay 2500 by noon.\n\n{table}\n\n121"),
+			(2, header.format(page=122) + "\n\n- Second page item.\n\n122"),
+			(3, header.format(page=123) + "\n\n- Third page item.\n\n123"),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertFalse(cleaned[1].startswith("|"))
+		self.assertEqual(cleaned[2].strip(), "- Second page item.")
+		self.assertNotIn("121", cleaned[1])
+		self.assertIn(f"- Pay 2500 by noon.\n\n{table}", cleaned[1])
+
+	def test_clean_pages_rejoins_a_sentence_split_by_a_page_break(self):
+		pages = [
+			(1, "- Organs are retrieved after withdrawal of life-sustaining\n\n132"),
+			(
+				2,
+				"measures; the kidneys may be recovered.\n\n## 5.8.12 Grievances\n\n- Last item ends.\n\n133",
+			),
+			(3, "- New item starts the page.\n\n134"),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(
+			cleaned[1],
+			"- Organs are retrieved after withdrawal of life-sustaining measures; the kidneys may be recovered.",
+		)
+		self.assertNotIn("measures", cleaned[2])
+		self.assertIn("## 5.8.12 Grievances", cleaned[2])
+		self.assertEqual(cleaned[3], "- New item starts the page.")
+
 	def test_title_is_clipped_to_the_storable_length(self):
 		long_title = "DETERMINATION OF RESIDENTIAL STATUS OF " + "HINDU UNDIVIDED FAMILY " * 8
 		secs = sectionize([(1, f"## {long_title}\nbody")])
