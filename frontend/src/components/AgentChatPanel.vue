@@ -1,9 +1,4 @@
 <script setup>
-// Chat panel for the Wikify AI agent: docked beside the sidebar on desktop (like Builder's
-// Bob), a full-screen sheet on phones. Slice 12 shipped the message list + tool-call cards +
-// streaming bubble + input. Slice 13 added the context chips row + a session-history
-// dropdown. Slice 16 added a model picker, session rename/archive, error retry, and empty
-// states.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Button, dialog, Dropdown, Spinner, Textarea } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";

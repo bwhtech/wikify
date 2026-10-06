@@ -26,8 +26,6 @@ const BUG_REPORT_URL = "https://github.com/bwhtech/wikify/issues/new";
 
 const settingsOpen = ref(false);
 const mobileMenuOpen = ref(false);
-// The agent panel is mounted once here so it's available on every screen (slice 12): docked
-// beside the sidebar on desktop, opened from a MobileNav tab on mobile.
 const agentOpen = ref(false);
 
 const menuItems = computed(() => [
@@ -152,8 +150,6 @@ onMounted(initializeTheme);
 		     PageHeader above it. -->
 		<DesktopShell v-else :scroll="pageScroll">
 			<template #sidebar>
-				<!-- Composed rather than via the `sections` config: that path never passes
-				     `active` through, so no item could ever show as active. -->
 				<Sidebar v-model:collapsed="collapsed" class="border-r border-outline-gray-1">
 					<div class="flex h-full flex-col p-2">
 						<SidebarHeader
