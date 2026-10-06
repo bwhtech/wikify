@@ -156,7 +156,7 @@ test.describe("ask", () => {
 				await pickProject(page, fixture.projectName);
 				await expect(page.getByPlaceholder("Ask a question of this wiki…")).toBeVisible();
 				// frappe-ui's Button overwrites aria-label with its (empty) label prop, so the icon-only
-				// history and trash buttons have no accessible name; find them by their icon.
+				// history button has no accessible name; find it by its icon.
 				const history = page.getByRole("heading", { name: "History" });
 				if (!(await history.isVisible()))
 					await page.locator("button:has(.lucide-history)").click();
@@ -171,10 +171,10 @@ test.describe("ask", () => {
 				).toBeVisible();
 
 				const row = page.getByRole("listitem").filter({ hasText: question });
-				await row.locator("button:has(.lucide-trash-2)").click();
+				await row.getByRole("button", { name: /^Delete conversation: / }).click();
 				const confirm = page.getByRole("dialog");
-				test.fail(); // known failure: #53. Remove test.fail() when the issue is closed.
 				await expect(confirm).toBeVisible();
+				await expect(confirm).toContainText(`Delete "${question}" and its answers?`);
 				expect(
 					await api.call("frappe.client.get_count", {
 						doctype: "Wikify Ask Session",

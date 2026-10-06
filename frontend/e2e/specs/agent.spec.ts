@@ -580,11 +580,24 @@ test.describe("assistant", () => {
 				await page.goto(`/wikify/import/${fixture.agent.import}/pages?page=${pageNo}`);
 				await expect(page.getByText("([test] page edit)")).toBeVisible();
 
-				test.fail(); // known failure: #21. Remove test.fail() when the issue is closed.
+				// A page edit reaches a section only when that section alone owns the page.
+				const ranges = await api.getList("Source Section", {
+					filters: { source_document: sourceDocument },
+					fields: ["name", "page_start", "page_end", "lft", "rgt"],
+				});
+				const covering = ranges.filter(
+					(row) => row.page_start <= pageNo && row.page_end >= pageNo,
+				);
+				const owners = covering.filter(
+					(row) => !covering.some((other) => other.lft > row.lft && other.rgt < row.rgt),
+				);
+				const changed = [edited.name, ...(owners.length === 1 ? [owners[0].name] : [])];
 				const after = await sectionRows(api, sourceDocument);
+				if (owners.length === 1)
+					expect(after.find((row) => row.name === owners[0].name)!.markdown).toContain(pageEdit);
 				const others = (rows: SectionRow[]) =>
 					rows
-						.filter((row) => row.name !== edited.name)
+						.filter((row) => !changed.includes(row.name))
 						.map(({ title, markdown }) => ({ title, markdown }));
 				expect(others(after)).toEqual(others(before));
 			} finally {
@@ -866,7 +879,6 @@ test.describe("assistant", () => {
 					.poll(() => toolCards.count(), { timeout: TURN_TIMEOUT })
 					.toBeGreaterThanOrEqual(2);
 
-				test.fail(); // known failure: #24. Remove test.fail() when the issue is closed.
 				await iconButton(page, "lucide-square", panel).click();
 				const toolsAtStop = await toolCards.count();
 				await waitFor(
@@ -1002,7 +1014,6 @@ test.describe("assistant", () => {
 			const rows = await waitForTurn(api, sessionId, prompt, TURN_TIMEOUT);
 			const reply = finalReply(rows);
 			expect(reply.status).toBe("done");
-			test.fail(); // known failure: #25. Remove test.fail() when the issue is closed.
 			expect(reply.content).toContain(codeWord);
 		},
 	);

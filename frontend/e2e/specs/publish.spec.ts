@@ -7,7 +7,6 @@ import { waitFor } from "../helpers/wait";
 import {
 	cloneImport,
 	createProject,
-	escapeRegExp,
 	findFigure,
 	outline,
 	sectionRows,
@@ -139,15 +138,24 @@ test.describe("publish", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/44" },
 		},
 		async ({ page, api }) => {
-			// known failure: #44. Remove test.fail() when the issue is closed.
-			test.fail();
 			const preview = await api.call("wikify.api.imports.preview_wiki", {
 				import_name: first.import,
 			});
+			const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 			const dialog = await openPublishDialog(page, first.import);
-			await expect(dialog).toContainText(
-				new RegExp(`${escapeRegExp(leafTitle)}|\\b${preview.pages} pages?\\b`, "i"),
-			);
+			await expect(dialog.getByText("Pages to publish", { exact: true })).toBeVisible();
+			await expect(
+				dialog.getByText(`${plural(preview.pages, "page")} · ${plural(preview.groups, "group")}`, {
+					exact: true,
+				}),
+			).toBeVisible();
+			await expect(
+				dialog.getByText(`${preview.excluded} excluded`, { exact: true }),
+			).toBeVisible();
+			const tree = dialog.getByRole("tree");
+			for (const node of preview.tree)
+				await expect(tree.getByText(node.title, { exact: true })).toBeVisible();
+			await expect(tree.getByText(excluded.title, { exact: true })).toHaveCount(0);
 		},
 	);
 
@@ -197,14 +205,13 @@ test.describe("publish", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/30" },
 		},
 		async ({ page }) => {
-			// known failure: #30. Remove test.fail() when the issue is closed.
-			test.fail();
 			test.skip(!root, "this parse produced no parent section");
 			const parent = sections.find((row) => row.name === root!.name)!;
 			const paragraph = ownParagraph(parent.markdown);
 			expect(sections.filter((row) => row.markdown?.includes(paragraph))).toEqual([parent]);
 			const group = publishedDocuments.find((document) => document.name === parent.wiki_document)!;
 			await page.goto(`/${group.route}`);
+			test.fail(); // known failure: #30. Remove test.fail() when the issue is closed.
 			await expect(page.getByRole("main")).toContainText(paragraph);
 		},
 	);
@@ -326,7 +333,7 @@ test.describe("publish", () => {
 		async () => {
 			test.skip(
 				true,
-				"BLOCKED: the dialog closes on Generate wiki and small imports generate in seconds; the only large import (R1) never reaches Review because its parse is killed at the 1 h RQ timeout.",
+				"generation makes no AI calls and commits every 50 pages, so even the 98-page fixture is published in seconds, too fast to stop from the UI",
 			);
 		},
 	);

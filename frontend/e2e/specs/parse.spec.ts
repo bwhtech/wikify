@@ -75,7 +75,6 @@ test.describe("parse", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/48" },
 		},
 		async ({ page, api }) => {
-			test.fail(); // known failure: #48. Remove test.fail() when the issue is closed.
 			test.setTimeout(QUEUE_WAIT + 2 * PARSE_TIMEOUT);
 			const projectName = `${AREA_PREFIX} watch`;
 			const project = await createProject(api, projectName);
@@ -205,7 +204,7 @@ test.describe("parse", () => {
 			const seqBefore = await lastLogSeq(api, importName);
 			await page.goto(`/wikify/import/${importName}`);
 			await expect(page.getByRole("heading", { name: title })).toBeVisible();
-			await page.getByRole("button", { name: "Remediate" }).click();
+			await page.getByRole("button", { name: "Actions" }).click();
 			await page.getByRole("menuitem", { name: menuItem }).click();
 			await waitForValue(api, "Wikify Import", importName, "status", "Remediating", {
 				timeout: 30_000,
@@ -221,7 +220,6 @@ test.describe("parse", () => {
 				annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/31" },
 			},
 			async ({ page, api }) => {
-				test.fail(); // known failure: #31. Remove test.fail() when the issue is closed.
 				test.setTimeout(QUEUE_WAIT + REMEDIATE_TIMEOUT + 120_000);
 				const parsed = await pageState(api, sourceDocument);
 				// A clean parse flags no page, and then "Remediate flagged" has nothing to run on.
@@ -262,6 +260,7 @@ test.describe("parse", () => {
 							canonical_source,
 							canonical_composite,
 						}));
+				test.fail(); // known failure: #31. Remove test.fail() when the issue is closed.
 				expect(
 					canonical(await pageState(api, sourceDocument)),
 					"passed pages keep their canonical read",
@@ -324,20 +323,27 @@ test.describe("parse", () => {
 				],
 			},
 			async ({ page, api }) => {
-				test.fail(); // known failure: #33, #50. Remove test.fail() when the issues are closed.
 				test.setTimeout(QUEUE_WAIT + REMEDIATE_TIMEOUT);
 				expect(await api.getValue("Wikify Import", importName, "status")).toBe("Review");
 				const seqBefore = await lastLogSeq(api, importName);
 
 				await page.goto(`/wikify/import/${importName}`);
 				await expect(page.getByRole("heading", { name: title })).toBeVisible();
-				const remediate = page.getByRole("button", { name: "Remediate" });
-				await expect(remediate).toBeVisible();
-				const headerControl = page.getByRole("button", { name: /Reclassify/ });
-				if (!(await headerControl.isVisible())) await remediate.click();
-				const control = headerControl.or(page.getByRole("menuitem", { name: /Reclassify/ }));
-				await expect(control, "a Reclassify control on the import page").toBeVisible();
-				await control.click();
+				await page.getByRole("button", { name: "Actions" }).click();
+				await page.getByRole("menuitem", { name: "Reclassify sections" }).click();
+				const confirm = page.getByRole("dialog");
+				await expect(confirm.getByText("Reclassify sections", { exact: true })).toBeVisible();
+				await confirm.getByRole("button", { name: "Reclassify", exact: true }).click();
+				await expect(confirm).toBeHidden();
+				// The toast disappears after a few seconds, so watch for it while the job runs.
+				const toastShown = page
+					.getByRole("region", { name: /Notifications/ })
+					.getByText("Sections reclassified")
+					.waitFor({ timeout: QUEUE_WAIT + REMEDIATE_TIMEOUT / 2 })
+					.then(
+						() => true,
+						() => false,
+					);
 
 				const entries = await waitFor(
 					async () =>
@@ -357,9 +363,7 @@ test.describe("parse", () => {
 				for (const section of sections)
 					expect(classified).toContain(`${section.title} → ${section.section_type}`);
 				expect(await api.getValue("Wikify Import", importName, "status")).toBe("Review");
-				await expect(
-					page.getByRole("region", { name: /Notifications/ }).getByText(/classif/i),
-				).toBeVisible();
+				expect(await toastShown, "a Sections reclassified toast").toBe(true);
 			},
 		);
 	});
@@ -373,7 +377,7 @@ test.describe("parse", () => {
 		async () => {
 			test.fixme(
 				true,
-				"needs a 400-page client PDF and over an hour of the only worker; the job is killed at its 3600 s RQ timeout (#22)",
+				"no public 400-page PDF in the suite; #22 (the 1 h job timeout) is fixed, so this needs only a large CC-licensed fixture",
 			);
 		},
 	);
