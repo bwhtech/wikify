@@ -264,7 +264,7 @@ TOOLS = [
 			"Split one section into two sibling pages at a markdown heading inside its body. "
 			"The original keeps everything above the heading; a new sibling right after it "
 			"gets the heading and everything below. at_heading matches the heading text (with "
-			"or without #s); fails loudly if not found."
+			"or without #s), else the opening text of exactly one paragraph; fails loudly otherwise."
 		),
 		parameters={
 			"type": "object",

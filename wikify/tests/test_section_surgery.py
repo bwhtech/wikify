@@ -137,6 +137,33 @@ class TestSectionSurgery(FrappeTestCase):
 		res = api.split_section(self._name("1. Alpha"), "## Part Two", new_title="Custom")
 		self.assertEqual(res["new_title"], "Custom")
 
+	def test_split_at_paragraph_start_when_section_has_no_headings(self):
+		gamma = self._name("3. Gamma")
+		store.set_section_markdown(
+			gamma, "Intro paragraph.\n\nFig. 2 shows the spicule\nforest at the limb.\n\nClosing paragraph."
+		)
+		res = api.split_section(gamma, "  fig. 2 SHOWS the spicule forest ")
+		rows = self._rows()
+		new_title = res["new_title"]
+		self.assertEqual(rows["3. Gamma"].markdown, "Intro paragraph.")
+		self.assertEqual(
+			rows[new_title].markdown, "Fig. 2 shows the spicule\nforest at the limb.\n\nClosing paragraph."
+		)
+		self.assertEqual(rows[new_title].parent_source_section, rows["3. Gamma"].parent_source_section)
+		self.assertLess(rows["3. Gamma"].rgt, rows[new_title].lft)
+		self._assert_tree_invariants()
+
+	def test_split_refuses_ambiguous_paragraph_start(self):
+		gamma = self._name("3. Gamma")
+		markdown = "Intro.\n\nFig. 2 left panel.\n\nFig. 2 right panel."
+		store.set_section_markdown(gamma, markdown)
+		before = set(self._rows())
+		with self.assertRaises(frappe.ValidationError) as cm:
+			api.split_section(gamma, "Fig. 2")
+		self.assertIn("2 paragraphs", str(cm.exception))
+		self.assertEqual(set(self._rows()), before)
+		self.assertEqual(self._rows()["3. Gamma"].markdown, markdown)
+
 	def test_merge_rejects_non_siblings(self):
 		with self.assertRaises(frappe.ValidationError):
 			api.merge_sections([self._name("1.1 Child"), self._name("2. Beta")])
