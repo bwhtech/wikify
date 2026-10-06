@@ -7,6 +7,7 @@ import {
 	MobileNavItem,
 	MobileShell,
 	Sidebar,
+	formatShortcutLabel,
 } from "frappe-ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -16,7 +17,7 @@ import { session } from "@/data/session";
 import AgentChatPanel from "@/components/AgentChatPanel.vue";
 import AppSettingsDialog from "@/components/AppSettingsDialog.vue";
 import CommandPalette from "@/components/CommandPalette.vue";
-import { paletteOpen } from "@/data/commandPalette";
+import { PALETTE_SHORTCUT, paletteOpen } from "@/data/commandPalette";
 import { DESTINATIONS } from "@/data/navigation";
 import { openSettings, visibleRoute } from "@/data/settingsRoute";
 
@@ -75,7 +76,14 @@ const destinations = computed(() =>
 	}))
 );
 
-const sections = computed(() => [{ label: "", items: destinations.value }]);
+const searchItem = {
+	label: "Search",
+	icon: "lucide-search",
+	suffix: formatShortcutLabel(PALETTE_SHORTCUT),
+	onClick: () => (paletteOpen.value = true),
+};
+
+const sections = computed(() => [{ label: "", items: [...destinations.value, searchItem] }]);
 
 // Full-height, multi-pane routes own their own scroll (graph canvas, split review,
 // tabbed import). Everything else scrolls as one page inside the shell's scroll area.
