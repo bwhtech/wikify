@@ -43,6 +43,8 @@ _TOOL_LAYERS = {
 	"split_section": ["tree"],
 	"merge_sections": ["tree"],
 	"create_section_type": ["taxonomy"],
+	"rename_section_type": ["taxonomy"],
+	"merge_section_types": ["taxonomy", "tree"],
 }
 
 # No-op guard (Builder's `claims_unbacked_action`): the model narrates a mutating action

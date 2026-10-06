@@ -142,6 +142,34 @@ def create_section_type(
 
 
 @frappe.whitelist(methods=["POST"])
+def rename_section_type(type_name: str, label: str) -> dict:
+	label = (label or "").strip()
+	if not label:
+		frappe.throw(_("Label can't be empty."))
+	doc = frappe.get_doc("Section Type", type_name)
+	old_label = doc.label or doc.name
+	doc.label = label
+	doc.save()
+	return {"type_name": doc.name, "old_label": old_label, "label": doc.label}
+
+
+@frappe.whitelist(methods=["POST"])
+def merge_section_types(source: str, target: str) -> dict:
+	if source == target:
+		frappe.throw(_("Pick two different Section Types to merge."))
+	for type_name in (source, target):
+		if not frappe.db.exists("Section Type", type_name):
+			frappe.throw(_("Unknown Section Type {0}.").format(type_name))
+	if frappe.db.get_value("Section Type", source, "is_other"):
+		frappe.throw(_("{0} is the catch-all type the classifier falls back to.").format(source))
+	frappe.has_permission("Section Type", ptype="delete", doc=source, throw=True)
+	section_names = frappe.get_all("Source Section", filters={"section_type": source}, pluck="name")
+	frappe.rename_doc("Section Type", source, target, merge=True)
+	events.section_content_changed(section_names)
+	return {"source": source, "target": target, "moved": len(section_names)}
+
+
+@frappe.whitelist(methods=["POST"])
 def reorder_section(
 	name: str, new_parent: str | None = None, new_index: int = 0, siblings: str | list | None = None
 ) -> dict:
