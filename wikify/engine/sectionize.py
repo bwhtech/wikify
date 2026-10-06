@@ -20,19 +20,24 @@ from collections.abc import Callable
 
 import frappe
 
-from wikify.engine import store
+from wikify.engine import llm, store
 from wikify.engine.classify import classify_document
 from wikify.engine.lint import fix_table_separators
 from wikify.engine.loader.cleanup import clean_pages
+from wikify.engine.loader.page_plan import plan_pages
 from wikify.engine.loader.sectionizer import _HEADING_RE, _clean_title, sectionize
 from wikify.engine.loader.toc import toc_level_map
 
 
-def sectionize_document(source_document: str, pdf_path: str) -> int:
+def sectionize_document(source_document: str, pdf_path: str, project_context: str = "") -> int:
 	"""Rebuild the Source Section tree from the doc's canonical pages. Returns the count."""
 	level_map = toc_level_map(str(pdf_path))
 	pages = clean_pages(store.get_canonical_pages(source_document))
-	sections = sectionize(pages, level_map)
+	sections = plan_pages(
+		sectionize(pages, level_map),
+		project_context,
+		use_llm=llm.has_openrouter() and not frappe.flags.in_test,
+	)
 	# 0.6 auto-fix boundary: repair separator-less tables in the assembled section
 	# product, pre-review. Page canonical stays untouched — pages are evidence.
 	for sec in sections:
@@ -55,7 +60,7 @@ def rebuild_and_classify(
 	"""
 	if stage_cb:
 		stage_cb("Building section tree")
-	count = sectionize_document(source_document, pdf_path)
+	count = sectionize_document(source_document, pdf_path, project_context)
 	if stage_cb:
 		stage_cb("Classifying sections")
 	classify_document(
