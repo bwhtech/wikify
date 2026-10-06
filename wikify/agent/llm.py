@@ -7,8 +7,6 @@ from wikify.engine import claude_cli, settings
 litellm.drop_params = True
 
 DEFAULT_AGENT_MODEL = "anthropic/claude-sonnet-4.6"
-# OpenRouter reserves credit for max_tokens up front; unset, it reserves the model maximum.
-MAX_OUTPUT_TOKENS = 16384
 
 
 def resolve_model(explicit: str | None = None, project: str | None = None) -> str:
@@ -64,7 +62,6 @@ def complete_with_tools(
 		tools=tool_schemas,
 		stream=stream,
 		stream_options={"include_usage": True} if stream and include_usage else None,
-		max_tokens=MAX_OUTPUT_TOKENS,
 		api_key=key,
 		num_retries=2,
 	)
