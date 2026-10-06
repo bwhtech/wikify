@@ -59,15 +59,14 @@ async function seedImport(api: Api, project: string, title: string): Promise<Imp
 }
 
 setup("seed the fixture project and imports", async () => {
-	setup.setTimeout(PARSE_TIMEOUT + 120_000);
+	setup.setTimeout(2 * PARSE_TIMEOUT + 120_000);
 	const api = await Api.create();
 	try {
 		const project =
 			(await findProject(api, PROJECT_NAME)) || (await createProject(api, PROJECT_NAME));
-		const [review, agent] = await Promise.all([
-			seedImport(api, project, `${FIXTURE_PREFIX} review`),
-			seedImport(api, project, `${FIXTURE_PREFIX} agent`),
-		]);
+		// One at a time: parallel inserts on a fresh site deadlock creating the IMP- naming series row.
+		const review = await seedImport(api, project, `${FIXTURE_PREFIX} review`);
+		const agent = await seedImport(api, project, `${FIXTURE_PREFIX} agent`);
 		const fixtures: Fixtures = { project, projectName: PROJECT_NAME, review, agent };
 		fs.mkdirSync(STATE_DIR, { recursive: true });
 		fs.writeFileSync(FIXTURES_FILE, JSON.stringify(fixtures, null, "\t"));
