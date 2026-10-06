@@ -218,20 +218,34 @@ class TestAgentWrite(FrappeTestCase):
 		self.assertIn("Excluded", out)
 		self.assertEqual(frappe.db.get_value("Source Section", secs[0].name, "include_in_wiki"), 0)
 
-	def test_use_page_image_adds_page_to_one_section_and_keeps_page_text(self):
+	def test_use_page_image_adds_page_image_to_the_page_and_one_section(self):
 		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
 		alpha, alpha_one = self._sections()[:2]
 		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
 		self.assertIn("1.1 Alpha-One", out)
-		page = frappe.db.get_value(
-			"Source Page", page_name, ["image", "canonical_markdown", "baseline_markdown"], as_dict=True
+		image = frappe.db.get_value("Source Page", page_name, "image")
+		self.assertEqual(
+			frappe.db.get_value("Source Page", page_name, "canonical_markdown"),
+			f"page one text\n\n![Page 1]({image})",
 		)
-		self.assertEqual(page.canonical_markdown or page.baseline_markdown, "page one text")
 		self.assertEqual(
 			frappe.db.get_value("Source Section", alpha_one.name, "markdown"),
-			f"body of 1.1 Alpha-One\n\n![Page 1]({page.image})",
+			f"body of 1.1 Alpha-One\n\n![Page 1]({image})",
 		)
 		self.assertEqual(frappe.db.get_value("Source Section", alpha.name, "markdown"), "body of 1. Alpha")
+
+	def test_use_page_image_twice_adds_the_image_once(self):
+		page_name = store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")
+		alpha_one = self._sections()[1]
+		rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
+		out = rep._use_page_image(self.ctx, {"page_no": 1, "section": alpha_one.name})
+		self.assertIn("Nothing was added", out)
+		self.assertEqual(
+			frappe.db.get_value("Source Page", page_name, "canonical_markdown").count("![Page 1]"), 1
+		)
+		self.assertEqual(
+			frappe.db.get_value("Source Section", alpha_one.name, "markdown").count("![Page 1]"), 1
+		)
 
 	def test_use_page_image_rejects_a_section_from_another_document(self):
 		store.add_page(self.sd.name, 1, "visual", _PNG, "page one text")

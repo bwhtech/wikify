@@ -5,6 +5,7 @@ from frappe import _
 
 from wikify.agent.context import Ctx
 from wikify.agent.registry import Tool
+from wikify.engine import store
 from wikify.engine.store import get_import_pdf_path
 
 
@@ -74,23 +75,31 @@ def _use_page_image(ctx: Ctx, args: dict) -> str:
 		)
 		if not section_row or section_row.source_document != source_document:
 			return _("Section {0} not found in {1}.").format(section, source_document)
-		image_url = frappe.db.get_value(
-			"Source Page", {"source_document": source_document, "page_no": page_no}, "image"
+		page = frappe.db.get_value(
+			"Source Page",
+			{"source_document": source_document, "page_no": page_no},
+			["name", "image", "canonical_markdown", "baseline_markdown"],
+			as_dict=True,
 		)
-		if not image_url:
+		if not page or not page.image:
 			return _("Page {0} has no rendered image to embed.").format(page_no)
+		tag = f"![Page {page_no}]({page.image})"
+		page_markdown = page.canonical_markdown or page.baseline_markdown or ""
+		if tag not in page_markdown:
+			store.set_canonical_markdown(
+				page.name, f"{page_markdown.rstrip()}\n\n{tag}".lstrip(), keep_audit=True
+			)
 		markdown = (section_row.markdown or "").rstrip()
+		if tag in markdown:
+			return _("Page {0} and its section already end with the page image. Nothing was added.").format(
+				page_no
+			)
 		return (
 			_edit_section_content(
-				ctx,
-				{
-					"name": section,
-					"mode": "replace",
-					"content": f"{markdown}\n\n![Page {page_no}]({image_url})".lstrip(),
-				},
+				ctx, {"name": section, "mode": "replace", "content": f"{markdown}\n\n{tag}".lstrip()}
 			)
 			+ " "
-			+ _("Page {0} itself is unchanged.").format(page_no)
+			+ _("Page {0} now ends with the page image too.").format(page_no)
 		)
 	try:
 		embed_page_image(source_document, page_no, caption)
@@ -161,10 +170,11 @@ TOOLS = [
 		# nosemgrep
 		description=(
 			"Deterministically embed a page's rendered photo (no LLM, no cropping). Pass "
-			"`section` to add the full page photo to the END of that section; the page's own "
-			"text is kept — use this when the user asks to add/show page N as an image in a "
-			"section. Pass `caption` instead to replace ONLY that one existing `![caption](...)` "
-			"image tag on the page with the full page photo, leaving the rest of the page's "
+			"`section` to add the full page photo to the END of page N and of that section (the "
+			"section holding page N); the page's own text is kept and nothing is added twice — "
+			"use this when the user asks to add/show page N as an image. Pass `caption` instead "
+			"to replace ONLY that one existing `![caption](...)` image tag on the page with the "
+			"full page photo, leaving the rest of the page's "
 			"content untouched — use this when a figure/screenshot placeholder needs a real image "
 			"and precise cropping isn't reliable; the user can crop the exact figure out of the "
 			"full page photo themselves later, in the wiki. `caption` must exactly match the alt "
