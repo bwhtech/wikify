@@ -1,12 +1,14 @@
 <script setup>
 import {
 	BottomSheet,
-	Button,
 	DesktopShell,
 	MobileNav,
 	MobileNavItem,
 	MobileShell,
 	Sidebar,
+	SidebarCollapseToggle,
+	SidebarHeader,
+	SidebarItem,
 } from "frappe-ui";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -24,8 +26,8 @@ const BUG_REPORT_URL = "https://github.com/bwhtech/wikify/issues/new";
 
 const settingsOpen = ref(false);
 const mobileMenuOpen = ref(false);
-// The agent panel + its floating button are mounted once here so they're available on
-// every screen (slice 12). On mobile the floating button is replaced by a MobileNav tab.
+// The agent panel is mounted once here so it's available on every screen (slice 12): docked
+// beside the sidebar on desktop, opened from a MobileNav tab on mobile.
 const agentOpen = ref(false);
 
 const menuItems = computed(() => [
@@ -91,7 +93,6 @@ const sections = computed(() => [{ label: "", items: destinations.value }]);
 // Ask owns its scrolling: the transcript scrolls, the composer under it does not.
 const FIXED_HEIGHT_ROUTES = ["Explore", "ProjectGraph", "ImportGraph", "AskWiki"];
 const pageScroll = computed(() => !FIXED_HEIGHT_ROUTES.includes(route.name));
-const onAskPage = computed(() => route.name === "AskWiki");
 
 const collapsed = ref(localStorage.getItem("sidebar-collapsed") === "true");
 watch(collapsed, (v) => localStorage.setItem("sidebar-collapsed", v));
@@ -151,18 +152,52 @@ onMounted(initializeTheme);
 		     PageHeader above it. -->
 		<DesktopShell v-else :scroll="pageScroll">
 			<template #sidebar>
-				<Sidebar v-model:collapsed="collapsed" :header="header" :sections="sections">
-					<template #header-logo>
-						<div
-							class="flex h-full w-full items-center justify-center bg-surface-gray-3"
+				<!-- Composed rather than via the `sections` config: that path never passes
+				     `active` through, so no item could ever show as active. -->
+				<Sidebar v-model:collapsed="collapsed" class="border-r border-outline-gray-1">
+					<div class="flex h-full flex-col p-2">
+						<SidebarHeader
+							:title="header.title"
+							:subtitle="header.subtitle"
+							:menu-items="header.menuItems"
 						>
-							<span
-								class="lucide-book-open size-4 text-ink-gray-7"
-								aria-hidden="true"
+							<template #logo>
+								<div
+									class="flex h-full w-full items-center justify-center bg-surface-gray-3"
+								>
+									<span
+										class="lucide-book-open size-4 text-ink-gray-7"
+										aria-hidden="true"
+									/>
+								</div>
+							</template>
+						</SidebarHeader>
+						<nav
+							v-for="section in sections"
+							:key="section.label"
+							class="mt-2 flex flex-col gap-0.5"
+						>
+							<SidebarItem
+								v-for="item in section.items"
+								:key="item.label"
+								:label="item.label"
+								:icon="item.icon"
+								:to="item.to"
+								:active="item.isActive"
 							/>
+							<SidebarItem
+								label="Assistant"
+								icon="lucide-sparkles"
+								:active="agentOpen"
+								@click="agentOpen = !agentOpen"
+							/>
+						</nav>
+						<div class="mt-auto">
+							<SidebarCollapseToggle />
 						</div>
-					</template>
+					</div>
 				</Sidebar>
+				<AgentChatPanel v-model:open="agentOpen" docked />
 			</template>
 
 			<router-view />
@@ -185,20 +220,6 @@ onMounted(initializeTheme);
 			</div>
 		</BottomSheet>
 
-		<!-- Floating assistant button (desktop only — mobile uses the nav tab). It sits
-		     bottom-right, which on any screen narrower than desktop would sit on top of
-		     card actions like "Open in wiki"; the `!isMobile` guard is what keeps it clear.
-		     Ask hides it outright: it lands on that page's composer, and a second chat
-		     entry point beside a chat is a coin-flip over which one answers. -->
-		<Button
-			v-if="!isMobile && !onAskPage"
-			v-show="!agentOpen"
-			variant="solid"
-			icon="lucide-sparkles"
-			class="fixed bottom-5 right-5 z-30 !size-11 !rounded-full shadow-lg"
-			tooltip="Ask the assistant"
-			@click="agentOpen = true"
-		/>
-		<AgentChatPanel v-model:open="agentOpen" />
+		<AgentChatPanel v-if="isMobile" v-model:open="agentOpen" />
 	</div>
 </template>
