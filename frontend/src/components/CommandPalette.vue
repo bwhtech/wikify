@@ -184,7 +184,7 @@ const actions = computed(() => [
 			`Theme: ${theme.label}`,
 			theme.icon,
 			() => setTheme(theme.value),
-			"appearance mode color dark light",
+			"appearance mode color",
 			{ checked: currentTheme.value === theme.value }
 		)
 	),
