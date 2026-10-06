@@ -129,6 +129,29 @@ class TestAgent(FrappeTestCase):
 		self.assertEqual(len(fake.calls), 2)
 		self.assertEqual(fake.calls[1]["messages"][-1]["role"], "tool")
 
+	def test_loop_clears_old_tool_results_within_a_turn(self):
+		sess = self._make_session()
+		tree = _read_tree(Ctx(session=sess.name, user="Administrator", source_document=self.sd.name), {})
+		fake = FakeLLM(
+			[
+				[_tool_chunk(0, "call_1", "read_tree", "{}")],
+				[_tool_chunk(0, "call_2", "read_tree", "{}")],
+				[_text_chunk("Done.")],
+			]
+		)
+		with (
+			patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=len(tree) + 10, TOOL_RESULT_CLEAR_STEP_CHARS=1),
+			patch("wikify.agent.llm.complete_with_tools", fake),
+		):
+			AgentRunner(sess.name, "Administrator").run()
+
+		second_round, third_round = (
+			[message["content"] for message in call["messages"] if message["role"] == "tool"]
+			for call in fake.calls[1:]
+		)
+		self.assertEqual(second_round, [tree])
+		self.assertEqual(third_round, [session.cleared_result_note("call_1"), tree])
+
 	def test_loop_streams_realtime(self):
 		sess = self._make_session()
 		fake = FakeLLM([[_text_chunk("hi "), _text_chunk("there")]])
@@ -437,14 +460,12 @@ class TestAgentHistoryWindow(FrappeTestCase):
 			"",
 			tool_calls=[{"id": call_id, "name": "read_section", "args": {}} for call_id in call_ids],
 		)
-		names = [
+		for call_id, result in zip(call_ids, results, strict=True):
 			session.append_message(
 				self.session, "tool", result, tool_name="read_section", tool_call_id=call_id
-			).name
-			for call_id, result in zip(call_ids, results, strict=True)
-		]
+			)
 		session.append_message(self.session, "assistant", f"finished {prompt}")
-		return names
+		return call_ids
 
 	def tool_contents(self):
 		messages = session.history_messages(self.session)
@@ -469,35 +490,35 @@ class TestAgentHistoryWindow(FrappeTestCase):
 
 	@patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=1000, TOOL_RESULT_CLEAR_STEP_CHARS=500)
 	def test_oldest_tool_results_over_the_budget_are_cleared(self):
-		names = self.add_tool_turn("read six sections", ["x" * 300] * 6)
+		call_ids = self.add_tool_turn("read six sections", ["x" * 300] * 6)
 
 		contents = self.tool_contents()
 
-		self.assertEqual(contents[:4], [session.cleared_result_note(name) for name in names[:4]])
+		self.assertEqual(contents[:4], [session.cleared_result_note(call_id) for call_id in call_ids[:4]])
 		self.assertEqual(contents[4:], ["x" * 300] * 2)
 
 	@patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=1000, TOOL_RESULT_CLEAR_STEP_CHARS=500)
 	def test_cleared_results_change_only_when_a_step_fills(self):
-		names = self.add_tool_turn("first", ["x" * 300] * 6)
+		call_ids = self.add_tool_turn("first", ["x" * 300] * 6)
 		self.add_tool_turn("second", ["y" * 150])
 		after_small_result = self.tool_contents()
 		self.add_tool_turn("third", ["z" * 100])
 		after_step_filled = self.tool_contents()
 
 		self.assertEqual(after_small_result[4], "x" * 300)
-		self.assertEqual(after_step_filled[4], session.cleared_result_note(names[4]))
+		self.assertEqual(after_step_filled[4], session.cleared_result_note(call_ids[4]))
 		self.assertEqual(after_step_filled[:4], after_small_result[:4])
 
 	@patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=1000, TOOL_RESULT_CLEAR_STEP_CHARS=500)
 	def test_read_history_returns_a_cleared_result(self):
-		names = self.add_tool_turn(
+		call_ids = self.add_tool_turn(
 			"read six sections", [f"body of section {index} " + "x" * 300 for index in range(6)]
 		)
 		ctx = Ctx(session=self.session, user="Administrator")
 
-		self.assertEqual(self.tool_contents()[0], session.cleared_result_note(names[0]))
-		self.assertIn("body of section 0", read_history(ctx, {"message": names[0]}))
-		self.assertIn(f"<{names[2]}>", read_history(ctx, {"query": "body of section 2"}))
+		self.assertEqual(self.tool_contents()[0], session.cleared_result_note(call_ids[0]))
+		self.assertIn("body of section 0", read_history(ctx, {"call_id": call_ids[0]}))
+		self.assertIn(f"call_id {call_ids[2]}", read_history(ctx, {"query": "body of section 2"}))
 
 	def test_read_history_stays_inside_the_session(self):
 		other_session = session.get_or_create(None, user="Administrator").name

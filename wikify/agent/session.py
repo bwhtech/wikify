@@ -85,10 +85,9 @@ def history_messages(session: str) -> list[dict]:
 	rows = frappe.get_all(
 		"Wikify Agent Message",
 		filters={"session": session},
-		fields=["name", "role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
+		fields=["role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
 		order_by="creation asc",
 	)
-	cleared = cleared_tool_results(rows)
 	messages: list[dict] = []
 	for r in rows:
 		if r.status in ("error", "clarification"):
@@ -111,30 +110,33 @@ def history_messages(session: str) -> list[dict]:
 				]
 			messages.append(msg)
 		elif r.role == "tool":
-			content = cleared_result_note(r.name) if r.name in cleared else r.content or ""
-			messages.append({"role": "tool", "tool_call_id": r.tool_call_id or "", "content": content})
+			messages.append(
+				{"role": "tool", "tool_call_id": r.tool_call_id or "", "content": r.content or ""}
+			)
+	clear_old_tool_results(messages)
 	return messages
 
 
-def cleared_tool_results(rows: list) -> set[str]:
-	tool_rows = [row for row in rows if row.role == "tool"]
-	overflow = sum(len(row.content or "") for row in tool_rows) - TOOL_RESULT_BUDGET_CHARS
+def clear_old_tool_results(messages: list[dict]) -> None:
+	tool_indexes = [index for index, message in enumerate(messages) if message["role"] == "tool"]
+	overflow = sum(len(messages[index]["content"]) for index in tool_indexes) - TOOL_RESULT_BUDGET_CHARS
 	if overflow <= 0:
-		return set()
+		return
 	to_clear = math.ceil(overflow / TOOL_RESULT_CLEAR_STEP_CHARS) * TOOL_RESULT_CLEAR_STEP_CHARS
-	cleared = set()
-	for row in tool_rows:
+	for index in tool_indexes:
 		if to_clear <= 0:
 			break
-		cleared.add(row.name)
-		to_clear -= len(row.content or "")
-	return cleared
+		message = messages[index]
+		note = cleared_result_note(message["tool_call_id"])
+		if message["content"] != note:
+			to_clear -= len(message["content"])
+			messages[index] = {**message, "content": note}
 
 
-def cleared_result_note(message: str) -> str:
+def cleared_result_note(call_id: str) -> str:
 	return (
 		f"[Result cleared to save space. Call the tool again, or call read_history with "
-		f'message "{message}" to see it.]'
+		f'call_id "{call_id}" to see it.]'
 	)
 
 

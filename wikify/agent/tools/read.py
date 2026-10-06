@@ -289,14 +289,14 @@ def _read_wiki_page(ctx: Ctx, args: dict) -> str:
 
 
 def read_history(ctx: Ctx, args: dict) -> str:
-	message = (args.get("message") or "").strip()
+	call_id = (args.get("call_id") or "").strip()
 	query = (args.get("query") or "").strip()
 	tool_name = (args.get("tool_name") or "").strip()
-	if not (message or query or tool_name):
-		return _("Pass `message`, `query` or `tool_name`.")
+	if not (call_id or query or tool_name):
+		return _("Pass `call_id`, `query` or `tool_name`.")
 	filters = {"session": ctx.session}
-	if message:
-		filters["name"] = message
+	if call_id:
+		filters["tool_call_id"] = call_id
 	if query:
 		filters["content"] = ("like", f"%{query}%")
 	if tool_name:
@@ -304,14 +304,16 @@ def read_history(ctx: Ctx, args: dict) -> str:
 	rows = frappe.get_all(
 		"Wikify Agent Message",
 		filters=filters,
-		fields=["name", "role", "tool_name", "content"],
+		fields=["role", "tool_name", "tool_call_id", "content"],
 		order_by="creation desc",
 		limit=HISTORY_MATCHES,
 	)
 	if not rows:
 		return _("No earlier message in this conversation matches.")
 	return "\n\n".join(
-		f"<{row.name}> {row.role}{f' ({row.tool_name})' if row.tool_name else ''}:\n{_truncate(row.content)}"
+		f"{row.role} ({row.tool_name}, call_id {row.tool_call_id}):\n{_truncate(row.content)}"
+		if row.tool_name
+		else f"{row.role}:\n{_truncate(row.content)}"
 		for row in rows
 	)
 
@@ -444,13 +446,13 @@ TOOLS = [
 		# nosemgrep
 		description=(
 			"Search earlier messages of this conversation, including tool results that were "
-			"cleared from the history to save space. Pass the `message` id from a cleared note, "
+			"cleared from the history to save space. Pass the `call_id` from a cleared note, "
 			"or a `query` and/or `tool_name`. Returns the newest {0} matches."
 		).format(HISTORY_MATCHES),
 		parameters={
 			"type": "object",
 			"properties": {
-				"message": {"type": "string", "description": "Message id from a cleared result note."},
+				"call_id": {"type": "string", "description": "Tool call id from a cleared result note."},
 				"query": {"type": "string", "description": "Text to find in earlier messages."},
 				"tool_name": {"type": "string", "description": "Only results of this tool."},
 			},
