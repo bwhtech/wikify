@@ -77,9 +77,10 @@ class TestClaudeCliMessages(FrappeTestCase):
 		)
 
 
-class TestClaudeCliNativeToolRetry(FrappeTestCase):
-	tools = [SimpleNamespace(name="read_tree", description="Read the tree", parameters={"type": "object"})]
+TOOLS = [SimpleNamespace(name="read_tree", description="Read the tree", parameters={"type": "object"})]
 
+
+class TestClaudeCliNativeToolRetry(FrappeTestCase):
 	def completed(self, native_tools, tool_calls):
 		events = [
 			{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": name}]}}
@@ -98,7 +99,7 @@ class TestClaudeCliNativeToolRetry(FrappeTestCase):
 		]
 		with patch.object(claude_cli.subprocess, "run", side_effect=replies) as run:
 			chunks = list(
-				claude_cli.complete_with_tools([{"role": "user", "content": "Show the tree"}], self.tools)
+				claude_cli.complete_with_tools([{"role": "user", "content": "Show the tree"}], TOOLS)
 			)
 		self.assertEqual(run.call_count, 2)
 		retry_prompt = run.call_args_list[1].args[0][
@@ -111,7 +112,7 @@ class TestClaudeCliNativeToolRetry(FrappeTestCase):
 		reply = self.completed([], [{"name": "read_tree", "arguments": {}}])
 		with patch.object(claude_cli.subprocess, "run", return_value=reply) as run:
 			chunks = list(
-				claude_cli.complete_with_tools([{"role": "user", "content": "Show the tree"}], self.tools)
+				claude_cli.complete_with_tools([{"role": "user", "content": "Show the tree"}], TOOLS)
 			)
 		self.assertEqual(run.call_count, 1)
 		self.assertEqual(self.tool_calls_of(chunks), ["read_tree"])
