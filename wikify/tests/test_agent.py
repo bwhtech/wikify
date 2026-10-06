@@ -15,6 +15,7 @@ from wikify.agent.tools.read import (
 	_read_section,
 	_read_tree,
 	_search_sections,
+	read_history,
 )
 from wikify.api import agent as agent_api
 from wikify.engine import store
@@ -417,63 +418,45 @@ class TestAgentHistoryWindow(FrappeTestCase):
 		_cleanup.register_session_sweep(self)
 		self.session = session.get_or_create(None, user="Administrator").name
 
-	def test_window_keeps_the_newest_messages(self):
-		for i in range(session.HISTORY_LIMIT + 5):
-			session.append_message(self.session, "user", f"turn {i}")
+	def test_history_keeps_every_conversation_message(self):
+		for index in range(45):
+			session.append_message(self.session, "user", f"turn {index}")
 
 		messages = session.history_messages(self.session)
 
-		self.assertEqual(len(messages), session.HISTORY_LIMIT)
-		self.assertEqual(messages[-1]["content"], f"turn {session.HISTORY_LIMIT + 4}")
-		self.assertEqual(messages[0]["content"], "turn 5")
+		self.assertEqual(
+			[message["content"] for message in messages], [f"turn {index}" for index in range(45)]
+		)
 
-	def test_window_drops_tool_results_orphaned_by_the_cut(self):
-		session.append_message(self.session, "user", "retag everything")
+	def add_tool_turn(self, prompt, results):
+		session.append_message(self.session, "user", prompt)
+		call_ids = [f"call_{prompt}_{index}" for index in range(len(results))]
 		session.append_message(
 			self.session,
 			"assistant",
 			"",
-			tool_calls=[{"id": f"call_{i}", "name": "set_section_type", "args": {}} for i in range(39)],
+			tool_calls=[{"id": call_id, "name": "read_section", "args": {}} for call_id in call_ids],
 		)
-		for i in range(39):
+		names = [
 			session.append_message(
-				self.session, "tool", "tagged", tool_name="set_section_type", tool_call_id=f"call_{i}"
-			)
-		session.append_message(self.session, "user", "now fix the redundant types")
-
-		messages = session.history_messages(self.session)
-
-		self.assertNotEqual(messages[0]["role"], "tool")
-		self.assertEqual(messages[-1]["content"], "now fix the redundant types")
-
-	def add_tool_heavy_turn(self, prompt, rounds):
-		session.append_message(self.session, "user", prompt)
-		for round_index in range(rounds):
-			call_ids = [f"call_{prompt}_{round_index}_{call_index}" for call_index in range(2)]
-			session.append_message(
-				self.session,
-				"assistant",
-				"",
-				tool_calls=[{"id": call_id, "name": "read_section", "args": {}} for call_id in call_ids],
-			)
-			for call_id in call_ids:
-				session.append_message(
-					self.session, "tool", "section body", tool_name="read_section", tool_call_id=call_id
-				)
+				self.session, "tool", result, tool_name="read_section", tool_call_id=call_id
+			).name
+			for call_id, result in zip(call_ids, results, strict=True)
+		]
 		session.append_message(self.session, "assistant", f"finished {prompt}")
+		return names
 
-	def assert_tool_results_follow_their_calls(self, messages):
-		requested_ids = set()
-		for message in messages:
-			for call in message.get("tool_calls", []):
-				requested_ids.add(call["id"])
-			if message["role"] == "tool":
-				self.assertIn(message["tool_call_id"], requested_ids)
+	def tool_contents(self):
+		messages = session.history_messages(self.session)
+		requested_ids = {call["id"] for message in messages for call in message.get("tool_calls", [])}
+		tool_messages = [message for message in messages if message["role"] == "tool"]
+		self.assertTrue(all(message["tool_call_id"] in requested_ids for message in tool_messages))
+		return [message["content"] for message in tool_messages]
 
 	def test_window_keeps_the_conversation_before_a_tool_heavy_turn(self):
 		session.append_message(self.session, "user", "re-parse page 18 keeping the table")
 		session.append_message(self.session, "assistant", "Re-parsed page 18.")
-		self.add_tool_heavy_turn("read every section", 25)
+		self.add_tool_turn("read every section", ["section body"] * 50)
 		session.append_message(self.session, "user", "what did I ask before this?")
 
 		messages = session.history_messages(self.session)
@@ -481,17 +464,45 @@ class TestAgentHistoryWindow(FrappeTestCase):
 
 		self.assertEqual(messages[0], {"role": "user", "content": "re-parse page 18 keeping the table"})
 		self.assertIn("Re-parsed page 18.", contents)
-		self.assertIn("read every section", contents)
 		self.assertEqual(contents[-1], "what did I ask before this?")
-		self.assert_tool_results_follow_their_calls(messages)
+		self.assertEqual(self.tool_contents(), ["section body"] * 50)
 
-	def test_window_starts_at_a_user_message_when_the_cut_lands_inside_a_turn(self):
-		self.add_tool_heavy_turn("first sweep", 25)
-		self.add_tool_heavy_turn("second sweep", 25)
-		session.append_message(self.session, "user", "summarise")
+	@patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=1000, TOOL_RESULT_CLEAR_STEP_CHARS=500)
+	def test_oldest_tool_results_over_the_budget_are_cleared(self):
+		names = self.add_tool_turn("read six sections", ["x" * 300] * 6)
 
-		messages = session.history_messages(self.session)
+		contents = self.tool_contents()
 
-		self.assertEqual(messages[0], {"role": "user", "content": "second sweep"})
-		self.assertEqual(messages[-1]["content"], "summarise")
-		self.assert_tool_results_follow_their_calls(messages)
+		self.assertEqual(contents[:4], [session.cleared_result_note(name) for name in names[:4]])
+		self.assertEqual(contents[4:], ["x" * 300] * 2)
+
+	@patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=1000, TOOL_RESULT_CLEAR_STEP_CHARS=500)
+	def test_cleared_results_change_only_when_a_step_fills(self):
+		names = self.add_tool_turn("first", ["x" * 300] * 6)
+		self.add_tool_turn("second", ["y" * 150])
+		after_small_result = self.tool_contents()
+		self.add_tool_turn("third", ["z" * 100])
+		after_step_filled = self.tool_contents()
+
+		self.assertEqual(after_small_result[4], "x" * 300)
+		self.assertEqual(after_step_filled[4], session.cleared_result_note(names[4]))
+		self.assertEqual(after_step_filled[:4], after_small_result[:4])
+
+	@patch.multiple(session, TOOL_RESULT_BUDGET_CHARS=1000, TOOL_RESULT_CLEAR_STEP_CHARS=500)
+	def test_read_history_returns_a_cleared_result(self):
+		names = self.add_tool_turn(
+			"read six sections", [f"body of section {index} " + "x" * 300 for index in range(6)]
+		)
+		ctx = Ctx(session=self.session, user="Administrator")
+
+		self.assertEqual(self.tool_contents()[0], session.cleared_result_note(names[0]))
+		self.assertIn("body of section 0", read_history(ctx, {"message": names[0]}))
+		self.assertIn(f"<{names[2]}>", read_history(ctx, {"query": "body of section 2"}))
+
+	def test_read_history_stays_inside_the_session(self):
+		other_session = session.get_or_create(None, user="Administrator").name
+		session.append_message(other_session, "user", "the other conversation")
+
+		found = read_history(Ctx(session=self.session, user="Administrator"), {"query": "other conversation"})
+
+		self.assertEqual(found, "No earlier message in this conversation matches.")

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import math
 
 import frappe
 from frappe.utils import now_datetime
 
-HISTORY_LIMIT = 40
+# About 40k and 10k tokens at ~4 chars a token. The cutoff moves a whole step at a time so the
+# history prefix, and the prompt cache on it, stays the same across a turn's rounds.
+TOOL_RESULT_BUDGET_CHARS = 160_000
+TOOL_RESULT_CLEAR_STEP_CHARS = 40_000
 
 TITLE_CHARS = 120
 
@@ -78,26 +82,13 @@ def update_message(name: str, **values) -> None:
 
 
 def history_messages(session: str) -> list[dict]:
-	# Tool rows don't count toward the limit (one turn can write hundreds), and the window
-	# opens on a user message so no turn is cut in half.
-	recent = frappe.get_all(
-		"Wikify Agent Message",
-		filters={"session": session, "role": ("!=", "tool")},
-		fields=["role", "creation"],
-		order_by="creation desc",
-		limit=HISTORY_LIMIT,
-	)
-	turn_starts = [row.creation for row in recent if row.role == "user"]
-	if not turn_starts:
-		return []
 	rows = frappe.get_all(
 		"Wikify Agent Message",
-		filters={"session": session, "creation": (">=", turn_starts[-1])},
-		fields=["role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
+		filters={"session": session},
+		fields=["name", "role", "content", "tool_calls", "tool_name", "tool_call_id", "status"],
 		order_by="creation asc",
 	)
-	while rows and rows[0].role == "tool":
-		rows.pop(0)
+	cleared = cleared_tool_results(rows)
 	messages: list[dict] = []
 	for r in rows:
 		if r.status in ("error", "clarification"):
@@ -120,10 +111,31 @@ def history_messages(session: str) -> list[dict]:
 				]
 			messages.append(msg)
 		elif r.role == "tool":
-			messages.append(
-				{"role": "tool", "tool_call_id": r.tool_call_id or "", "content": r.content or ""}
-			)
+			content = cleared_result_note(r.name) if r.name in cleared else r.content or ""
+			messages.append({"role": "tool", "tool_call_id": r.tool_call_id or "", "content": content})
 	return messages
+
+
+def cleared_tool_results(rows: list) -> set[str]:
+	tool_rows = [row for row in rows if row.role == "tool"]
+	overflow = sum(len(row.content or "") for row in tool_rows) - TOOL_RESULT_BUDGET_CHARS
+	if overflow <= 0:
+		return set()
+	to_clear = math.ceil(overflow / TOOL_RESULT_CLEAR_STEP_CHARS) * TOOL_RESULT_CLEAR_STEP_CHARS
+	cleared = set()
+	for row in tool_rows:
+		if to_clear <= 0:
+			break
+		cleared.add(row.name)
+		to_clear -= len(row.content or "")
+	return cleared
+
+
+def cleared_result_note(message: str) -> str:
+	return (
+		f"[Result cleared to save space. Call the tool again, or call read_history with "
+		f'message "{message}" to see it.]'
+	)
 
 
 def set_running(session: str, value: bool) -> None:
