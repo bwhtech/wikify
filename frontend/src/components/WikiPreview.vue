@@ -5,7 +5,7 @@
 // matches the eventual generated Wiki Document page. We only post-process ```mermaid
 // fences into SVG client-side via the shared mermaid util.
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from "vue";
-import { Badge, Button, TabButtons, useCall } from "frappe-ui";
+import { Badge, Button, TabButtons, toast, useCall } from "frappe-ui";
 import { CodeEditor } from "frappe-ui/code-editor";
 import { renderMermaidIn } from "@/utils/mermaid";
 import { useSocket } from "@/socket";
@@ -15,8 +15,9 @@ const props = defineProps({
 	// Set by a parent that drilled down into this preview instead of showing it beside
 	// the tree, so the user has a way back to the list.
 	showBack: { type: Boolean, default: false },
+	editable: { type: Boolean, default: false },
 });
-const emit = defineEmits(["navigate", "back"]);
+const emit = defineEmits(["navigate", "back", "saved"]);
 
 const preview = useCall({
 	url: "/api/v2/method/wikify.api.wiki.render_section_preview",
@@ -41,6 +42,26 @@ onUnmounted(() => socket?.off("wikify_agent_mutation", onAgentMutation));
 
 const data = computed(() => preview.data || null);
 const mode = ref("rendered");
+
+const draft = ref("");
+watch(data, (d) => (draft.value = d?.markdown || ""), { immediate: true });
+const dirty = computed(() => !!data.value && draft.value !== (data.value.markdown || ""));
+
+const saveCall = useCall({
+	url: "/api/v2/method/wikify.api.sections.update_section_markdown",
+	method: "POST",
+	immediate: false,
+});
+async function save() {
+	await saveCall.submit({ name: props.section, markdown: draft.value });
+	if (saveCall.error) {
+		toast.error(saveCall.error.messages?.[0] || "Could not save the markdown");
+		return;
+	}
+	toast.success("Markdown saved");
+	load();
+	emit("saved");
+}
 
 // "table missing separator row (L16), ragged table rows (L18)" — line numbers point
 // into the Source view.
@@ -117,6 +138,16 @@ function onBodyClick(e) {
 					variant="subtle"
 					size="sm"
 				/>
+				<template v-if="mode === 'source' && dirty">
+					<Button size="sm" label="Discard" @click="draft = data.markdown || ''" />
+					<Button
+						size="sm"
+						variant="solid"
+						label="Save"
+						:loading="saveCall.loading"
+						@click="save"
+					/>
+				</template>
 				<TabButtons
 					v-model="mode"
 					:options="[
@@ -162,11 +193,11 @@ function onBodyClick(e) {
 				<!-- Raw markdown source -->
 				<CodeEditor
 					v-else
-					:model-value="data.markdown || ''"
+					v-model="draft"
 					language="markdown"
 					variant="outline"
-					:disabled="true"
-					class="h-full"
+					:disabled="!editable"
+					class="markdown-wrap h-full"
 				/>
 			</div>
 		</template>
