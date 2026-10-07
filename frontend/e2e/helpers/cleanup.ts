@@ -101,7 +101,13 @@ export async function deleteWikiSpace(api: Api, wikiSpace: string): Promise<void
 	await tryDelete(api, "Wiki Space", wikiSpace);
 }
 
+// Runs once, in the teardown. Deleting imports mid-run reverts the IMP- naming series, so a new
+// import reuses a deleted one's name and job id, and its parse job never runs.
 export async function deleteTestProjects(api: Api, prefix: string): Promise<void> {
+	const strays = await api.getList("Wikify Import", {
+		filters: { import_title: ["like", `${prefix}%`] },
+	});
+	for (const imp of strays) await deleteImport(api, imp.name);
 	const projects = await api.getList("Wikify Project", {
 		filters: { project_name: ["like", `${prefix}%`] },
 	});

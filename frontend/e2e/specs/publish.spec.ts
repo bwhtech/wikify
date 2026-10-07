@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor } from "../helpers/wait";
@@ -140,11 +139,6 @@ test.describe("publish", () => {
 
 		await api.call("wikify.api.sections.build_graph", { import_name: first.import });
 		await waitForImport(api, first.import, "Graphed", 120_000);
-	});
-
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(QUEUE_TIMEOUT);
-		await deleteTestProjects(api, name);
 	});
 
 	test(

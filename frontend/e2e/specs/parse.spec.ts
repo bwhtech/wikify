@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX, WHAT_IS_WIKIFY_PDF } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor, waitForValue } from "../helpers/wait";
@@ -63,11 +62,6 @@ function remediatedPages(entries: { stage: string; message: string }[]): number[
 }
 
 test.describe("parse", () => {
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT);
-		await deleteTestProjects(api, AREA_PREFIX);
-	});
-
 	test(
 		"F-PARSE-01 stage label, Pages and Started follow a running parse",
 		{

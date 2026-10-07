@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { serverMessage, type Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import {
@@ -330,11 +329,6 @@ test.describe("tree", () => {
 test.describe("tree after publish", () => {
 	const stamp = Date.now();
 	const name = `${PREFIX} tree ${stamp}`;
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(1_500_000);
-		await deleteTestProjects(api, name);
-	});
-
 	test(
 		"F-TREE-07 edits after publish are rejected",
 		{ tag: ["@negative", "@tree"] },

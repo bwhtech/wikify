@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
-import { deleteImport, deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { writePdfs } from "../helpers/pdf";
 import { expect, test } from "../helpers/test";
@@ -15,8 +14,6 @@ const STARTED = ["Queued", "Parsing", "Remediating", "Review"];
 const BULK_PROJECT = `${AREA_PREFIX} bulk`;
 // One worker serves every queue on the bench, so an import can sit Queued for many minutes.
 const QUEUE_WAIT = 1_200_000;
-
-const strayImports: string[] = [];
 
 async function projectImports(api: Api, project: string) {
 	return api.getList("Wikify Import", {
@@ -49,13 +46,6 @@ async function dropFiles(
 }
 
 test.describe("upload", () => {
-	test.afterAll(async ({ api }) => {
-		// deleteImport waits for each queued import to finish parsing: 25 bulk PDFs at ~16 s each.
-		test.setTimeout(1_500_000);
-		for (const name of strayImports) await deleteImport(api, name);
-		await deleteTestProjects(api, AREA_PREFIX);
-	});
-
 	test(
 		"F-UP-06 create a project, upload into it",
 		{ tag: ["@functional", "@upload", "@sanity"] },
@@ -185,7 +175,6 @@ test.describe("upload", () => {
 				files: [{ file_url: fileUrl, title }],
 			});
 			expect(names).toHaveLength(1);
-			strayImports.push(...names);
 
 			const imp = await api.getValue("Wikify Import", names[0], [
 				"import_title",

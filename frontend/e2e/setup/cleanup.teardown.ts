@@ -4,7 +4,7 @@ import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 
 teardown("delete leftover [test] records", async () => {
-	teardown.setTimeout(300_000);
+	teardown.setTimeout(2_700_000);
 	const api = await Api.create();
 	try {
 		await deleteTestProjects(api, PREFIX);

@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { Row } from "../helpers/api";
 import { iconButton, waitForTurn } from "../helpers/assistant";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { env, PREFIX } from "../helpers/env";
 import { writePdfs } from "../helpers/pdf";
 import { expect, test } from "../helpers/test";
@@ -55,11 +54,6 @@ function plainSnippet(markdown: string): string | undefined {
 
 test.describe("smoke", () => {
 	test.describe.configure({ mode: "serial" });
-
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(QUEUE_TIMEOUT);
-		await deleteTestProjects(api, NAME);
-	});
 
 	test.describe("login", () => {
 		test.use({ storageState: { cookies: [], origins: [] } });
