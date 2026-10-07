@@ -22,6 +22,7 @@ _HTML_TABLE = re.compile(r"<table\b[^>]*>.*?</table\s*>", re.IGNORECASE | re.DOT
 _INLINE_MARKS = {"strong": "**", "b": "**", "em": "*", "i": "*"}
 _KEPT_INLINE_TAGS = ("sup", "sub")
 _WRAPPER_TAGS = ("thead", "tbody", "tfoot", "span", "p", "u")
+_LIST_TAGS = ("ul", "ol")
 MIN_NUMBERED_ROWS = 2
 
 
@@ -35,6 +36,7 @@ class _TableReader(HTMLParser):
 		self.saw_row_tag = False
 		self.table_depth = 0
 		self.convertible = True
+		self.list_counters: list[int | None] = []
 
 	def handle_starttag(self, tag, attrs):
 		if tag == "table":
@@ -45,19 +47,15 @@ class _TableReader(HTMLParser):
 			self.saw_row_tag = True
 			self.start_row()
 		elif tag in ("td", "th"):
-			if any(name in ("rowspan", "colspan") and (value or "1").strip() != "1" for name, value in attrs):
-				self.convertible = False
-			self.close_cell()
-			if not self.row_open:
-				self.start_row()
-			self.cell = []
-			self.header_flags[-1].append(tag == "th")
+			self.start_cell(tag, attrs)
 		elif tag == "br":
 			self.append("<br>")
 		elif tag in _INLINE_MARKS:
 			self.append(_INLINE_MARKS[tag])
 		elif tag in _KEPT_INLINE_TAGS:
 			self.append(f"<{tag}>")
+		elif tag in (*_LIST_TAGS, "li") and self.cell is not None:
+			self.start_list_tag(tag)
 		elif tag not in _WRAPPER_TAGS:
 			self.convertible = False
 
@@ -71,6 +69,8 @@ class _TableReader(HTMLParser):
 			self.append(_INLINE_MARKS[tag])
 		elif tag in _KEPT_INLINE_TAGS:
 			self.append(f"</{tag}>")
+		elif tag in _LIST_TAGS and self.list_counters:
+			self.list_counters.pop()
 
 	def handle_data(self, data):
 		if self.cell is not None:
@@ -81,6 +81,31 @@ class _TableReader(HTMLParser):
 	def append(self, text: str):
 		if self.cell is not None:
 			self.cell.append(text)
+
+	def start_cell(self, tag: str, attrs):
+		if any(name in ("rowspan", "colspan") and (value or "1").strip() != "1" for name, value in attrs):
+			self.convertible = False
+		self.close_cell()
+		if not self.row_open:
+			self.start_row()
+		self.cell = []
+		self.header_flags[-1].append(tag == "th")
+
+	def start_list_tag(self, tag: str):
+		if tag in _LIST_TAGS:
+			self.list_counters.append(0 if tag == "ol" else None)
+		elif self.list_counters:
+			self.start_list_item()
+
+	def start_list_item(self):
+		counter = self.list_counters[-1]
+		if counter is None:
+			marker = "•"
+		else:
+			self.list_counters[-1] = counter = counter + 1
+			marker = f"{counter}."
+		text = "".join(self.cell or []).rstrip()
+		self.cell = [f"{text}<br>{marker} " if text else f"{marker} "]
 
 	def start_row(self):
 		self.rows.append([])
@@ -234,6 +259,29 @@ def _leading_table(md: str):
 	return lines[:j], lines[j:]  # (table_lines, after)
 
 
+def _empty_column(table: list[str]) -> int | None:
+	"""The first column with no text in any body row: the column a parser drops when a table goes on
+	over a page break, since nothing on the continuation page shows it is there."""
+	body = table[2:] if len(table) > 1 and _SEP.match(table[1]) else table
+	rows = [_cells(row) for row in body]
+	if not rows:
+		return None
+	return next(
+		(
+			column
+			for column in range(_ncols(table[0]))
+			if not any(_plain_cell(row[column]) for row in rows if column < len(row))
+		),
+		None,
+	)
+
+
+def _with_blank_cell(row: str, column: int) -> str:
+	cells = _cells(row)
+	cells.insert(column, "")
+	return _format_row(cells)
+
+
 def stitch_cross_page_tables(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 	out = [[pno, md] for pno, md in pages]
 	for k in range(len(out) - 1):
@@ -243,12 +291,17 @@ def stitch_cross_page_tables(pages: list[tuple[int, str]]) -> list[tuple[int, st
 			continue
 		a_before, a_tbl = a
 		b_tbl, b_after = b
-		if not a_tbl or not b_tbl or _ncols(a_tbl[0]) != _ncols(b_tbl[0]):
+		if not a_tbl or not b_tbl:
+			continue
+		dropped_column = _empty_column(a_tbl) if _ncols(b_tbl[0]) == _ncols(a_tbl[0]) - 1 else None
+		if _ncols(a_tbl[0]) != _ncols(b_tbl[0]) and dropped_column is None:
 			continue
 		cont = b_tbl
 		if len(b_tbl) >= 2 and _SEP.match(b_tbl[1]):
 			repeated = _header_key(b_tbl[0]) in ("", _header_key(a_tbl[0]))
 			cont = b_tbl[2:] if repeated else [b_tbl[0], *b_tbl[2:]]
+		if dropped_column is not None:
+			cont = [_with_blank_cell(row, dropped_column) for row in cont]
 		if cont and not _SEP.match(a_tbl[-1]) and _is_numbered(a_tbl) and _continues(cont[0], True):
 			a_tbl = [*a_tbl[:-1], _merge_rows(a_tbl[-1], cont[0])]
 			cont = cont[1:]

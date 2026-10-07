@@ -821,6 +821,33 @@ class TestSectionizer(FrappeTestCase):
 		)
 		self.assertEqual(cleaned[15], "Every staff member keeps this manual correct.")
 
+	def test_clean_pages_stitches_a_continuation_that_lost_an_empty_column_and_its_header(self):
+		checklist = (
+			"### PRE-OPERATIVE CHECKLIST FOR PD NURSE\n\n<table>\n<tr>\n<th></th>\n<th>Tick (√)</th>\n<th></th>\n</tr>\n"
+			"<tr>\n<td>PD education material given in patient's own language\n<ul>\n"
+			"<li>Introductory PD pamphlet</li>\n<li>PD patient information sheet</li>\n</ul>\n</td>\n"
+			"<td></td>\n<td></td>\n</tr>\n"
+			"<tr>\n<td>Patient's ability to do CAPD ensured</td>\n<td></td>\n<td></td>\n</tr>\n</table>\n\n212"
+		)
+		continuation = (
+			"| Care-giver identified | Specify |\n|---|---|\n"
+			"| Dedicated PD area at home identified | |\n"
+			"| Date of surgery decided | Date: |\n\n"
+			"Signature of the PD nurse."
+		)
+		cleaned = dict(clean_pages([(212, checklist), (213, continuation)]))
+		self.assertEqual(
+			cleaned[212],
+			"### PRE-OPERATIVE CHECKLIST FOR PD NURSE\n\n|  | Tick (√) |  |\n|---|---|---|\n"
+			"| PD education material given in patient's own language<br>• Introductory PD pamphlet"
+			"<br>• PD patient information sheet |  |  |\n"
+			"| Patient's ability to do CAPD ensured |  |  |\n"
+			"| Care-giver identified |  | Specify |\n"
+			"| Dedicated PD area at home identified |  |  |\n"
+			"| Date of surgery decided |  | Date: |",
+		)
+		self.assertEqual(cleaned[213], "Signature of the PD nurse.")
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):
