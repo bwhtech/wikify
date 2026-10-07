@@ -442,10 +442,5 @@ test.describe("parse", () => {
 				await expect(page.getByRole("button", { name: "Actions", exact: true })).toHaveCount(0);
 			},
 		);
-
-		test.afterAll(async ({ api }) => {
-			test.setTimeout(QUEUE_WAIT);
-			await deleteTestProjects(api, PR_PREFIX);
-		});
 	});
 });
