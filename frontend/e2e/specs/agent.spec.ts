@@ -2,14 +2,11 @@ import type { Locator, Page } from "@playwright/test";
 import type { Api, Row } from "../helpers/api";
 import { iconButton, waitForTurn } from "../helpers/assistant";
 import { PREFIX } from "../helpers/env";
-import { expect, test } from "../helpers/test";
-import { rowOrder, sectionRow } from "../helpers/tree";
+import { expect, type FixtureOutline, type OutlineEntry, test } from "../helpers/test";
+import { openTree, rowOrder, sectionRow } from "../helpers/tree";
 import { waitFor } from "../helpers/wait";
 import {
-	FIXTURE_ROOT,
-	FIXTURE_SECTIONS,
 	findFigure,
-	findSection,
 	propagationPending,
 	type SectionRow,
 	sectionRows,
@@ -24,10 +21,7 @@ const createdSessions = new Set<string>();
 type Turn = { session: Row; messages: Row[] };
 
 async function openAssistant(page: Page, importName: string): Promise<Locator> {
-	await page.goto(`/wikify/import/${importName}/tree`);
-	await expect(
-		page.getByRole("treeitem", { name: new RegExp(`^(Collapse |Expand )?${FIXTURE_ROOT}`) }),
-	).toBeVisible();
+	await openTree(page, importName);
 	await iconButton(page, "lucide-sparkles").click();
 	const panel = page.getByRole("complementary").filter({ hasText: "Assistant" });
 	await expect(panel.getByPlaceholder("Ask the assistant…")).toBeVisible();
@@ -154,13 +148,77 @@ async function restoreContent(
 	);
 }
 
+function treeShape(rows: SectionRow[]) {
+	return rows.map(({ name, title, parent_source_section }) => ({
+		name,
+		title,
+		parent_source_section,
+	}));
+}
+
+// A run of plain words that occurs once in the markdown, so a prompt can quote it and the render shows it as is.
+function plainPhrase(markdown: string, words = 4): string | undefined {
+	for (const line of (markdown || "").split("\n")) {
+		if (/^\s*([#!|>]|[-*]\s|\d+\.)/.test(line)) continue;
+		const tokens = line.trim().split(/\s+/);
+		for (let start = 0; start + words <= tokens.length; start++) {
+			const run = tokens.slice(start, start + words);
+			if (!run.every((token) => /^[A-Za-z][A-Za-z'-]*$/.test(token))) continue;
+			const phrase = run.join(" ");
+			if (markdown.split(phrase).length === 2) return phrase;
+		}
+	}
+}
+
+// A word in exactly one section body and in no title, so only a search tool can place it.
+function bodyOnlyWord(sections: SectionRow[]): { word: string; owner: SectionRow } | undefined {
+	const bodies = sections.map((row) =>
+		(row.markdown || "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\]\([^)]*\)/g, "]"),
+	);
+	const titles = sections.map((row) => row.title.toLowerCase()).join("\n");
+	const words = new Set(
+		bodies.flatMap((body) => body.match(/\b[A-Za-z][A-Za-z0-9]{5,}\b/g) || []),
+	);
+	const rank = (word: string) => (/[a-z][A-Z]/.test(word) ? 0 : /^[A-Z]/.test(word) ? 1 : 2);
+	for (const word of [...words].sort((a, b) => rank(a) - rank(b))) {
+		const lower = word.toLowerCase();
+		if (titles.includes(lower)) continue;
+		const owners = sections.filter((_, index) => bodies[index].toLowerCase().includes(lower));
+		if (owners.length === 1) return { word, owner: owners[0] };
+	}
+}
+
+// A figure whose tag points at its page image and that exactly one section embeds.
+async function pageImageFigure(api: Api, sourceDocument: string, sections: SectionRow[]) {
+	const pages = await api.getList("Source Page", {
+		filters: { source_document: sourceDocument },
+		fields: ["name", "page_no", "image", "canonical_markdown"],
+		orderBy: "page_no asc",
+	});
+	for (const page of pages) {
+		for (const [tag, caption, url] of (page.canonical_markdown || "").matchAll(
+			/!\[([^\]]*)\]\(([^)]*)\)/g,
+		)) {
+			if (!caption || caption.includes('"') || url !== page.image) continue;
+			const owners = sections.filter((row) => row.markdown?.includes(tag));
+			if (owners.length === 1)
+				return { owner: owners[0], page: page.name, pageNo: page.page_no, caption, image: url };
+		}
+	}
+}
+
+function outlineRows(sections: SectionRow[], { root, children }: FixtureOutline): SectionRow[] {
+	const names = [...(root ? [root] : []), ...children].map((entry) => entry.name);
+	return sections.filter((row) => names.includes(row.name));
+}
+
 async function expectPristine(
 	api: Api,
 	sourceDocument: string,
 	sections: SectionRow[],
 ): Promise<void> {
 	const after = await sectionRows(api, sourceDocument);
-	expect(after.map((row) => row.title)).toEqual([FIXTURE_ROOT, ...FIXTURE_SECTIONS]);
+	expect(treeShape(after)).toEqual(treeShape(sections));
 	expect(after.every((row) => row.include_in_wiki === 1)).toBe(true);
 	expect(after.map(({ name, markdown }) => ({ name, markdown }))).toEqual(
 		sections.map(({ name, markdown }) => ({ name, markdown })),
@@ -202,7 +260,10 @@ test.describe("assistant", () => {
 				const treeCalls = toolRows(rows, ["read_tree"]);
 				expect(treeCalls.length).toBeGreaterThan(0);
 				const sections = await sectionRows(api, sourceDocument);
-				expect(sections.map((row) => row.title)).toEqual([FIXTURE_ROOT, ...FIXTURE_SECTIONS]);
+				const { root, children } = fixture.agent.outline;
+				expect(outlineRows(sections, fixture.agent.outline).map((row) => row.title)).toEqual(
+					[...(root ? [root] : []), ...children].map((entry) => entry.title),
+				);
 				// The stored tool result loses its <section id> tags (Long Text is HTML-sanitised), so match titles and pages.
 				const treeText = treeCalls.at(-1)!.content as string;
 				for (const section of sections) {
@@ -222,7 +283,10 @@ test.describe("assistant", () => {
 			async ({ page, api, fixture }) => {
 				test.setTimeout(TEST_TIMEOUT);
 				const { sourceDocument } = fixture.agent;
-				const prompt = `${PREFIX} agent ${Date.now()} Use your search tool to find the sections of this document that mention PyMuPDF or OpenRouter, then list their titles.`;
+				const found = bodyOnlyWord(await sectionRows(api, sourceDocument));
+				test.skip(!found, "no word of this parse sits in exactly one section body and no title");
+				const { word, owner } = found!;
+				const prompt = `${PREFIX} agent ${Date.now()} Use your search tool to find the sections of this document that mention "${word}", then list their titles.`;
 				const panel = await openAssistant(page, fixture.agent.import);
 				await sendPrompt(panel, prompt);
 				const sessionId = await findSession(api, sourceDocument, prompt);
@@ -231,11 +295,10 @@ test.describe("assistant", () => {
 				expect(finalReply(rows).status).toBe("done");
 				const searches = toolRows(rows, ["semantic_search", "search_sections"]);
 				expect(searches.length).toBeGreaterThan(0);
-				const found = searches.map((row) => row.content).join("\n");
-				// Both words appear only in section bodies, never in a title, so the tree alone cannot answer it.
-				for (const title of ["How Wikify processes a PDF", "Which AI service Wikify uses"]) {
-					expect(found, `search results name "${title}"`).toContain(title);
-				}
+				const results = searches.map((row) => row.content).join("\n");
+				expect(results, `search results for "${word}" name "${owner.title}"`).toContain(
+					owner.title,
+				);
 			},
 		);
 	});
@@ -247,18 +310,20 @@ test.describe("assistant", () => {
 			test.setTimeout(TEST_TIMEOUT);
 			const { sourceDocument } = fixture.agent;
 			const stamp = Date.now();
-			const root = await findSection(api, sourceDocument, FIXTURE_ROOT);
-			const moved = await findSection(api, sourceDocument, "Finding content across documents");
-			const renamed = await findSection(api, sourceDocument, "Reading the page review");
-			const retyped = await findSection(api, sourceDocument, "The assistant");
-			const movedIndex = FIXTURE_SECTIONS.indexOf(moved.title);
+			const { root, children } = fixture.agent.outline;
+			test.skip(!root, "this parse has no root section to move a child out of");
+			const before = await sectionRows(api, sourceDocument);
+			const row = (entry: OutlineEntry) => before.find((section) => section.name === entry.name)!;
+			const movedIndex = 3;
+			const [renamed, retyped, moved] = [children[1], children[2], children[movedIndex]].map(row);
 			const newTitle = `${PREFIX} agent renamed ${stamp}`;
-			const newType =
-				retyped.section_type === "training_and_education"
-					? "quality_and_audits"
-					: "training_and_education";
+			// Section types are per project, so pick another one this document already uses.
+			const newType = before
+				.map((section) => section.section_type)
+				.find((type) => type && type !== retyped.section_type);
+			test.skip(!newType, "this parse uses a single section type");
 			const prompt =
-				`${PREFIX} agent ${stamp} Do three things: 1) move the section '${moved.title}' (currently under '${FIXTURE_ROOT}') to the top level of the tree; ` +
+				`${PREFIX} agent ${stamp} Do three things: 1) move the section '${moved.title}' (currently under '${root!.title}') to the top level of the tree; ` +
 				`2) rename the section '${renamed.title}' to '${newTitle}'; 3) set the section type of '${retyped.title}' to '${newType}'.`;
 			let sessionId = "";
 			try {
@@ -290,7 +355,7 @@ test.describe("assistant", () => {
 				if (sessionId) await settle(api, sessionId);
 				await api.call("wikify.api.sections.move_section", {
 					name: moved.name,
-					new_parent: root.name,
+					new_parent: root!.name,
 					new_index: movedIndex,
 				});
 				await api.call("wikify.api.sections.rename_section", {
@@ -302,10 +367,7 @@ test.describe("assistant", () => {
 					section_type: retyped.section_type,
 				});
 			}
-			expect((await sectionRows(api, sourceDocument)).map((row) => row.title)).toEqual([
-				FIXTURE_ROOT,
-				...FIXTURE_SECTIONS,
-			]);
+			expect(treeShape(await sectionRows(api, sourceDocument))).toEqual(treeShape(before));
 		},
 	);
 
@@ -423,6 +485,7 @@ test.describe("assistant", () => {
 				).toEqual([true]);
 				expect(await exists()).toBe(true);
 				await expect(panel.getByText("Confirm delete_section")).toBeVisible();
+				await expect(panel.getByText(`Delete section '${title}'.`, { exact: true })).toBeVisible();
 				await panel.getByRole("button", { name: "Cancel" }).click();
 				await expect(panel.getByText("Cancelled.")).toBeVisible();
 				expect(await exists()).toBe(true);
@@ -449,9 +512,7 @@ test.describe("assistant", () => {
 				expect(await exists()).toBe(false);
 
 				await page.reload();
-				await expect(
-					page.getByRole("treeitem", { name: new RegExp(`^(Collapse |Expand )?${FIXTURE_ROOT}`) }),
-				).toBeVisible();
+				await expect(page.locator("[data-section-row]").first()).toBeVisible();
 				await expect(page.getByText(title)).toHaveCount(0);
 			} finally {
 				if (sessionId) await settle(api, sessionId);
@@ -468,21 +529,26 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/21" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #21. Remove test.fail() when the issue is closed.
 			test.setTimeout(TEST_TIMEOUT * 2);
 			const { sourceDocument } = fixture.agent;
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const edited = before.find((row) => row.title === "How Wikify processes a PDF")!;
-			// Page 6 is shared by "The assistant" and "Which AI service Wikify uses".
-			const pageNo = 6;
+			const { children } = fixture.agent.outline;
+			const edited = before.find((row) => row.name === children[1].name)!;
+			const pageNo = children.at(-1)!.page_start;
+			const pageRow = pagesBefore.find((row) => row.page_no === pageNo)!;
+			const sectionPhrase = plainPhrase(edited.markdown);
+			const pagePhrase = plainPhrase(pageRow.canonical_markdown);
+			test.skip(!sectionPhrase || !pagePhrase, "no quotable phrase in the section or the page");
+			const sectionEdit = `${sectionPhrase}, [test] section edit`;
+			const pageEdit = `${pagePhrase} ([test] page edit)`;
 			const sectionPrompt =
-				`${PREFIX} agent ${stamp} In the section '${edited.title}', change the text 'and it costs nothing' to ` +
-				`'and it costs nothing, [test] section edit'. Change only that section.`;
+				`${PREFIX} agent ${stamp} In the section '${edited.title}', change the text '${sectionPhrase}' to ` +
+				`'${sectionEdit}'. Change only that section.`;
 			const pagePrompt =
-				`Edit page ${pageNo} only (the page text, not any section): change 'Wikify calls one service' to ` +
-				`'Wikify calls one service ([test] page edit)'. Do not change any section.`;
+				`Edit page ${pageNo} only (the page text, not any section): change '${pagePhrase}' to ` +
+				`'${pageEdit}'. Do not change any section.`;
 			let sessionId = "";
 			try {
 				const panel = await openAssistant(page, fixture.agent.import);
@@ -491,11 +557,11 @@ test.describe("assistant", () => {
 				let rows = await waitForTurn(api, sessionId, sectionPrompt, TURN_TIMEOUT);
 				expect(toolRows(rows, ["edit_section_content"]).length).toBeGreaterThan(0);
 				expect(await api.getValue("Source Section", edited.name, "markdown")).toContain(
-					"and it costs nothing, [test] section edit",
+					sectionEdit,
 				);
 				const article = page.getByRole("article");
 				await sectionRow(page, edited.name).getByText(edited.title, { exact: true }).click();
-				await expect(article).toContainText("and it costs nothing, [test] section edit");
+				await expect(article).toContainText(sectionEdit);
 
 				// Sent before the reload: a reloaded page opens a new chat, not this session.
 				await sendPrompt(panel, pagePrompt);
@@ -507,18 +573,31 @@ test.describe("assistant", () => {
 				await waitForPropagation(api, sourceDocument);
 				await page.reload();
 				await sectionRow(page, edited.name).getByText(edited.title, { exact: true }).click();
-				await expect(article).toContainText("and it costs nothing, [test] section edit");
-				const pageRow = pagesBefore.find((row) => row.page_no === pageNo)!;
+				await expect(article).toContainText(sectionEdit);
 				expect(await api.getValue("Source Page", pageRow.name, "canonical_markdown")).toContain(
-					"Wikify calls one service ([test] page edit)",
+					pageEdit,
 				);
 				await page.goto(`/wikify/import/${fixture.agent.import}/pages?page=${pageNo}`);
 				await expect(page.getByText("([test] page edit)")).toBeVisible();
 
+				// A page edit reaches a section only when that section alone owns the page.
+				const ranges = await api.getList("Source Section", {
+					filters: { source_document: sourceDocument },
+					fields: ["name", "page_start", "page_end", "lft", "rgt"],
+				});
+				const covering = ranges.filter(
+					(row) => row.page_start <= pageNo && row.page_end >= pageNo,
+				);
+				const owners = covering.filter(
+					(row) => !covering.some((other) => other.lft > row.lft && other.rgt < row.rgt),
+				);
+				const changed = [edited.name, ...(owners.length === 1 ? [owners[0].name] : [])];
 				const after = await sectionRows(api, sourceDocument);
+				if (owners.length === 1)
+					expect(after.find((row) => row.name === owners[0].name)!.markdown).toContain(pageEdit);
 				const others = (rows: SectionRow[]) =>
 					rows
-						.filter((row) => row.name !== edited.name)
+						.filter((row) => !changed.includes(row.name))
 						.map(({ title, markdown }) => ({ title, markdown }));
 				expect(others(after)).toEqual(others(before));
 			} finally {
@@ -540,7 +619,18 @@ test.describe("assistant", () => {
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const target = before.find((row) => row.title === "Finding content across documents")!;
+			const candidates = fixture.agent.outline.children.flatMap((child) => {
+				const section = before.find((row) => row.name === child.name)!;
+				const sourcePage = pagesBefore.find((row) => row.page_no === section.page_start);
+				const phrase = plainPhrase(section.markdown);
+				return section.page_start === section.page_end &&
+					phrase &&
+					sourcePage?.canonical_markdown.includes(phrase)
+					? [{ section, sourcePage, phrase }]
+					: [];
+			});
+			test.skip(!candidates.length, "no one-page section quotes its page");
+			const { section: target, sourcePage, phrase } = candidates[0];
 			const marker = `[test] drift marker ${stamp}`;
 			const prompt = `${PREFIX} agent ${stamp} Rebuild the section '${target.title}' from its pages.`;
 			let sessionId = "";
@@ -556,17 +646,15 @@ test.describe("assistant", () => {
 				const rows = await waitForTurn(api, sessionId, prompt, TURN_TIMEOUT);
 				const rebuilds = toolRows(rows, ["rebuild_section_from_pages"]);
 				expect(rebuilds.map((row) => toolArgs(row).name)).toEqual([target.name]);
-				// Every fixture page is shared, so the rebuild adopts the whole page and the agent may then trim
-				// the neighbours' text off (the tool's overlap warning tells it to). The tool row proves the page was adopted.
-				const sourcePage = pagesBefore.find((row) => row.page_no === target.page_start)!;
-				expect(target.page_end).toBe(target.page_start);
+				// The rebuild adopts the whole page, and on a shared page the agent may then trim the
+				// neighbours' text off (the tool's overlap warning tells it to). The tool row proves the page was adopted.
 				expect(rebuilds[0].content).toContain(
 					`(${sourcePage.canonical_markdown.trim().length} chars)`,
 				);
 				const after = await sectionRows(api, sourceDocument);
 				const rebuilt = after.find((row) => row.name === target.name)!;
 				expect(rebuilt.markdown).not.toContain(marker);
-				expect(rebuilt.markdown).toContain("The **Explore** view filters sections by label.");
+				expect(rebuilt.markdown).toContain(phrase);
 				const others = (sections: SectionRow[]) =>
 					sections.filter((row) => row.name !== target.name);
 				expect(others(after)).toEqual(others(drifted));
@@ -574,7 +662,7 @@ test.describe("assistant", () => {
 				await page.reload();
 				await sectionRow(page, target.name).getByText(target.title, { exact: true }).click();
 				const article = page.getByRole("article");
-				await expect(article).toContainText("The Explore view filters sections by label.");
+				await expect(article).toContainText(phrase);
 				await expect(article).not.toContainText(marker);
 			} finally {
 				if (sessionId) await settle(api, sessionId);
@@ -594,14 +682,10 @@ test.describe("assistant", () => {
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const owner = before.find((row) => row.title === FIXTURE_SECTIONS[0])!;
-			const { pageNo, caption } = await findFigure(api, sourceDocument, {
-				fromPage: owner.page_start,
-				toPage: owner.page_end,
-				plainCaption: true,
-			});
+			const found = await pageImageFigure(api, sourceDocument, before);
+			test.skip(!found, "no section embeds a page-image figure with a plain caption");
+			const { owner, pageNo, caption, image } = found!;
 			const target = pagesBefore.find((row) => row.page_no === pageNo)!;
-			const image: string = await api.getValue("Source Page", target.name, "image");
 			const placeholder = `/files/test-placeholder-${stamp}.png`;
 			expect(target.canonical_markdown).toContain(`![${caption}](${image})`);
 			expect(owner.markdown).toContain(`![${caption}](${image})`);
@@ -660,12 +744,12 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/38" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #38. Remove test.fail() when the issue is closed.
 			test.setTimeout(TEST_TIMEOUT);
 			const { sourceDocument } = fixture.agent;
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const prompt = `${PREFIX} agent ${Date.now()} Crop the figure on page 1 (the screenshot of the Wikify Projects screen) to its top half.`;
+			const { pageNo, caption } = await findFigure(api, sourceDocument, { plainCaption: true });
+			const prompt = `${PREFIX} agent ${Date.now()} Crop the figure "${caption}" on page ${pageNo} to its top half.`;
 			let sessionId = "";
 			try {
 				const panel = await openAssistant(page, fixture.agent.import);
@@ -687,6 +771,7 @@ test.describe("assistant", () => {
 				expect(await pageSnapshot(api, sourceDocument)).toEqual(pagesBefore);
 				expect(await sectionRows(api, sourceDocument)).toEqual(before);
 				// The wording is the bug (#38): the reply sends the user to the wiki editor, not the crop dialog.
+				test.fail(); // known failure: #38. Remove test.fail() when the issue is closed.
 				expect(reply.content).toMatch(/crop/i);
 				expect(reply.content).toMatch(/\bPages\b/);
 				expect(reply.content).toMatch(/click/i);
@@ -699,7 +784,7 @@ test.describe("assistant", () => {
 		},
 	);
 
-	// Every fixture page is shared by two sections, so the section side of the case is left to propagation (#21).
+	// The page is usually shared by two sections, so the section side of the case is left to propagation (#21).
 	test(
 		"F-AGENT-10 reparse one page with the VLM, with an instruction",
 		{ tag: ["@functional", "@llm", "@agent"] },
@@ -709,8 +794,18 @@ test.describe("assistant", () => {
 			const stamp = Date.now();
 			const before = await sectionRows(api, sourceDocument);
 			const pagesBefore = await pageSnapshot(api, sourceDocument);
-			const pageNo = 6;
-			const target = pagesBefore.find((row) => row.page_no === pageNo)!;
+			const markers = [
+				{ span: /`[^`\n]+`/g, name: "inline code span", mark: "backticks", word: /backtick/i },
+				{ span: /\*\*[^*\n]+\*\*/g, name: "bold span", mark: "asterisks", word: /asterisk/i },
+			];
+			const marker = markers.find((entry) =>
+				pagesBefore.some((row) => row.canonical_markdown?.match(entry.span)),
+			);
+			test.skip(!marker, "no page of this parse has inline code or bold text");
+			const { span, name: spanName, mark, word } = marker!;
+			const target = pagesBefore.find((row) => row.canonical_markdown?.match(span))!;
+			const pageNo: number = target.page_no;
+			const kept = plainPhrase(target.canonical_markdown.replace(span, ""), 2);
 			const reparseFields = [
 				"canonical_source",
 				"remediation_method",
@@ -721,11 +816,9 @@ test.describe("assistant", () => {
 			];
 			const reparseBefore: Row = await api.getValue("Source Page", target.name, reparseFields);
 			const meanBefore = await api.getValue("Source Document", sourceDocument, "canonical_mean");
-			const backticked = /`[\w-]+\/[\w.-]+`/;
-			expect(target.canonical_markdown).toMatch(backticked);
 			const prompt =
 				`${PREFIX} agent ${stamp} Re-parse page ${pageNo} with the VLM, instruction: ` +
-				`"in the table, write every model name as plain text, without backticks".`;
+				`"write every ${spanName} as plain text, without ${mark}".`;
 			let sessionId = "";
 			try {
 				const panel = await openAssistant(page, fixture.agent.import);
@@ -738,7 +831,7 @@ test.describe("assistant", () => {
 				expect(reparses.length).toBeGreaterThan(0);
 				const args = toolArgs(reparses.at(-1)!);
 				expect(args).toMatchObject({ page_no: pageNo, method: "vlm" });
-				expect(args.instruction).toMatch(/backtick/i);
+				expect(args.instruction).toMatch(word);
 				expect(reparses.at(-1)!.content).toContain(`Re-parsed page ${pageNo} via vlm`);
 
 				const reparsed: string = await api.getValue(
@@ -747,13 +840,11 @@ test.describe("assistant", () => {
 					"canonical_markdown",
 				);
 				expect(reparsed).not.toBe(target.canonical_markdown);
-				expect(reparsed).toContain("OpenRouter");
-				expect(reparsed).not.toMatch(backticked);
+				if (kept) expect(reparsed).toContain(kept);
+				expect(reparsed).not.toMatch(span);
 
 				await page.goto(`/wikify/import/${fixture.agent.import}/pages?page=${pageNo}`);
-				await expect(
-					page.getByRole("cell", { name: "Re-read a page from its image" }),
-				).toBeVisible();
+				if (kept) await expect(page.getByText(kept).first()).toBeVisible();
 			} finally {
 				if (sessionId) await settle(api, sessionId);
 				await waitForPropagation(api, sourceDocument);
@@ -773,15 +864,15 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/24" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #24. Remove test.fail() when the issue is closed.
 			// Waits: queue (TURN_TIMEOUT) + stop (15 s) + follow-up or cleanup settle (TURN_TIMEOUT), so a timeout can't hide the bug.
 			test.setTimeout(TURN_TIMEOUT * 2 + 120_000);
 			const { sourceDocument } = fixture.agent;
-			const sectionCount = FIXTURE_SECTIONS.length + 1;
+			const sectionCount = (await sectionRows(api, sourceDocument)).length;
+			const pageCount = (await pageSnapshot(api, sourceDocument)).length;
 			const prompt =
 				`${PREFIX} agent ${Date.now()} Read the sections strictly one at a time: call read_section for ONE section, wait for its result, ` +
 				`then call it for the next one. Never put more than one tool call in a step. Read all ${sectionCount} sections, ` +
-				`then call read_page for each of the 6 pages the same way, then list the sections without figures.`;
+				`then call read_page for each of the ${pageCount} pages the same way, then list the sections without figures.`;
 			const followUp = "How many sections does this document have? Answer with one number.";
 			let sessionId = "";
 			try {
@@ -874,11 +965,11 @@ test.describe("assistant", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/25" },
 		},
 		async ({ page, api, fixture }) => {
-			test.fail(); // known failure: #25. Remove test.fail() when the issue is closed.
 			test.setTimeout(TEST_TIMEOUT);
 			const { sourceDocument } = fixture.agent;
 			const stamp = Date.now();
 			const codeWord = `ZEPHYR${stamp % 100000}`;
+			const pageCount = (await pageSnapshot(api, sourceDocument)).length;
 			const title = `${PREFIX} agent ${stamp} long history`;
 			const { session_id: sessionId } = await api.call("wikify.api.agent.new_session", {
 				scope: "document",
@@ -891,7 +982,7 @@ test.describe("assistant", () => {
 			const calls = Array.from({ length: 42 }, (_, index) => ({
 				id: `call_e2e_${stamp}_${index}`,
 				name: "read_page",
-				args: { page_no: (index % 6) + 1 },
+				args: { page_no: (index % pageCount) + 1 },
 			}));
 			const history: Row[] = [
 				{
@@ -907,7 +998,7 @@ test.describe("assistant", () => {
 					tool_call_id: call.id,
 					content: `Page ${call.args.page_no} read.`,
 				})),
-				{ role: "assistant", content: "I read all 6 pages seven times." },
+				{ role: "assistant", content: `I read all ${pageCount} pages seven times.` },
 			];
 			for (const message of history) {
 				await api.call("frappe.client.insert", {
@@ -921,7 +1012,7 @@ test.describe("assistant", () => {
 			const panel = await openAssistant(page, fixture.agent.import);
 			await iconButton(page, "lucide-history", panel.locator("header")).click();
 			await page.getByRole("menuitem", { name: title }).click();
-			await expect(panel.getByText("I read all 6 pages seven times.")).toBeVisible();
+			await expect(panel.getByText(`I read all ${pageCount} pages seven times.`)).toBeVisible();
 			const prompt =
 				"What was the code word I gave you in my first message of this chat? Reply with only the code word.";
 			await sendPrompt(panel, prompt);

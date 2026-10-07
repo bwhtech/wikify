@@ -90,7 +90,8 @@ test.describe("ask", () => {
 			{ tag: ["@functional", "@llm", "@ask"] },
 			async ({ page, api, fixture }) => {
 				test.setTimeout(ANSWER_TIMEOUT + 60_000);
-				const question = `${AREA_PREFIX} Which AI service does Wikify use?`;
+				const topic = fixture.review.outline.children[1].title;
+				const question = `${AREA_PREFIX} What does the document say about "${topic}"?`;
 
 				await page.goto("/wikify/ask");
 				await pickProject(page, fixture.projectName);
@@ -142,10 +143,9 @@ test.describe("ask", () => {
 				annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/53" },
 			},
 			async ({ page, api, fixture }) => {
-				// known failure: #53. Remove test.fail() when the issue is closed.
-				test.fail();
 				test.setTimeout(ANSWER_TIMEOUT + 60_000);
-				const question = `${AREA_PREFIX} What do the page review badges mean?`;
+				const topic = fixture.review.outline.children[2].title;
+				const question = `${AREA_PREFIX} What does the document say about "${topic}"?`;
 				const countBefore = await api.call("frappe.client.get_count", {
 					doctype: "Wikify Ask Session",
 					filters: { project: fixture.project },
@@ -156,7 +156,7 @@ test.describe("ask", () => {
 				await pickProject(page, fixture.projectName);
 				await expect(page.getByPlaceholder("Ask a question of this wiki…")).toBeVisible();
 				// frappe-ui's Button overwrites aria-label with its (empty) label prop, so the icon-only
-				// history and trash buttons have no accessible name; find them by their icon.
+				// history button has no accessible name; find it by its icon.
 				const history = page.getByRole("heading", { name: "History" });
 				if (!(await history.isVisible()))
 					await page.locator("button:has(.lucide-history)").click();
@@ -171,9 +171,10 @@ test.describe("ask", () => {
 				).toBeVisible();
 
 				const row = page.getByRole("listitem").filter({ hasText: question });
-				await row.locator("button:has(.lucide-trash-2)").click();
+				await row.getByRole("button", { name: /^Delete conversation: / }).click();
 				const confirm = page.getByRole("dialog");
 				await expect(confirm).toBeVisible();
+				await expect(confirm).toContainText(`Delete "${question}" and its answers?`);
 				expect(
 					await api.call("frappe.client.get_count", {
 						doctype: "Wikify Ask Session",
@@ -183,12 +184,15 @@ test.describe("ask", () => {
 				await confirm.getByRole("button", { name: /Delete/ }).click();
 
 				await expect(row).toHaveCount(0);
-				expect(
-					await api.call("frappe.client.get_count", {
-						doctype: "Wikify Ask Session",
-						filters: { project: fixture.project },
-					}),
-				).toBe(countBefore);
+				// The row leaves the list before the delete request returns.
+				await expect
+					.poll(() =>
+						api.call("frappe.client.get_count", {
+							doctype: "Wikify Ask Session",
+							filters: { project: fixture.project },
+						}),
+					)
+					.toBe(countBefore);
 				expect(
 					await api.call("frappe.client.get_count", {
 						doctype: "Wikify Ask Message",

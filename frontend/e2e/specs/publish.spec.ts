@@ -1,16 +1,14 @@
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor } from "../helpers/wait";
 import {
+	cloneImport,
 	createProject,
-	escapeRegExp,
 	findFigure,
 	outline,
 	sectionRows,
-	startImport,
 	waitForImport,
 	type SectionRow,
 } from "../helpers/wikify";
@@ -52,6 +50,11 @@ async function expectRoutesOpen(page: Page, documents: WikiDocument[]): Promise<
 	}
 }
 
+async function firstLeaf(api: Api, sourceDocument: string): Promise<SectionRow> {
+	const { rows, children } = await outline(api, sourceDocument);
+	return children.find((child) => !rows.some((row) => row.parent_source_section === child.name))!;
+}
+
 function ownParagraph(markdown: string): string {
 	const paragraph = markdown
 		.split(/\n\s*\n/)
@@ -68,9 +71,10 @@ test.describe("publish", () => {
 	const stamp = Date.now();
 	const name = `${PREFIX} publish ${stamp}`;
 	const spaceRoute = `test-publish-${stamp}`;
-	const first = { import: "", sourceDocument: "" };
-	const second = { import: "" };
+	let first = { import: "", sourceDocument: "" };
+	let second = { import: "", sourceDocument: "" };
 	let sections: SectionRow[] = [];
+	let root: SectionRow | undefined;
 	let excluded: SectionRow;
 	let leafTitle = "";
 	let otherTitle = "";
@@ -78,24 +82,36 @@ test.describe("publish", () => {
 	let space = "";
 	let publishedDocuments: WikiDocument[] = [];
 
-	test.beforeAll(async ({ api }) => {
+	test.beforeAll(async ({ api, fixture }) => {
 		test.setTimeout(QUEUE_TIMEOUT + 1_200_000);
 		const project = await createProject(api, name);
-		first.import = await startImport(api, { title: name, project });
-		second.import = await startImport(api, { title: `${name} 2`, project });
-		first.sourceDocument = (
-			await waitForImport(api, first.import, "Review", QUEUE_TIMEOUT)
-		).source_document;
+		first = await cloneImport(api, fixture.source.import, { title: name, project });
+		second = await cloneImport(api, fixture.source.import, { title: `${name} 2`, project });
 
-		const { children } = await outline(api, first.sourceDocument);
-		excluded = children.at(-1)!;
-		leafTitle = children[0].title;
-		otherTitle = children[1].title;
+		let rows: SectionRow[];
+		let children: SectionRow[];
+		({ rows, root, children } = await outline(api, first.sourceDocument));
+		// A group's wiki route opens its first child, so the pages checked by title must be leaves.
+		const leaves = children.filter(
+			(child) => !rows.some((row) => row.parent_source_section === child.name),
+		);
+		expect(leaves.length, "two top-level sections without children").toBeGreaterThanOrEqual(2);
+		const [leaf, other] = leaves;
+		excluded = children.findLast((child) => child !== leaf && child !== other)!;
+		leafTitle = leaf.title;
+		otherTitle = other.title;
 		await api.call("wikify.api.sections.toggle_include", { name: excluded.name, include: 0 });
 
-		// Page 3 on, not 1 or 2: a crop rebuilds every section covering the page from whole pages, and page 1
-		// holds the root's own text, which would then leak into its first child and hide bug #30.
-		const figure = await findFigure(api, first.sourceDocument, { fromPage: 3 });
+		// Past the first two children and off both leaves' pages: a crop rebuilds every section covering the
+		// page from whole pages, so the root's own text would leak into its first child (hiding bug #30), and
+		// a shared page would put another section's heading into a leaf's page.
+		const onLeafPage = (pageNo: number) =>
+			[leaf, other].some((row) => row.page_start <= pageNo && pageNo <= row.page_end);
+		let figure = await findFigure(api, first.sourceDocument, {
+			fromPage: children[1].page_end + 1,
+		});
+		while (onLeafPage(figure.pageNo))
+			figure = await findFigure(api, first.sourceDocument, { fromPage: figure.pageNo + 1 });
 		const result = await api.call("wikify.api.pages.crop_page_figure", {
 			source_document: first.sourceDocument,
 			page_no: figure.pageNo,
@@ -125,11 +141,6 @@ test.describe("publish", () => {
 		await waitForImport(api, first.import, "Graphed", 120_000);
 	});
 
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(QUEUE_TIMEOUT);
-		await deleteTestProjects(api, name);
-	});
-
 	test(
 		"F-PUB-01 publish dialog previews the pages to be created",
 		{
@@ -137,15 +148,24 @@ test.describe("publish", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/44" },
 		},
 		async ({ page, api }) => {
-			// known failure: #44. Remove test.fail() when the issue is closed.
-			test.fail();
 			const preview = await api.call("wikify.api.imports.preview_wiki", {
 				import_name: first.import,
 			});
+			const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 			const dialog = await openPublishDialog(page, first.import);
-			await expect(dialog).toContainText(
-				new RegExp(`${escapeRegExp(leafTitle)}|\\b${preview.pages} pages?\\b`, "i"),
-			);
+			await expect(dialog.getByText("Pages to publish", { exact: true })).toBeVisible();
+			await expect(
+				dialog.getByText(`${plural(preview.pages, "page")} · ${plural(preview.groups, "group")}`, {
+					exact: true,
+				}),
+			).toBeVisible();
+			await expect(
+				dialog.getByText(`${preview.excluded} excluded`, { exact: true }),
+			).toBeVisible();
+			const tree = dialog.getByRole("tree");
+			for (const node of preview.tree)
+				await expect(tree.getByText(node.title, { exact: true })).toBeVisible();
+			await expect(tree.getByText(excluded.title, { exact: true })).toHaveCount(0);
 		},
 	);
 
@@ -195,19 +215,13 @@ test.describe("publish", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/30" },
 		},
 		async ({ page }) => {
-			// known failure: #30. Remove test.fail() when the issue is closed.
-			test.fail();
-			const root = sections.find(
-				(row) =>
-					!row.parent_source_section &&
-					sections.some((child) => child.parent_source_section === row.name),
-			);
 			test.skip(!root, "this parse produced no parent section");
-			const parent = root!;
+			const parent = sections.find((row) => row.name === root!.name)!;
 			const paragraph = ownParagraph(parent.markdown);
 			expect(sections.filter((row) => row.markdown?.includes(paragraph))).toEqual([parent]);
 			const group = publishedDocuments.find((document) => document.name === parent.wiki_document)!;
 			await page.goto(`/${group.route}`);
+			test.fail(); // known failure: #30. Remove test.fail() when the issue is closed.
 			await expect(page.getByRole("main")).toContainText(paragraph);
 		},
 	);
@@ -260,12 +274,7 @@ test.describe("publish", () => {
 		{ tag: ["@functional", "@publish"] },
 		async ({ page, api }) => {
 			test.setTimeout(QUEUE_TIMEOUT * 2);
-			const { source_document: sourceDocument } = await waitForImport(
-				api,
-				second.import,
-				"Review",
-				QUEUE_TIMEOUT,
-			);
+			const { sourceDocument } = second;
 			const before = await wikiDocuments(api, spaceRoute);
 
 			await page.goto(`/wikify/import/${second.import}/tree`);
@@ -306,9 +315,9 @@ test.describe("publish", () => {
 			);
 			await expectRoutesOpen(page, added);
 
-			const secondLeaf = (await outline(api, sourceDocument)).children[0];
-			const firstLeaf = (await outline(api, first.sourceDocument)).children[0];
-			for (const leaf of [secondLeaf, firstLeaf]) {
+			const secondLeaf = await firstLeaf(api, sourceDocument);
+			const leafOfFirst = await firstLeaf(api, first.sourceDocument);
+			for (const leaf of [secondLeaf, leafOfFirst]) {
 				const document = after.find((row) => row.name === leaf.wiki_document)!;
 				await page.goto(`/${document.route}`);
 				const main = page.getByRole("main");
@@ -334,7 +343,7 @@ test.describe("publish", () => {
 		async () => {
 			test.skip(
 				true,
-				"BLOCKED: the dialog closes on Generate wiki and small imports generate in seconds; the only large import (R1) never reaches Review because its parse is killed at the 1 h RQ timeout.",
+				"generation makes no AI calls and commits every 50 pages, so even the 98-page fixture is published in seconds, too fast to stop from the UI",
 			);
 		},
 	);

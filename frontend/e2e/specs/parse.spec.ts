@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
-import { FIXTURE_PDF, PREFIX } from "../helpers/env";
+import { PREFIX, WHAT_IS_WIKIFY_PDF } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor, waitForValue } from "../helpers/wait";
 import {
@@ -21,11 +20,14 @@ const QUEUE_WAIT = 1_200_000;
 const REMEDIATE_TIMEOUT = 1_200_000;
 
 async function logEntries(api: Api, importName: string) {
-	return api.getList("Import Log Entry", {
-		filters: { import: importName },
-		fields: ["name", "idx_seq", "stage", "message"],
-		orderBy: "idx_seq asc",
-	});
+	return api.getList<{ name: string; idx_seq: number; stage: string; message: string }>(
+		"Import Log Entry",
+		{
+			filters: { import: importName },
+			fields: ["name", "idx_seq", "stage", "message"],
+			orderBy: "idx_seq asc",
+		},
+	);
 }
 
 async function lastLogSeq(api: Api, importName: string): Promise<number> {
@@ -60,11 +62,6 @@ function remediatedPages(entries: { stage: string; message: string }[]): number[
 }
 
 test.describe("parse", () => {
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT);
-		await deleteTestProjects(api, AREA_PREFIX);
-	});
-
 	test(
 		"F-PARSE-01 stage label, Pages and Started follow a running parse",
 		{
@@ -72,7 +69,6 @@ test.describe("parse", () => {
 			annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/48" },
 		},
 		async ({ page, api }) => {
-			test.fail(); // known failure: #48. Remove test.fail() when the issue is closed.
 			test.setTimeout(QUEUE_WAIT + 2 * PARSE_TIMEOUT);
 			const projectName = `${AREA_PREFIX} watch`;
 			const project = await createProject(api, projectName);
@@ -83,7 +79,7 @@ test.describe("parse", () => {
 			const dialog = page.getByRole("dialog");
 			const chooser = page.waitForEvent("filechooser");
 			await dialog.getByRole("button", { name: "Choose PDFs" }).click();
-			await (await chooser).setFiles(FIXTURE_PDF);
+			await (await chooser).setFiles(WHAT_IS_WIKIFY_PDF);
 			await dialog.getByLabel("Title").fill(title);
 			await dialog.getByRole("button", { name: "Start", exact: true }).click();
 
@@ -142,7 +138,7 @@ test.describe("parse", () => {
 			test.setTimeout(QUEUE_WAIT + 2 * PARSE_TIMEOUT);
 			const project = await createProject(api, `${AREA_PREFIX} logs`);
 			const title = `${AREA_PREFIX} logs`;
-			const importName = await startImport(api, { title, project });
+			const importName = await startImport(api, { title, project, pdf: WHAT_IS_WIKIFY_PDF });
 
 			await page.goto(`/wikify/import/${importName}`);
 			await page.getByRole("tab", { name: "Logs" }).click();
@@ -191,7 +187,7 @@ test.describe("parse", () => {
 			test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT + 60_000);
 			title = `${AREA_PREFIX} remediate`;
 			const project = await createProject(api, title);
-			importName = await startImport(api, { title, project });
+			importName = await startImport(api, { title, project, pdf: WHAT_IS_WIKIFY_PDF });
 			sourceDocument = (await waitForImport(api, importName, "Review", QUEUE_WAIT + PARSE_TIMEOUT))
 				.source_document;
 			const parsedPages = await pageState(api, sourceDocument);
@@ -202,7 +198,7 @@ test.describe("parse", () => {
 			const seqBefore = await lastLogSeq(api, importName);
 			await page.goto(`/wikify/import/${importName}`);
 			await expect(page.getByRole("heading", { name: title })).toBeVisible();
-			await page.getByRole("button", { name: "Remediate" }).click();
+			await page.getByRole("button", { name: "Actions", exact: true }).click();
 			await page.getByRole("menuitem", { name: menuItem }).click();
 			await waitForValue(api, "Wikify Import", importName, "status", "Remediating", {
 				timeout: 30_000,
@@ -218,7 +214,6 @@ test.describe("parse", () => {
 				annotation: { type: "issue", description: "https://github.com/bwhtech/wikify/issues/31" },
 			},
 			async ({ page, api }) => {
-				test.fail(); // known failure: #31. Remove test.fail() when the issue is closed.
 				test.setTimeout(QUEUE_WAIT + REMEDIATE_TIMEOUT + 120_000);
 				const parsed = await pageState(api, sourceDocument);
 				// A clean parse flags no page, and then "Remediate flagged" has nothing to run on.
@@ -259,6 +254,7 @@ test.describe("parse", () => {
 							canonical_source,
 							canonical_composite,
 						}));
+				test.fail(); // known failure: #31. Remove test.fail() when the issue is closed.
 				expect(
 					canonical(await pageState(api, sourceDocument)),
 					"passed pages keep their canonical read",
@@ -321,20 +317,27 @@ test.describe("parse", () => {
 				],
 			},
 			async ({ page, api }) => {
-				test.fail(); // known failure: #33, #50. Remove test.fail() when the issues are closed.
 				test.setTimeout(QUEUE_WAIT + REMEDIATE_TIMEOUT);
 				expect(await api.getValue("Wikify Import", importName, "status")).toBe("Review");
 				const seqBefore = await lastLogSeq(api, importName);
 
 				await page.goto(`/wikify/import/${importName}`);
 				await expect(page.getByRole("heading", { name: title })).toBeVisible();
-				const remediate = page.getByRole("button", { name: "Remediate" });
-				await expect(remediate).toBeVisible();
-				const headerControl = page.getByRole("button", { name: /Reclassify/ });
-				if (!(await headerControl.isVisible())) await remediate.click();
-				const control = headerControl.or(page.getByRole("menuitem", { name: /Reclassify/ }));
-				await expect(control, "a Reclassify control on the import page").toBeVisible();
-				await control.click();
+				await page.getByRole("button", { name: "Actions", exact: true }).click();
+				await page.getByRole("menuitem", { name: "Reclassify sections" }).click();
+				const confirm = page.getByRole("dialog");
+				await expect(confirm.getByText("Reclassify sections", { exact: true })).toBeVisible();
+				await confirm.getByRole("button", { name: "Reclassify", exact: true }).click();
+				await expect(confirm).toBeHidden();
+				// The toast disappears after a few seconds, so watch for it while the job runs.
+				const toastShown = page
+					.getByRole("region", { name: /Notifications/ })
+					.getByText("Sections reclassified")
+					.waitFor({ timeout: QUEUE_WAIT + REMEDIATE_TIMEOUT / 2 })
+					.then(
+						() => true,
+						() => false,
+					);
 
 				const entries = await waitFor(
 					async () =>
@@ -354,9 +357,7 @@ test.describe("parse", () => {
 				for (const section of sections)
 					expect(classified).toContain(`${section.title} → ${section.section_type}`);
 				expect(await api.getValue("Wikify Import", importName, "status")).toBe("Review");
-				await expect(
-					page.getByRole("region", { name: /Notifications/ }).getByText(/classif/i),
-				).toBeVisible();
+				expect(await toastShown, "a Sections reclassified toast").toBe(true);
 			},
 		);
 	});
@@ -370,7 +371,7 @@ test.describe("parse", () => {
 		async () => {
 			test.fixme(
 				true,
-				"needs a 400-page client PDF and over an hour of the only worker; the job is killed at its 3600 s RQ timeout (#22)",
+				"no public 400-page PDF in the suite; #22 (the 1 h job timeout) is fixed, so this needs only a large CC-licensed fixture",
 			);
 		},
 	);
@@ -441,10 +442,5 @@ test.describe("parse", () => {
 				await expect(page.getByRole("button", { name: "Actions", exact: true })).toHaveCount(0);
 			},
 		);
-
-		test.afterAll(async ({ api }) => {
-			test.setTimeout(QUEUE_WAIT);
-			await deleteTestProjects(api, PR_PREFIX);
-		});
 	});
 });

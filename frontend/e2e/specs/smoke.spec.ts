@@ -1,8 +1,8 @@
 import type { Page } from "@playwright/test";
 import type { Row } from "../helpers/api";
 import { iconButton, waitForTurn } from "../helpers/assistant";
-import { deleteTestProjects } from "../helpers/cleanup";
-import { env, FIXTURE_PDF, PREFIX } from "../helpers/env";
+import { env, PREFIX } from "../helpers/env";
+import { writePdfs } from "../helpers/pdf";
 import { expect, test } from "../helpers/test";
 import {
 	childOrder,
@@ -15,7 +15,15 @@ import {
 } from "../helpers/tree";
 import { pickInDialog } from "../helpers/upload";
 import { waitFor } from "../helpers/wait";
-import { findFigure, outline, pageRows, sectionRows, waitForImport } from "../helpers/wikify";
+import {
+	cloneImport,
+	createProject,
+	findFigure,
+	outline,
+	pageRows,
+	sectionRows,
+	waitForImport,
+} from "../helpers/wikify";
 
 const stamp = Date.now();
 const NAME = `${PREFIX} smoke ${stamp}`;
@@ -26,6 +34,7 @@ const IMAGE_TAG = /!\[([^\]]*)\]\(([^)]*)\)/g;
 
 const run = {
 	project: "",
+	upload: "",
 	import: "",
 	sourceDocument: "",
 	renamed: "",
@@ -34,23 +43,17 @@ const run = {
 };
 
 // The start of the first plain paragraph, cut before any inline markup so it matches the rendered text.
-function plainSnippet(markdown: string): string {
+function plainSnippet(markdown: string): string | undefined {
 	for (const block of markdown.split(/\n\s*\n/)) {
 		const text = block.trim().replace(/\s+/g, " ");
 		if (/^(#|!\[|<|\||-|\*|>|\d)/.test(text)) continue;
 		const plain = text.split(/[*_`[\]&<]/)[0].trim();
 		if (plain.length >= 20) return plain.slice(0, 60);
 	}
-	throw new Error(`No plain paragraph in ${JSON.stringify(markdown.slice(0, 200))}`);
 }
 
 test.describe("smoke", () => {
 	test.describe.configure({ mode: "serial" });
-
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(QUEUE_TIMEOUT);
-		await deleteTestProjects(api, NAME);
-	});
 
 	test.describe("login", () => {
 		test.use({ storageState: { cookies: [], origins: [] } });
@@ -82,56 +85,64 @@ test.describe("smoke", () => {
 	test(
 		"S-02 upload a PDF into a new project and parse it",
 		{ tag: ["@smoke", "@upload"] },
-		async ({ page, api }) => {
+		async ({ page, api }, testInfo) => {
 			test.setTimeout(QUEUE_TIMEOUT + 300_000);
+			const uploadName = `${NAME} upload`;
+			const [pdf] = writePdfs(testInfo.outputPath("pdfs"), [uploadName]);
 			await page.goto("/wikify/");
 			await page.getByRole("button", { name: "New Project" }).first().click();
 			const projectDialog = page.getByRole("dialog");
-			await projectDialog.getByLabel("Project name").fill(NAME);
+			await projectDialog.getByLabel("Project name").fill(uploadName);
 			await projectDialog.getByRole("button", { name: "Create" }).click();
 			await expect(page).toHaveURL(/\/wikify\/project\/PRJ-[\d-]+$/);
-			run.project = decodeURIComponent(page.url().split("/").pop()!);
+			const project = decodeURIComponent(page.url().split("/").pop()!);
 
 			await page.getByRole("button", { name: "New Document" }).first().click();
 			const dialog = page.getByRole("dialog");
-			await expect(dialog.getByLabel("Project")).toContainText(NAME);
-			await pickInDialog(page, FIXTURE_PDF);
-			await dialog.getByLabel("Title").fill(NAME);
+			await expect(dialog.getByLabel("Project")).toContainText(uploadName);
+			await pickInDialog(page, pdf);
+			await dialog.getByLabel("Title").fill(uploadName);
 			await dialog.getByRole("button", { name: "Start", exact: true }).click();
 			await expect(page).toHaveURL(/\/wikify\/import\/IMP-[\d-]+$/);
-			run.import = decodeURIComponent(page.url().split("/").pop()!);
-			await expect(page.getByRole("heading", { name: NAME })).toBeVisible();
+			run.upload = decodeURIComponent(page.url().split("/").pop()!);
+			await expect(page.getByRole("heading", { name: uploadName })).toBeVisible();
 
-			const imp = await waitForImport(api, run.import, "Review", QUEUE_TIMEOUT);
+			const imp = await waitForImport(api, run.upload, "Review", QUEUE_TIMEOUT);
 			expect(imp.error).toBeFalsy();
-			expect(imp.stage_label).toBe("Parsed 6 pages");
-			expect(await api.getValue("Wikify Import", run.import, ["project", "import_title"])).toEqual(
-				{
-					project: run.project,
-					import_title: NAME,
-				},
-			);
-			run.sourceDocument = imp.source_document;
+			expect(
+				await api.getValue("Wikify Import", run.upload, ["project", "import_title", "page_count"]),
+			).toEqual({ project, import_title: uploadName, page_count: 1 });
+			expect(await pageRows(api, imp.source_document)).toHaveLength(1);
 		},
 	);
 
 	test(
 		"S-03 Pages tab shows result markdown for every page",
 		{ tag: ["@smoke", "@tree"] },
-		async ({ page, api }) => {
+		async ({ page, api, fixture }) => {
+			run.project = await createProject(api, NAME);
+			({ import: run.import, sourceDocument: run.sourceDocument } = await cloneImport(
+				api,
+				fixture.source.import,
+				{ title: NAME, project: run.project },
+			));
 			const pages = await pageRows(api, run.sourceDocument);
-			expect(pages).toHaveLength(6);
+			expect(pages).toHaveLength(await api.getValue("Wikify Import", run.import, "page_count"));
 			for (const row of pages)
 				expect(row.canonical_markdown?.trim(), `page ${row.page_no}`).toBeTruthy();
 			const flagged = pages.filter((row) => row.verdict !== "pass").length;
 
 			await page.goto(`/wikify/import/${run.import}/pages`);
-			await expect(page.getByRole("button", { name: "All (6)" })).toBeVisible();
+			await expect(page.getByRole("button", { name: `All (${pages.length})` })).toBeVisible();
 			await expect(page.getByRole("button", { name: `Flagged (${flagged})` })).toBeVisible();
-			await expect(page.getByRole("button", { name: `Passed (${6 - flagged})` })).toBeVisible();
+			await expect(
+				page.getByRole("button", { name: `Passed (${pages.length - flagged})` }),
+			).toBeVisible();
 			for (const row of pages) {
+				const snippet = plainSnippet(row.canonical_markdown);
+				if (!snippet) continue;
 				await page.getByRole("button", { name: new RegExp(`^Page ${row.page_no}\\b`) }).click();
-				await expect(page.getByText(plainSnippet(row.canonical_markdown))).toBeVisible();
+				await expect(page.getByText(snippet)).toBeVisible();
 			}
 		},
 	);
@@ -142,8 +153,12 @@ test.describe("smoke", () => {
 		async ({ page, api }) => {
 			const { rows: before, root, children: childRows } = await outline(api, run.sourceDocument);
 			const children = childRows.map((row) => row.name);
-			const renamed = childRows[2];
-			const excluded = childRows[3];
+			// S-08 opens the renamed section's wiki page, and a group's route opens its first child instead.
+			const renamed = childRows
+				.slice(0, -1)
+				.find((child) => !before.some((row) => row.parent_source_section === child.name))!;
+			expect(renamed, "a top-level section without children").toBeTruthy();
+			const excluded = [childRows[3], childRows[2]].find((row) => row.name !== renamed.name)!;
 			const moved = children.at(-1)!;
 			const newTitle = `${NAME} renamed`;
 
@@ -173,7 +188,10 @@ test.describe("smoke", () => {
 				sectionRow(page, excluded.name).getByText(excluded.title, { exact: true }),
 			).toHaveCSS("text-decoration-line", "line-through");
 			const heading = root ? [root.name] : [];
-			expect(await rowOrder(page)).toEqual([...heading, moved, ...children.slice(0, -1)]);
+			const shown = (await rowOrder(page)).filter(
+				(name) => name === root?.name || children.includes(name),
+			);
+			expect(shown).toEqual([...heading, moved, ...children.slice(0, -1)]);
 
 			const after = await sectionRows(api, run.sourceDocument);
 			const byName = Object.fromEntries(after.map((row) => [row.name, row]));
@@ -328,14 +346,15 @@ test.describe("smoke", () => {
 	test(
 		"S-09 Ask a question scoped to the project",
 		{ tag: ["@smoke", "@ask", "@llm"] },
-		async ({ page, api }) => {
+		async ({ page, api, fixture }) => {
 			test.setTimeout(QUEUE_TIMEOUT + 300_000);
 			await waitFor(
 				() => api.call("wikify.api.rag.index_status", { project: run.project }),
 				(status) => status.documents === 1,
 				{ timeout: QUEUE_TIMEOUT, interval: 5_000, label: `${run.project} indexed` },
 			);
-			const question = `${NAME} Which AI service does Wikify use, and where does its key live?`;
+			const topic = fixture.source.outline.children[1].title;
+			const question = `${NAME} What does the document say about "${topic}"?`;
 
 			await page.goto("/wikify/ask");
 			await page.getByRole("combobox").click();

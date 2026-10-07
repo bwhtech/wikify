@@ -4,11 +4,21 @@ import { test as base } from "@playwright/test";
 import { Api } from "./api";
 import { STATE_DIR } from "./env";
 
-export type ImportFixture = { import: string; sourceDocument: string; title: string };
+export type OutlineEntry = { name: string; title: string; page_start: number; page_end: number };
+
+export type FixtureOutline = { root: OutlineEntry | null; children: OutlineEntry[] };
+
+export type ImportFixture = {
+	import: string;
+	sourceDocument: string;
+	title: string;
+	outline: FixtureOutline;
+};
 
 export type Fixtures = {
 	project: string;
 	projectName: string;
+	source: ImportFixture;
 	review: ImportFixture;
 	agent: ImportFixture;
 };

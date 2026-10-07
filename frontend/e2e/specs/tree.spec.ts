@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { serverMessage, type Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import {
@@ -13,16 +12,15 @@ import {
 	waitForSectionCall,
 } from "../helpers/tree";
 import {
+	cloneImport,
 	createProject,
-	FIXTURE_ROOT,
-	FIXTURE_SECTIONS,
-	findSection,
 	outline,
 	sectionRows,
-	startImport,
 	waitForImport,
 	type SectionRow,
 } from "../helpers/wikify";
+
+const IMAGE_TAG = /!\[[^\]]*\]\([^)]+\)/g;
 
 async function expectStruck(page: Page, rows: SectionRow[], struck: boolean): Promise<void> {
 	for (const row of rows) {
@@ -63,20 +61,17 @@ async function restoreTree(
 			});
 		}
 	}
-	const root = original.find((row) => !row.parent_source_section)!;
-	const childOrder = original
-		.filter((row) => row.parent_source_section === root.name)
-		.map((row) => row.name);
-	const currentOrder = (await sectionRows(api, sourceDocument))
-		.filter((row) => row.parent_source_section === root.name)
-		.map((row) => row.name);
-	if (JSON.stringify(currentOrder) !== JSON.stringify(childOrder)) {
-		await api.call("wikify.api.sections.reorder_section", {
-			name: childOrder[0],
-			new_parent: root.name,
-			new_index: 0,
-			siblings: childOrder,
-		});
+	const latest = await sectionRows(api, sourceDocument);
+	for (const parent of new Set(original.map((row) => row.parent_source_section || undefined))) {
+		const siblings = childOrder(original, parent);
+		if (JSON.stringify(childOrder(latest, parent)) !== JSON.stringify(siblings)) {
+			await api.call("wikify.api.sections.reorder_section", {
+				name: siblings[0],
+				new_parent: parent ?? "",
+				new_index: 0,
+				siblings,
+			});
+		}
 	}
 }
 
@@ -95,7 +90,7 @@ test.describe("tree", () => {
 		"F-TREE-01 rename persists after reload",
 		{ tag: ["@functional", "@tree", "@sanity"] },
 		async ({ page, api, fixture }) => {
-			const section = await findSection(api, fixture.review.sourceDocument, FIXTURE_SECTIONS[2]);
+			const section = fixture.review.outline.children[2];
 			const newTitle = `${PREFIX} tree ${Date.now()} renamed`;
 			const renameCalls: string[] = [];
 			page.on("request", (request) => {
@@ -132,8 +127,9 @@ test.describe("tree", () => {
 		"F-TREE-02 exclude a parent section strikes it and its children",
 		{ tag: ["@functional", "@tree", "@sanity"] },
 		async ({ page, api, fixture }) => {
+			const root = fixture.review.outline.root!;
+			test.skip(!root, "this parse has no root section");
 			const rows = await sectionRows(api, fixture.review.sourceDocument);
-			const root = rows.find((row) => row.title === FIXTURE_ROOT && !row.parent_source_section)!;
 			const subtree = rows.filter(
 				(row) => row.name === root.name || row.parent_source_section === root.name,
 			);
@@ -159,8 +155,9 @@ test.describe("tree", () => {
 		"F-TREE-03 include the parent section again",
 		{ tag: ["@functional", "@tree"] },
 		async ({ page, api, fixture }) => {
+			const root = fixture.review.outline.root!;
+			test.skip(!root, "this parse has no root section");
 			const rows = await sectionRows(api, fixture.review.sourceDocument);
-			const root = rows.find((row) => row.title === FIXTURE_ROOT && !row.parent_source_section)!;
 			const subtree = rows.filter(
 				(row) => row.name === root.name || row.parent_source_section === root.name,
 			);
@@ -236,9 +233,12 @@ test.describe("tree", () => {
 		{ tag: ["@functional", "@tree"] },
 		async ({ page, api, fixture }) => {
 			const sourceDocument = fixture.review.sourceDocument;
-			const root = original.find((row) => !row.parent_source_section)!;
-			const children = childOrder(original, root.name);
+			const root = fixture.review.outline.root?.name;
+			const children = childOrder(original, root);
 			const moved = children.at(-1)!;
+			const heading = root ? [root] : [];
+			const shownOrder = async () =>
+				(await rowOrder(page)).filter((name) => name === root || children.includes(name));
 			const others = children.slice(0, -1);
 			let reorderCalls = 0;
 			page.on("request", (request) => {
@@ -256,9 +256,9 @@ test.describe("tree", () => {
 			expect(reorderCalls).toBe(1);
 			await page.reload();
 			await expect(sectionRow(page, moved)).toBeVisible();
-			expect(await rowOrder(page)).toEqual([root.name, moved, ...others]);
+			expect(await shownOrder()).toEqual([...heading, moved, ...others]);
 			let after = await sectionRows(api, sourceDocument);
-			expect(childOrder(after, root.name)).toEqual([moved, ...others]);
+			expect(childOrder(after, root)).toEqual([moved, ...others]);
 			expect(after.find((row) => row.name === moved)!.sort_order).toBe(0);
 
 			saved = waitForSectionCall(page, "reorder_section");
@@ -267,12 +267,11 @@ test.describe("tree", () => {
 			expect(reorderCalls).toBe(2);
 			await page.reload();
 			await expect(sectionRow(page, moved)).toBeVisible();
-			expect(await rowOrder(page)).toEqual([root.name, ...others, moved]);
+			expect(await shownOrder()).toEqual([...heading, ...others, moved]);
 			after = await sectionRows(api, sourceDocument);
-			expect(childOrder(after, root.name)).toEqual([...others, moved]);
-			expect(after.find((row) => row.name === moved)!.lft).toBe(
-				Math.max(...after.map((row) => row.lft)),
-			);
+			expect(childOrder(after, root)).toEqual([...others, moved]);
+			const siblingLft = after.filter((row) => children.includes(row.name)).map((row) => row.lft);
+			expect(after.find((row) => row.name === moved)!.lft).toBe(Math.max(...siblingLft));
 		},
 	);
 
@@ -280,19 +279,33 @@ test.describe("tree", () => {
 		"F-TREE-06 preview a section in the Wiki tab",
 		{ tag: ["@functional", "@tree"] },
 		async ({ page, api, fixture }) => {
-			const section = await findSection(api, fixture.review.sourceDocument, FIXTURE_SECTIONS[0]);
+			const names = fixture.review.outline.children.map((child) => child.name);
+			const rows = await sectionRows(api, fixture.review.sourceDocument);
+			const withFigure = rows.filter((row) => row.markdown?.match(IMAGE_TAG));
+			// Top-level sections of a long chapter are often groups whose figures sit in their children.
+			const section =
+				withFigure.find((row) => names.includes(row.name)) ??
+				withFigure.find((row) => row.parent_source_section)!;
+			expect(section, "a section with a figure").toBeTruthy();
+			const ancestors: string[] = [];
+			for (
+				let parent = section.parent_source_section;
+				parent;
+				parent = rows.find((row) => row.name === parent)!.parent_source_section
+			)
+				ancestors.unshift(rows.find((row) => row.name === parent)!.title);
+			const imageCount = section.markdown.match(IMAGE_TAG)!.length;
 			const documentTitle = await api.getValue(
 				"Source Document",
 				fixture.review.sourceDocument,
 				"title",
 			);
-			expect(section.markdown.match(/!\[/g)).toHaveLength(2);
 
 			await openTree(page, fixture.review.import, section.name);
 			await sectionRow(page, section.name).getByText(section.title, { exact: true }).click();
 
 			await expect(page.getByRole("radio", { name: "Rendered" })).toBeChecked();
-			const crumbs = [fixture.projectName, documentTitle, FIXTURE_ROOT, section.title];
+			const crumbs = [fixture.projectName, documentTitle, ...ancestors, section.title];
 			await expect(page.getByRole("navigation").filter({ hasText: documentTitle })).toHaveText(
 				new RegExp(
 					`^${crumbs.map((crumb) => crumb.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*›\\s*")}$`,
@@ -302,7 +315,7 @@ test.describe("tree", () => {
 			await expect(article.getByRole("heading", { level: 1, name: section.title })).toBeVisible();
 			await expect(article.locator("p").first()).not.toBeEmpty();
 			const images = article.locator("img");
-			await expect(images).toHaveCount(2);
+			await expect(images).toHaveCount(imageCount);
 			for (const image of await images.all()) {
 				await image.scrollIntoViewIfNeeded();
 				await expect
@@ -316,24 +329,16 @@ test.describe("tree", () => {
 test.describe("tree after publish", () => {
 	const stamp = Date.now();
 	const name = `${PREFIX} tree ${stamp}`;
-	test.afterAll(async ({ api }) => {
-		test.setTimeout(1_500_000);
-		await deleteTestProjects(api, name);
-	});
-
 	test(
 		"F-TREE-07 edits after publish are rejected",
 		{ tag: ["@negative", "@tree"] },
-		async ({ page, api }) => {
+		async ({ page, api, fixture }) => {
 			test.setTimeout(2_700_000);
 			const project = await createProject(api, name);
-			const importName = await startImport(api, { title: name, project });
-			// One worker serves every agent's parses, so this parse can sit in Queued for a long while.
-			const { source_document: sourceDocument } = await waitForImport(
+			const { import: importName, sourceDocument } = await cloneImport(
 				api,
-				importName,
-				"Review",
-				1_800_000,
+				fixture.source.import,
+				{ title: name, project },
 			);
 			const { rows: sections, root, children: childRows } = await outline(api, sourceDocument);
 			const children = childRows.map((row) => row.name);
@@ -346,7 +351,7 @@ test.describe("tree after publish", () => {
 				import_name: importName,
 				new_space: { space_name: name, route: `test-tree-${stamp}` },
 			});
-			await waitForImport(api, importName, "Completed");
+			await waitForImport(api, importName, "Completed", 1_800_000);
 			const before = await sectionRows(api, sourceDocument);
 
 			let reorderCalls = 0;

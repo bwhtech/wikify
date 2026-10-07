@@ -9,11 +9,15 @@ on:
       - .github/workflows/e2e.yml
       - .github/actions/e2e-site/**
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   playwright:
     name: Playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 300
     permissions:
       contents: read
       issues: write
@@ -95,6 +99,14 @@ jobs:
           free -m
           echo "Peak used memory (MB): $(sort -n ~/memory-used.log | tail -n 1)"
 
+      - name: Save the Error Log
+        if: always()
+        working-directory: /home/runner/frappe-bench
+        run: |
+          bench --site wikify.localhost execute frappe.get_all \
+            --kwargs "{'doctype': 'Error Log', 'fields': ['creation', 'method', 'error'], 'order_by': 'creation desc', 'limit_page_length': 50}" \
+            > logs/e2e-error-log.json 2>&1 || true
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v7
@@ -110,7 +122,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: bench-logs
-          path: /home/runner/frappe-bench/logs/*.log
+          path: |
+            /home/runner/frappe-bench/logs/*.log
+            /home/runner/frappe-bench/logs/e2e-error-log.json
           if-no-files-found: ignore
 
       - name: Report a failed weekly run
