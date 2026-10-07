@@ -20,7 +20,7 @@ from collections.abc import Callable
 
 import frappe
 
-from wikify.engine import llm, store
+from wikify.engine import images, llm, store
 from wikify.engine.classify import classify_document
 from wikify.engine.lint import repair_markdown
 from wikify.engine.loader.cleanup import clean_pages
@@ -32,7 +32,7 @@ from wikify.engine.loader.toc import toc_level_map
 def sectionize_document(source_document: str, pdf_path: str, project_context: str = "") -> int:
 	"""Rebuild the Source Section tree from the doc's canonical pages. Returns the count."""
 	level_map = toc_level_map(str(pdf_path))
-	pages = clean_pages(store.get_canonical_pages(source_document))
+	pages = clean_pages(images.drop_figure_echoes(store.get_canonical_pages(source_document), pdf_path))
 	sections = plan_pages(
 		sectionize(pages, level_map),
 		project_context,

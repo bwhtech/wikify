@@ -172,6 +172,42 @@ class TestTranscribedFigures(FrappeTestCase):
 		self.assertEqual(drop_transcribed_figures(markdown), markdown)
 
 
+class TestFigureEchoes(FrappeTestCase):
+	def test_drops_labels_read_off_the_picture_and_keeps_the_printed_text(self):
+		body = [
+			"Figure 2 . Anatomy of lumbar spine",
+			"Prep and drape the area after identifying landmarks. Use lidocaine 1% with or without",
+			"epinephrine to anesthetize the skin and the deeper tissues under the insertion site",
+			"Assemble needle and manometer. Attach the 3-way stopcock to manometer",
+		]
+		path = Path(tempfile.mkdtemp()) / "procedure.pdf"
+		document = fitz.open()
+		page = document.new_page(width=612, height=792)
+		page.insert_image(CHART_RECT, pixmap=solid_pixmap(600, 400, (200, 60, 30)))
+		for offset, line in enumerate(body):
+			page.insert_text((72, 530 + 16 * offset), line, fontsize=10)
+		document.save(str(path))
+		markdown = (
+			"![Figure 2 . Anatomy of lumbar spine](/private/files/page-0348-crop.png)\n\n"
+			"Puncture site (L4-5 interspace)\n\nLevel of posterior superior iliac crests\n\nL5 L4 L3\n\n"
+			"Figure 2 . Anatomy of lumbar spine\n\n"
+			"Prep and drape the area after identifying landmarks. Use lidocaine 1% with or without epinephrine "
+			"to anesthetize the skin and the deeper tissues under the insertion site\n\n"
+			"Assemble needle and manometer. Attach the 3-way stopcock to manometer"
+		)
+
+		[(_, cleaned)] = images.drop_figure_echoes([(1, markdown)], str(path))
+
+		self.assertEqual(
+			cleaned,
+			"![Figure 2 . Anatomy of lumbar spine](/private/files/page-0348-crop.png)\n\n"
+			"Figure 2 . Anatomy of lumbar spine\n\n"
+			"Prep and drape the area after identifying landmarks. Use lidocaine 1% with or without epinephrine "
+			"to anesthetize the skin and the deeper tissues under the insertion site\n\n"
+			"Assemble needle and manometer. Attach the 3-way stopcock to manometer",
+		)
+
+
 class TestFigureRemediation(FrappeTestCase):
 	def setUp(self):
 		real_get = engine_settings.get

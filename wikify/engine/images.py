@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 
@@ -21,6 +22,12 @@ MAX_CAPTION_CHARS = 120
 ANCHOR_LENGTHS = (60, 25)
 MIN_ANCHOR_CHARS = 12
 EDGE_TOLERANCE = 2.0
+MAX_ECHO_CHARS = 120
+MIN_TEXT_LAYER_CHARS = 200
+_IMAGE_LINE_RE = re.compile(r"^\s*!\[[^\]]*\]\([^)]*\)\s*$")
+_ECHO_BLOCKER_RE = re.compile(r"^\s*(?:[|<!#>]|```|[-*+]\s|\d+[.)]\s)")
+_WORD_RE = re.compile(r"\w{3,}")
+_TRANSCRIPTION_START_RE = re.compile(r"^\s*(?:\||<table|```)")
 
 FIGURE_TOKEN_RE = re.compile(r"\[\[FIGURE (\d+)(?::[ \t]*([^\]\n]*))?\]\]")
 _CAPTION_RE = re.compile(
@@ -231,6 +238,58 @@ def searchable(markdown: str) -> tuple[str, list[int]]:
 
 def normalized(text: str) -> str:
 	return "".join(character.lower() for character in text if character.isalnum())
+
+
+def layer_text(text: str) -> str:
+	return unicodedata.normalize("NFKC", text)
+
+
+def is_echo(line: str, page_text: str, page_words: set[str]) -> bool:
+	"""A short line the parser read off the picture itself: neither the line nor most of its words are
+	anywhere in the page's text layer, so it can only be a label or caption drawn inside the image."""
+	text = line.strip()
+	if not text or len(text) > MAX_ECHO_CHARS or _ECHO_BLOCKER_RE.match(text):
+		return False
+	if normalized(layer_text(text)) in page_text:
+		return False
+	words = {word.lower() for word in _WORD_RE.findall(layer_text(text))}
+	return len(words & page_words) * 2 < len(words) or not words
+
+
+def drop_echoes_after_figures(markdown: str, page_text: str) -> str:
+	page_words = {word.lower() for word in _WORD_RE.findall(layer_text(page_text))}
+	page_text = normalized(layer_text(page_text))
+	lines = markdown.splitlines()
+	drop: set[int] = set()
+	for index, line in enumerate(lines):
+		if not _IMAGE_LINE_RE.match(line):
+			continue
+		echoes = []
+		following = index + 1
+		while following < len(lines) and (
+			not lines[following].strip() or is_echo(lines[following], page_text, page_words)
+		):
+			if lines[following].strip():
+				echoes.append(following)
+			following += 1
+		if following == len(lines) or not _TRANSCRIPTION_START_RE.match(lines[following]):
+			drop.update(echoes)
+	if not drop:
+		return markdown
+	return re.sub(r"\n{3,}", "\n\n", "\n".join(line for index, line in enumerate(lines) if index not in drop))
+
+
+def drop_figure_echoes(pages: list[tuple[int, str]], pdf_path: str) -> list[tuple[int, str]]:
+	"""Drop the labels and captions a parser copied out of a picture into the text after it. Only on pages
+	with a text layer to check against, since on a scanned page every line would look drawn."""
+	with fitz.open(pdf_path) as pdf_document:
+		cleaned = []
+		for page_no, markdown in pages:
+			page_text = pdf_document[page_no - 1].get_text() if 0 < page_no <= pdf_document.page_count else ""
+			if "![" in markdown and len(normalized(layer_text(page_text))) >= MIN_TEXT_LAYER_CHARS:
+				markdown = drop_echoes_after_figures(markdown, page_text)
+			cleaned.append((page_no, markdown))
+	return cleaned
 
 
 def enclosing_block(markdown: str, index: int) -> tuple[int, int] | None:
