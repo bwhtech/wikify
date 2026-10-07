@@ -127,6 +127,32 @@ function confirmReclassify() {
 	});
 }
 
+// A killed worker leaves the import in Parsing/Remediating with no job behind it.
+const canResume = useCall({
+	url: "/api/v2/method/wikify.api.imports.can_resume_import",
+	method: "GET",
+	immediate: false,
+});
+const isRunningStatus = computed(() => ["Parsing", "Remediating"].includes(status.value));
+const isStuck = computed(() => isRunningStatus.value && canResume.data === true);
+watch(
+	status,
+	() => {
+		if (isRunningStatus.value) canResume.submit({ import_name: props.name });
+	},
+	{ immediate: true }
+);
+const resume = useCall({
+	url: "/api/v2/method/wikify.api.imports.resume_import",
+	method: "POST",
+	immediate: false,
+});
+async function resumeImport() {
+	await resume.submit({ import_name: props.name });
+	if (resume.error) toast.error(resume.error?.messages?.[0] || "Could not resume the import");
+	await canResume.submit({ import_name: props.name });
+}
+
 // Attach the document (with its project) as the agent's default context. Keyed on the
 // source_document id so reloads (progress ticks) don't reset a page/section selection.
 watch(
@@ -309,8 +335,13 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:route="{ name: 'ImportGraph', params: { name: props.name } }"
 					/>
 					<Dropdown
-						v-if="canRemediate || canReclassify"
+						v-if="canRemediate || canReclassify || isStuck"
 						:options="[
+							{
+								label: 'Resume import',
+								onClick: resumeImport,
+								condition: () => isStuck,
+							},
 							{
 								label: 'Remediate flagged',
 								onClick: () => runRemediation('flagged'),
@@ -333,7 +364,7 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 							theme="gray"
 							v-bind="actionButtonProps(isMobile, 'lucide-wand-sparkles', 'Actions')"
 							:icon-right="isMobile ? undefined : 'lucide-chevron-down'"
-							:loading="remediate.loading"
+							:loading="remediate.loading || resume.loading"
 						/>
 					</Dropdown>
 					<Dropdown
