@@ -164,12 +164,14 @@ def page_figures(page, repeated: set[bytes], page_name: str, page_no: int) -> li
 def figure_hint(figures: list[Figure]) -> str:
 	if not figures:
 		return ""
-	positions = "\n".join(
-		f"- Figure {number}: {figure.bbox[1] / figure.page_size[1]:.0%} to "
-		f"{figure.bbox[3] / figure.page_size[1]:.0%} down the page, "
-		f"{figure.bbox[0] / figure.page_size[0]:.0%} to {figure.bbox[2] / figure.page_size[0]:.0%} across"
-		for number, figure in enumerate(figures, start=1)
-	)
+	lines = []
+	for number, figure in enumerate(figures, start=1):
+		width, height = figure.page_size
+		left, top, right, bottom = figure.bbox
+		down = f"{top / height:.0%} to {bottom / height:.0%} down the page"
+		across = f"{left / width:.0%} to {right / width:.0%} across"
+		lines.append(f"- Figure {number}: {down}, {across}")
+	positions = "\n".join(lines)
 	return (
 		f"\n\nFIGURES: this page has {len(figures)} picture(s) that are cropped from the PDF and shown "
 		f"as images, numbered top to bottom:\n{positions}\n"

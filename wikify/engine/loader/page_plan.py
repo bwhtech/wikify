@@ -199,10 +199,13 @@ def split_long_pages(
 			subtree_words[parent] += subtree_words[index]
 	pages = set(pages)
 	queue = sorted(pages)
-	for page in queue:
-		folded = [page]
-		for index in folded:
-			folded.extend(child for child in children[index] if child not in pages)
+	while queue:
+		page = queue.pop(0)
+		folded, pending = [], [page]
+		while pending:
+			index = pending.pop()
+			folded.append(index)
+			pending.extend(child for child in children[index] if child not in pages)
 		words = sum(len(sections[index].markdown.split()) for index in folded)
 		pdf_pages = max(sections[index].page_end for index in folded) - sections[page].page_start + 1
 		if words <= MAX_PAGE_WORDS and pdf_pages <= MAX_PAGE_PDF_PAGES:

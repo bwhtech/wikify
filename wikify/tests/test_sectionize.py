@@ -178,14 +178,12 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual(paths["3.2 Unit head"], ["3. JOB DESCRIPTIONS", "3.2 Unit head"])
 
 	def test_bold_line_continuing_the_numbering_is_a_heading(self):
-		pages = [
-			(
-				1,
-				"## 5.8.6 Blood Donation\na\n### 5.8.6.2 Donor criteria\nb\n"
-				"**5.8.6.3 Requesting blood from blood bank**\n**For use in ward**\nc\n"
-				"**5.8.6.4 For use in OR**\nd\n**1. Not a heading**\ne",
-			)
-		]
+		markdown = (
+			"## 5.8.6 Blood Donation\na\n### 5.8.6.2 Donor criteria\nb\n"
+			"**5.8.6.3 Requesting blood from blood bank**\n**For use in ward**\nc\n"
+			"**5.8.6.4 For use in OR**\nd\n**1. Not a heading**\ne"
+		)
+		pages = [(1, markdown)]
 		secs = sectionize(pages)
 		self.assertEqual(
 			[(s.title, s.level) for s in secs],
@@ -367,13 +365,11 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual(secs[0].title, "PROCEDURE MANUAL - NEPHROLOGY")
 
 	def test_lowercase_or_colon_heading_is_a_bold_label(self):
-		pages = [
-			(
-				1,
-				"# **IMMEDIATE PRE-OPERATIVE PROTOCOLS**\nintro\n# **are carried out as below:**\n"
-				"- PreHD: WBC\n# **Drug list:**\n- MMF 8 am\n# 5.1 Definitions:\nterms",
-			)
-		]
+		markdown = (
+			"# **IMMEDIATE PRE-OPERATIVE PROTOCOLS**\nintro\n# **are carried out as below:**\n"
+			"- PreHD: WBC\n# **Drug list:**\n- MMF 8 am\n# 5.1 Definitions:\nterms"
+		)
+		pages = [(1, markdown)]
 		secs = sectionize(pages)
 		self.assertEqual([s.title for s in secs], ["IMMEDIATE PRE-OPERATIVE PROTOCOLS", "5.1 Definitions:"])
 		self.assertIn("**are carried out as below:**\n- PreHD: WBC\n**Drug list:**", secs[0].markdown)
@@ -488,22 +484,22 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("**CRRT Order sheet :**", secs[0].markdown)
 
 	def test_numbered_list_items_inside_a_sub_section_stay_under_it(self):
+		extra_duties = (
+			"# 4. Extra procedures to be performed by the CAPD nurse educator:\n\n- Assist PET\n\n"
+			"# 5. Other responsibilities of the CAPD Nurse educator\n\n- Attend meetings"
+		)
+		administration = (
+			"## 11. Administration\n\n- Plan duty rosters\n\n"
+			"## 3.6.9 RENAL TRANSPLANT CO-ORDINATOR\n\n**Qualification:** nurse"
+		)
 		pages = [
 			(5, "## 3.6.8 CAPD Nurse Educator\n\nThe CAPD nurse educator trains patients."),
 			(
 				7,
 				"# 3. Responsibilities of the CAPD Nurse Educator towards inpatients\n\n- Check the log-book",
 			),
-			(
-				8,
-				"# 4. Extra procedures to be performed by the CAPD nurse educator:\n\n- Assist PET\n\n"
-				"# 5. Other responsibilities of the CAPD Nurse educator\n\n- Attend meetings",
-			),
-			(
-				9,
-				"## 11. Administration\n\n- Plan duty rosters\n\n"
-				"## 3.6.9 RENAL TRANSPLANT CO-ORDINATOR\n\n**Qualification:** nurse",
-			),
+			(8, extra_duties),
+			(9, administration),
 			(13, "## 3.7 Allied Health Staff\n\n### 3.7.1 Pharmacist\n\n- Dispensing"),
 			(14, "# 4. PROTOCOLS\n\n## 4.1 Dialysis\n\n- Prime the circuit"),
 		]
@@ -531,12 +527,12 @@ class TestSectionizer(FrappeTestCase):
 
 	def test_a_parent_heading_met_after_its_sub_sections_becomes_their_group(self):
 		policies = "6.2.1 POLICIES FOR MANAGEMENT OF HEMODIALYSIS"
+		first_page = (
+			"Saline dialysis is reserved for bleeding patients.\n\n"
+			"## 6.2.1.3ASSESSMENT AND MONITORING\n\nPatients develop complications."
+		)
 		pages = [
-			(
-				1,
-				"Saline dialysis is reserved for bleeding patients.\n\n"
-				"## 6.2.1.3ASSESSMENT AND MONITORING\n\nPatients develop complications.",
-			),
+			(1, first_page),
 			(3, "## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\n### AV FISTULA\n\nCannulate with care."),
 			(19, f"# {policies}\n\n## 6.2.1.8 Emergency Dialysis\n\nDialyse within an hour."),
 			(20, f"## {policies}\n\n### 6.2.1.9 Temporary Vascular Access\n\nUse a femoral catheter."),
@@ -581,13 +577,11 @@ class TestSectionizer(FrappeTestCase):
 		self.assertFalse(any("JOB DESCRIPTION" in section.markdown for section in sections))
 
 	def test_a_numbered_section_never_nests_under_another_chapter(self):
-		pages = [
-			(
-				1,
-				"# 3. **Other equipment:** \n\n- Gloves\n\n## Patient Preparation\n\nExplain the procedure.\n\n"
-				"# **6.4.2. CENTRAL VENOUS CATHETERIZATION** \n\n# **Definition** \n\nA double lumen catheter.",
-			)
-		]
+		markdown = (
+			"# 3. **Other equipment:** \n\n- Gloves\n\n## Patient Preparation\n\nExplain the procedure.\n\n"
+			"# **6.4.2. CENTRAL VENOUS CATHETERIZATION** \n\n# **Definition** \n\nA double lumen catheter."
+		)
+		pages = [(1, markdown)]
 		self.assertEqual(
 			[section.hierarchy_path for section in sectionize(pages)],
 			[
@@ -599,13 +593,13 @@ class TestSectionizer(FrappeTestCase):
 		)
 
 	def test_clean_pages_keeps_a_list_continued_on_the_next_page_in_its_place(self):
+		hyperkalemia = (
+			"## 7. HYPERKALEMIA\n\n4. **Drugs:** given on verbal order\n"
+			"   - Administer Inj. Dextrose 50% with Inj. Actrapid.\n"
+			"   - Administer Salbutamol nebulization 5mg.\n\n169"
+		)
 		pages = [
-			(
-				169,
-				"## 7. HYPERKALEMIA\n\n4. **Drugs:** given on verbal order\n"
-				"   - Administer Inj. Dextrose 50% with Inj. Actrapid.\n"
-				"   - Administer Salbutamol nebulization 5mg.\n\n169",
-			),
+			(169, hyperkalemia),
 			(
 				170,
 				"- Keep Inj.Calcium Gluconate 10% ready.\n\n## CENTRAL VENOUS CATHETER BLOCK\n\n- Flush it.\n\n170",
