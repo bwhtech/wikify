@@ -375,4 +375,77 @@ test.describe("parse", () => {
 			);
 		},
 	);
+
+	test.describe("PR #99 retry a failed import", () => {
+		const PR_PREFIX = `${PREFIX} parse W99 ${Date.now()}`;
+		const SEEDED_ERROR = "The background job stopped before finishing.";
+		let project: string;
+
+		test.beforeAll(async ({ api }) => {
+			project = await createProject(api, PR_PREFIX);
+		});
+
+		async function failedImport(api: Api, withDocument: boolean): Promise<string> {
+			const suffix = withDocument ? "retry" : "nodoc";
+			let sourceDocument: string | null = null;
+			if (withDocument) {
+				const doc = await api.call("frappe.client.insert", {
+					doc: { doctype: "Source Document", title: `${PR_PREFIX} ${suffix}` },
+				});
+				sourceDocument = doc.name;
+			}
+			const imp = await api.call("frappe.client.insert", {
+				doc: {
+					doctype: "Wikify Import",
+					import_title: `${PR_PREFIX} ${suffix}`,
+					project,
+					pdf: "/private/files/w99-missing.pdf",
+					source_document: sourceDocument,
+					status: "Failed",
+					error: SEEDED_ERROR,
+				},
+			});
+			return imp.name;
+		}
+
+		test(
+			"W99-1 Remediate is offered on a Failed import and clears the error",
+			{ tag: ["@functional", "@parse"] },
+			async ({ page, api }) => {
+				const importName = await failedImport(api, true);
+				await page.goto(`/wikify/import/${importName}`);
+				await expect(page.getByRole("heading", { name: `${PR_PREFIX} retry` })).toBeVisible();
+
+				await page.getByRole("button", { name: "Actions", exact: true }).click();
+				await page.getByRole("menuitem", { name: "Remediate all pages" }).click();
+
+				await waitFor(
+					() => api.getValue("Wikify Import", importName, ["status", "error"]),
+					(row) => row.error !== SEEDED_ERROR,
+					{ timeout: 30_000, interval: 1_000, label: "seeded error cleared by the retry" },
+				);
+			},
+		);
+
+		test(
+			"W99-2 remediating a Failed import with no parsed document is refused",
+			{ tag: ["@negative", "@parse"] },
+			async ({ page, api }) => {
+				const importName = await failedImport(api, false);
+				await expect(
+					api.call("wikify.api.imports.trigger_remediation", { import_name: importName }),
+				).rejects.toThrow(/parse hasn't produced a document/);
+				expect(await api.getValue("Wikify Import", importName, "status")).toBe("Failed");
+
+				await page.goto(`/wikify/import/${importName}`);
+				await expect(page.getByRole("heading", { name: `${PR_PREFIX} nodoc` })).toBeVisible();
+				await expect(page.getByRole("button", { name: "Actions", exact: true })).toHaveCount(0);
+			},
+		);
+
+		test.afterAll(async ({ api }) => {
+			test.setTimeout(QUEUE_WAIT);
+			await deleteTestProjects(api, PR_PREFIX);
+		});
+	});
 });
