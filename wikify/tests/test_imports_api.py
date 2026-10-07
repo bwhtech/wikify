@@ -243,7 +243,11 @@ class TestResumeImport(FrappeTestCase):
 	def test_a_stuck_import_requeues_its_parse_job(self):
 		for status in ("Parsing", "Remediating"):
 			imp = self.make_import(status)
-			with self.subTest(status=status), patch.object(frappe, "enqueue") as enqueue:
+			with (
+				self.subTest(status=status),
+				patch.object(imports_api, "is_job_enqueued", return_value=False),
+				patch.object(frappe, "enqueue") as enqueue,
+			):
 				self.assertTrue(imports_api.can_resume_import(imp.name))
 				imports_api.resume_import(imp.name)
 
