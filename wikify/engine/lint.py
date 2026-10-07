@@ -138,6 +138,10 @@ _BLANK_RUN_RE = re.compile(r"(?<![\\_])_{3,}")
 _RULE_LINE_RE = re.compile(r"^\s*(?:_\s*){3,}$")
 _HTML_LINE_RE = re.compile(r"^\s*</?[a-zA-Z]")
 _LETTER_START_RE = re.compile(r"^[a-z]{2,}")
+_TRAILING_OPENER_RE = re.compile(r"(?<=\w)\s*[(\[{]+$")
+_BOX_BULLET_RE = re.compile(r"^(\s*[-*+]\s+)[☐□]\s*(?=\S)")
+_LIST_LINE_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
+_FORM_MARK_RE = re.compile(r"[☑☒✓✔]|[☐□].*[☐□]")
 
 
 def _prose_lines(lines: list[str]):
@@ -172,6 +176,8 @@ def _fix_bold_span(before: str, content: str, after: str) -> tuple[str, str, str
 	stripped = content.strip()
 	if not any(char.isalnum() for char in stripped):
 		return before + content, "", after
+	if opener := _TRAILING_OPENER_RE.search(stripped):
+		stripped, after = stripped[: opener.start()], stripped[opener.start() :] + after
 	if len(stripped) == 1 and stripped.isalpha() and after[:1].islower() and not before[-1:].isalnum():
 		return before + stripped, "", after
 	if len(stripped) > 2 and stripped[-2] == " " and stripped[-1].isupper() and after[:1].islower():
@@ -211,6 +217,26 @@ def fix_glued_emphasis(markdown: str) -> str:
 	return "\n".join(lines)
 
 
+def drop_box_bullets(markdown: str) -> str:
+	"""Drop a box a parser read off a bullet glyph (`- ☐ Peritonitis rates`): a bulleted item never needs
+	a second marker. A list where any item is ticked or offers several boxes is a form and is kept."""
+	lines = (markdown or "").split("\n")
+	prose = set(_prose_lines(lines))
+	index = 0
+	while index < len(lines):
+		end = index
+		while end < len(lines) and end in prose and _LIST_LINE_RE.match(lines[end]):
+			end += 1
+		if end == index:
+			index += 1
+			continue
+		if not any(_FORM_MARK_RE.search(lines[line]) for line in range(index, end)):
+			for line in range(index, end):
+				lines[line] = _BOX_BULLET_RE.sub(r"\1", lines[line])
+		index = end
+	return "\n".join(lines)
+
+
 def repair_markdown(markdown: str) -> str:
 	"""Every mechanical repair, in one pass, for the assembled section product."""
-	return fix_glued_emphasis(escape_fill_in_blanks(fix_table_separators(markdown)))
+	return drop_box_bullets(fix_glued_emphasis(escape_fill_in_blanks(fix_table_separators(markdown))))

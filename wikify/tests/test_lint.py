@@ -22,6 +22,7 @@ from wikify.engine.lint import (
 	fix_glued_emphasis,
 	fix_table_separators,
 	lint_markdown,
+	repair_markdown,
 	table_artifacts,
 )
 from wikify.engine.loader.sectionizer import Section
@@ -126,6 +127,30 @@ class TestGluedEmphasis(FrappeTestCase):
 		self.assertEqual(
 			fix_glued_emphasis("**AVF**s and **Artero Venous Fistula (AVF**) is"),
 			"**AVF**s and **Artero Venous Fistula (AVF**) is",
+		)
+
+
+class TestFormattingLeaks(FrappeTestCase):
+	def test_bold_closing_after_a_bracket_and_boxes_read_off_bullets_are_repaired(self):
+		indicators = (
+			"PATIENT RELATED INDICATORS (TARGET)\n\n"
+			"1. **Haemoglobin > 11 g (**In > 80% of patients on PD)\n"
+			"2. **MEASUREMENT AND REPORTING OF PERITONITIS**\n"
+			"   - ☐ Culture - negative peritonitis (< 15 % of all peritonitis episodes)\n"
+			"   - ☐ Pre - PD peritonitis - % of total\n\n"
+			"- ☐ Yes ☐ No\n- ☐ Consent filed\n\n"
+			"- ☑ Catheter flushed\n- ☐ Dressing changed"
+		)
+
+		self.assertEqual(
+			repair_markdown(indicators),
+			"PATIENT RELATED INDICATORS (TARGET)\n\n"
+			"1. **Haemoglobin > 11 g** (In > 80% of patients on PD)\n"
+			"2. **MEASUREMENT AND REPORTING OF PERITONITIS**\n"
+			"   - Culture - negative peritonitis (< 15 % of all peritonitis episodes)\n"
+			"   - Pre - PD peritonitis - % of total\n\n"
+			"- ☐ Yes ☐ No\n- ☐ Consent filed\n\n"
+			"- ☑ Catheter flushed\n- ☐ Dressing changed",
 		)
 
 
