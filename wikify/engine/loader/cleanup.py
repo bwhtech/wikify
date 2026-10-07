@@ -60,6 +60,8 @@ BOILERPLATE_MAX_PAGES = 10
 _NUMBERED_HEADING = re.compile(r"^\s*#{1,6}\s+[*_]*\d+(?:\.\d+)*\.?\s*[A-Za-z]")
 _LIST_ITEM = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+\S")
 _ENUMERATED_TEXT = re.compile(r"^(\d+)[.)]\s")
+_CONTENTS_LINE = re.compile(r"^(\d+(?:\.\d+)+\.?|\d+)\s+(\S.*?)\s*(?:\.{2,}\s*)?(\d{1,4})\s*$")
+MIN_CONTENTS_LINES = 5
 
 
 def _plain(line: str) -> str:
@@ -331,9 +333,42 @@ def reindent_list_continuations(pages: list[tuple[int, str]]) -> list[tuple[int,
 	return [(page_no, "\n".join(lines)) for (page_no, _), lines in zip(pages, page_lines, strict=True)]
 
 
+def _contents_run(lines: list[str], start: int) -> tuple[int, list[re.Match]]:
+	entries: list[re.Match] = []
+	end = start
+	while end < len(lines):
+		entry = _CONTENTS_LINE.match(lines[end].strip())
+		if lines[end].strip() and not entry:
+			break
+		if entry:
+			entries.append(entry)
+		end += 1
+	return end, entries
+
+
+def contents_lines_to_table(md: str) -> str:
+	"""Lay out a run of table-of-contents lines (number, title, page) as a headless table, so the page
+	stitches onto the contents table the pages around it were parsed as."""
+	lines = md.splitlines()
+	out: list[str] = []
+	index = 0
+	while index < len(lines):
+		end, entries = _contents_run(lines, index)
+		if len(entries) < MIN_CONTENTS_LINES:
+			out.append(lines[index])
+			index += 1
+			continue
+		out.extend(["|  |  |  |", "|---|---|---|"])
+		out.extend(f"| {entry.group(1)} | {entry.group(2)} | {entry.group(3)} |" for entry in entries)
+		out.append("")
+		index = end
+	return "\n".join(out)
+
+
 def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
-	stitched = stitch_cross_page_tables(strip_boilerplate(pages, find_boilerplate(pages)))
+	stripped = strip_boilerplate(pages, find_boilerplate(pages))
+	stitched = stitch_cross_page_tables([(page_no, contents_lines_to_table(md)) for page_no, md in stripped])
 	joined = join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
 	return reindent_list_continuations(joined)
 

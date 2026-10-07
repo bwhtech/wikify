@@ -848,6 +848,32 @@ class TestSectionizer(FrappeTestCase):
 		)
 		self.assertEqual(cleaned[213], "Signature of the PD nurse.")
 
+	def test_clean_pages_lays_contents_lines_out_as_the_contents_table_they_continue(self):
+		contents_table = (
+			"# CONTENTS\n\n| S.No | CONTENTS | Pg No |\n|---|---|---|\n"
+			"| 3.5.4 | Fellow in Interventional Nephrology | 46 |\n"
+			"| 3.5.5 | Responsibilities of Dialysis Registrar | 47 |"
+		)
+		contents_lines = (
+			"3.5.6 Transplant registrar 50\n3.5.7 Fellow in Renal Transplantation 51\n3.6 Nursing staff 59\n"
+			"3.6.1 Nurse manager 57\n3.9.1 Hospital Attendant -Posted in clinical Area (A.K. Lab) 88\n"
+			"4 Records maintained 93"
+		)
+		cleaned = dict(clean_pages([(2, contents_table), (3, contents_lines)]))
+		self.assertEqual(
+			cleaned[2],
+			"# CONTENTS\n\n| S.No | CONTENTS | Pg No |\n|---|---|---|\n"
+			"| 3.5.4 | Fellow in Interventional Nephrology | 46 |\n"
+			"| 3.5.5 | Responsibilities of Dialysis Registrar | 47 |\n"
+			"| 3.5.6 | Transplant registrar | 50 |\n"
+			"| 3.5.7 | Fellow in Renal Transplantation | 51 |\n"
+			"| 3.6 | Nursing staff | 59 |\n"
+			"| 3.6.1 | Nurse manager | 57 |\n"
+			"| 3.9.1 | Hospital Attendant -Posted in clinical Area (A.K. Lab) | 88 |\n"
+			"| 4 | Records maintained | 93 |",
+		)
+		self.assertEqual(cleaned[3], "")
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):
