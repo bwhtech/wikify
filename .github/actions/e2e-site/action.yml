@@ -95,7 +95,8 @@ runs:
       working-directory: /home/runner/frappe-bench
       run: |
         nohup bench serve --port 8000 --noreload > logs/e2e-web.log 2>&1 &
-        nohup bench worker > logs/e2e-worker.log 2>&1 &
+        # With CI set, frappe runs every job in test mode, which turns Local models off.
+        nohup env -u CI bench worker > logs/e2e-worker.log 2>&1 &
         nohup node apps/frappe/socketio.js > logs/e2e-socketio.log 2>&1 &
         for attempt in $(seq 1 60); do
           curl -sf http://wikify.localhost:8000/api/method/ping && exit 0
