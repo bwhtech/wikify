@@ -34,7 +34,7 @@ def _outline():
 		_sec(["5.8 Care", "5.8.4 Sedation", "5.8.4.1 Indications"], 4),
 		_sec(["5.8 Care", "5.8.4 Sedation", "5.8.4.1 Indications", "Contraindications"], 4),
 		_sec(["5.8 Care", "5.8.4 Sedation", "5.8.4.2 Consents"], 5, 6),
-		_sec(["5.8 Care", "5.8.9 Grievances"], 7),
+		_sec(["5.8 Care", "5.8.9 Grievances"], 7, markdown=_words(30)),
 		_sec(["5.8 Care", "5.8.9 Grievances", "1. Drug Regimen"], 7),
 		_sec(["6.1 Protocols"], 8, markdown=""),
 		_sec(["6.1 Protocols", "6.1.2 Lupus nephritis"], 8),
@@ -265,9 +265,9 @@ class TestLlmPagePlan(FrappeTestCase):
 				"6.2.2.1.1 Counselling",
 				"6.2.2.1.2 Pre-op evaluation",
 				"6.2.2.1.3 Intra-op",
-				"6.2.2.2 Note",
 			],
 		)
+		self.assertIn("6.2.2.2 Note", pages[-1].markdown)
 		self.assertNotIn("6.2.2.2 Note", pages[0].markdown)
 
 	def test_a_long_page_without_numbered_children_splits_at_its_sub_headings(self):
@@ -351,7 +351,8 @@ class TestLlmPagePlan(FrappeTestCase):
 			_sec(["2. Organogram", "2.3 Staff list"], 2, markdown=_words(200)),
 			_sec(["2. Organogram", "2.4 Laboratory staff"], 3, markdown=_words(60)),
 			_sec(["2. Organogram", "2.5 Office staff"], 3, markdown=_words(60)),
-			_sec(["2. Organogram", "2.6 Support staff"], 3, markdown=_words(10)),
+			_sec(["2. Organogram", "2.6 Support staff"], 3, markdown=_words(25)),
+			_sec(["2. Organogram", "2.7 Attendants"], 3, markdown=_words(5)),
 		]
 		pages, _ = self._plan(_llm_reply({"pages": [0, 2]}), sections)
 		self.assertEqual(
@@ -366,6 +367,7 @@ class TestLlmPagePlan(FrappeTestCase):
 			],
 		)
 		self.assertNotIn("2.6 Support staff", pages[0].markdown + pages[-2].markdown)
+		self.assertIn("## 2.7 Attendants", pages[-1].markdown)
 
 	def test_a_long_page_never_splits_at_a_form_letterhead_or_a_step(self):
 		training = "6.2.2.1.5 PD TRAINING PROCEDURE"

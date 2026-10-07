@@ -19,6 +19,7 @@ from wikify.engine.store import resolve_parent_indexes
 FALLBACK_PAGE_NUMBER_DEPTH = 3
 FALLBACK_PAGE_TREE_DEPTH = 1
 FRAGMENT_WORDS = 40
+STUB_WORDS = 15
 LEADING_FRAGMENT_WORDS = 60
 MIN_SPLIT_PART_WORDS = 150
 MAX_PAGE_WORDS = 2500
@@ -160,7 +161,7 @@ def keep_sibling_order(
 	sections: list[Section], parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
 ) -> tuple[set[int], list[int | None]]:
 	"""A numbered sibling after a page must not fold into the parent, which would show it before that
-	page: it becomes a page, or joins the last page before it when it is only a list-item fragment."""
+	page: it becomes a page, or joins the last page before it when it is a stub or a list-item fragment."""
 	parents = list(parents)
 	subtree_words = [len(section.markdown.split()) for section in sections]
 	for index in reversed(range(len(sections))):
@@ -178,7 +179,10 @@ def keep_sibling_order(
 				previous_page = sibling
 			elif previous_page is not None and (
 				subtree_words[sibling] >= FRAGMENT_WORDS
-				or not _LIST_ITEM_TITLE.match(sections[sibling].title)
+				or (
+					subtree_words[sibling] >= STUB_WORDS
+					and not _LIST_ITEM_TITLE.match(sections[sibling].title)
+				)
 			):
 				pages.add(sibling)
 				previous_page = sibling
