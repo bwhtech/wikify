@@ -30,6 +30,8 @@ _PROMPT = (
 	"- Keep ALL substantive text. Do NOT summarize, add, translate, or drop real content.\n"
 	"- Keep form checkboxes (☐ ☑; a symbol-font box such as \uf0a8 becomes ☐) and blank fill-in "
 	"lines (runs of underscores).\n"
+	"- Keep list markers as printed: letters (a. b.), roman numerals (i. ii.) and ✓ ticks are never "
+	"renumbered into 1. 2. 3.\n"
 	"- Keep Markdown image embeds ![alt](url) exactly as they are — they are real figures.\n"
 	"- Output ONLY the cleaned Markdown — no commentary, no code fences.\n\nMARKDOWN:\n"
 )

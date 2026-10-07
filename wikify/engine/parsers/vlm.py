@@ -33,6 +33,8 @@ _PROMPT = (
 	"content.\n"
 	"Forms keep their furniture: write every checkbox as ☐ (empty) or ☑ (ticked) in front of its "
 	"option, and keep blank fill-in lines as runs of underscores.\n"
+	"Keep list markers as printed: letters (a. b. c.), roman numerals (i. ii.) and ✓ ticks are "
+	"never renumbered into 1. 2. 3.\n"
 	"Output only the Markdown — no commentary, and no code fences except ```mermaid."
 )
 
