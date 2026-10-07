@@ -11,6 +11,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from wikify.engine import images, parse_pdf, remediate_pdf
 from wikify.engine import settings as engine_settings
+from wikify.engine.loader.cleanup import drop_transcribed_figures
 from wikify.tests import _cleanup
 from wikify.tests.test_remediate_pipeline import _fake_chat
 
@@ -119,6 +120,41 @@ class TestFigurePlacement(FrappeTestCase):
 		markdown = f"{TEXT_BEFORE}\n\n![Admissions per year](/private/files/chart.png)\n\n{TEXT_AFTER}"
 
 		self.assertEqual(images.place_figures(markdown, [chart_figure()], 2), markdown)
+
+
+class TestTranscribedFigures(FrappeTestCase):
+	def test_keeps_the_crop_of_a_redrawn_chart_and_the_typed_copy_of_a_table_image(self):
+		org_chart = (
+			"![Figure 28.1](/private/files/page-0028-crop.png)\n\n"
+			'```mermaid\nflowchart TD\nA["Head of the Department"]\nB["Clinical"]\nA --> B\n```\n\n28'
+		)
+		table_image = (
+			"## DOSES OF IP ANTIBIOTICS\n\n![Figure 251.1](/private/files/page-0251-crop.png)\n\n"
+			"**TABLE 5**\nIntraperitoneal Antibiotic Dosing Recommendations\n\n"
+			"| | Intermittent | Continuous |\n|---|---|---|\n"
+			"| Amikacin | 2 mg/kg daily | LD 25 mg/L |\n| Gentamicin | 0.6 mg/kg daily | LD 8 mg/L |\n"
+			"| Cefazolin | 15 mg/kg daily | LD 500 mg/L |"
+		)
+
+		self.assertEqual(
+			drop_transcribed_figures(org_chart), "![Figure 28.1](/private/files/page-0028-crop.png)\n\n\n28"
+		)
+		self.assertEqual(
+			drop_transcribed_figures(table_image),
+			"## DOSES OF IP ANTIBIOTICS\n\n\n**TABLE 5**\nIntraperitoneal Antibiotic Dosing Recommendations\n\n"
+			"| | Intermittent | Continuous |\n|---|---|---|\n"
+			"| Amikacin | 2 mg/kg daily | LD 25 mg/L |\n| Gentamicin | 0.6 mg/kg daily | LD 8 mg/L |\n"
+			"| Cefazolin | 15 mg/kg daily | LD 500 mg/L |",
+		)
+
+	def test_keeps_a_chart_followed_by_a_paragraph_and_a_table(self):
+		markdown = (
+			"![Figure 3: Admissions](/private/files/chart.png)\n\n"
+			f"{TEXT_BEFORE} {TEXT_AFTER} {TEXT_BEFORE} {TEXT_AFTER}\n\n"
+			"| Year | Admissions |\n|---|---|\n| 2019 | 40 |\n| 2020 | 52 |\n| 2021 | 61 |"
+		)
+
+		self.assertEqual(drop_transcribed_figures(markdown), markdown)
 
 
 class TestFigureRemediation(FrappeTestCase):

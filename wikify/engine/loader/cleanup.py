@@ -62,6 +62,11 @@ _LIST_ITEM = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+\S")
 _ENUMERATED_TEXT = re.compile(r"^(\d+)[.)]\s")
 _CONTENTS_LINE = re.compile(r"^(\d+(?:\.\d+)+\.?|\d+)\s+(\S.*?)\s*(?:\.{2,}\s*)?(\d{1,4})\s*$")
 MIN_CONTENTS_LINES = 5
+_MERMAID_OPEN = re.compile(r"^\s*```\s*mermaid\b")
+_FENCE_CLOSE = re.compile(r"^\s*```\s*$")
+MAX_TABLE_TITLE_LINES = 2
+MAX_TABLE_TITLE_CHARS = 120
+MIN_TRANSCRIBED_ROWS = 4
 
 
 def _plain(line: str) -> str:
@@ -365,10 +370,64 @@ def contents_lines_to_table(md: str) -> str:
 	return "\n".join(out)
 
 
+def _table_rows_from(lines: list[str], start: int) -> int:
+	if lines[start].lstrip().startswith("<table"):
+		rows = 0
+		for line in lines[start:]:
+			rows += line.count("<tr")
+			if "</table" in line:
+				break
+		return rows
+	end = start
+	while end < len(lines) and _is_table_row(lines[end]):
+		end += 1
+	return end - start
+
+
+def _transcription_after_figure(lines: list[str], figure: int) -> tuple[str, int, int] | None:
+	"""What the parser wrote for the picture straight after it: ("mermaid", fence start, fence end) for a
+	diagram redrawn from it, ("table", first line, rows) for a table typed out under its title."""
+	following = [index for index in range(figure + 1, len(lines)) if lines[index].strip()]
+	if not following:
+		return None
+	first = following[0]
+	if _MERMAID_OPEN.match(lines[first]):
+		close = next((index for index in following[1:] if _FENCE_CLOSE.match(lines[index])), None)
+		return ("mermaid", first, close) if close is not None else None
+	for index in following[: MAX_TABLE_TITLE_LINES + 1]:
+		if _is_table_row(lines[index]) or lines[index].lstrip().startswith("<table"):
+			return "table", index, _table_rows_from(lines, index)
+		if len(_plain(lines[index])) > MAX_TABLE_TITLE_CHARS or _STRUCTURAL_LINE.match(lines[index]):
+			return None
+	return None
+
+
+def drop_transcribed_figures(md: str) -> str:
+	"""Keep one copy of a picture the parser also transcribed: the crop for a diagram it redrew as mermaid,
+	the typed table for a table printed as an image, since that copy is exact and searchable."""
+	lines = md.splitlines()
+	drop: set[int] = set()
+	for index, line in enumerate(lines):
+		transcription = _IMAGE_LINE.match(line) and _transcription_after_figure(lines, index)
+		if not transcription:
+			continue
+		kind, start, end = transcription
+		if kind == "mermaid":
+			drop.update(range(start, end + 1))
+		elif end >= MIN_TRANSCRIBED_ROWS:
+			drop.add(index)
+	if not drop:
+		return md
+	return "\n".join(line for index, line in enumerate(lines) if index not in drop)
+
+
 def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
-	stripped = strip_boilerplate(pages, find_boilerplate(pages))
-	stitched = stitch_cross_page_tables([(page_no, contents_lines_to_table(md)) for page_no, md in stripped])
+	stripped = [
+		(page_no, contents_lines_to_table(drop_transcribed_figures(md)))
+		for page_no, md in strip_boilerplate(pages, find_boilerplate(pages))
+	]
+	stitched = stitch_cross_page_tables(stripped)
 	joined = join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
 	return reindent_list_continuations(joined)
 
