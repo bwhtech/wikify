@@ -28,6 +28,8 @@ _PROMPT = (
 	"- Headings must be plain text: strip bold/italic emphasis from heading lines "
 	"(e.g. `## _**Verbal Orders**_` → `## Verbal Orders`); never wrap a heading in * or _.\n"
 	"- Keep ALL substantive text. Do NOT summarize, add, translate, or drop real content.\n"
+	"- Keep form checkboxes (☐ ☑; a symbol-font box such as \uf0a8 becomes ☐) and blank fill-in "
+	"lines (runs of underscores).\n"
 	"- Keep Markdown image embeds ![alt](url) exactly as they are — they are real figures.\n"
 	"- Output ONLY the cleaned Markdown — no commentary, no code fences.\n\nMARKDOWN:\n"
 )

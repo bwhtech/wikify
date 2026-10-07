@@ -31,6 +31,8 @@ _PROMPT = (
 	'and statutory references (e.g. "u/s 115BAC", "section 44AD", "First Proviso") character '
 	"for character. Never round, re-word, convert or summarise a number, and never invent "
 	"content.\n"
+	"Forms keep their furniture: write every checkbox as ☐ (empty) or ☑ (ticked) in front of its "
+	"option, and keep blank fill-in lines as runs of underscores.\n"
 	"Output only the Markdown — no commentary, and no code fences except ```mermaid."
 )
 
