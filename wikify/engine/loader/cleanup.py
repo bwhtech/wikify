@@ -1,9 +1,9 @@
 """Strip repeated page headers/footers before sectionizing.
 
 Real manuals repeat a running header/footer on every page (doc title, doc code,
-"Pg X of Y", version/date). Left in, each becomes a fake heading. We remove lines
-that recur across many pages, plus a few varying-boilerplate patterns (page
-numbers, doc codes) that won't match exactly page-to-page.
+"Pg X of Y", version/date). Left in, each becomes a fake heading. We remove the run of
+lines at each page edge that recur at the edges of many pages, plus a few
+varying-boilerplate patterns (page numbers, doc codes) that won't match exactly page-to-page.
 
 Ported verbatim from the POC `loader/cleanup.py` (pure markdown, no I/O). Wired into
 the pipeline at sectionize time (Slice 4); shipped here per the Slice 3 cleanup port.
@@ -15,15 +15,27 @@ import re
 from collections import Counter
 from itertools import groupby
 
-_NORM = re.compile(r"[#*_`>\-\s]+")
-_VARYING = [
+from wikify.engine.loader.table_stitch import (
+	html_tables_to_markdown,
+	merge_continuation_rows,
+	stitch_cross_page_tables,
+)
+
+_NORM = re.compile(r"[#*_`>|\-\s]+")
+_MARKUP = re.compile(r"(?:<br\s*/?>|[*_`|]|^[\s>#]+)")
+_PAGE_OF = [
 	re.compile(r"(?i)\bpg\.?\s*\d+\s*of\s*\d+"),
 	re.compile(r"(?i)\bpage\s*\d+\s*of\s*\d+"),
+]
+_HEADER_FIELDS = [
 	re.compile(r"(?i)^man/[a-z0-9/]+"),
 	re.compile(r"(?i)\bver\.?\s*:"),
 	re.compile(r"(?i)\bissue\s*:\s*\d"),
 	re.compile(r"(?i)^\s*date\s*:"),
 ]
+_STRUCTURAL_LINE = re.compile(r"^\s*(?:<|```|~~~|!\[)")
+_IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\([^)]*\)\s*$")
+EDGE_LINES = 4
 
 # Approval / sign-off footer block — QMS-manual page furniture rendered as a one- or
 # two-row Markdown table, e.g. `|Prepared by - Dr X|Issued by: QMC|Approved by - Dr Y|`.
@@ -43,8 +55,13 @@ _MIN_BROKEN_LINE_LENGTH = 40
 _NUMBERED_HEADING = re.compile(r"^\s*#{1,6}\s+[*_]*\d+(?:\.\d+)*\.?\s*[A-Za-z]")
 
 
+def _plain(line: str) -> str:
+	"""The line's visible text: emphasis, table pipes, <br>, blockquote and heading markers removed."""
+	return " ".join(_MARKUP.sub(" ", line).split())
+
+
 def _norm(line: str) -> str:
-	return _NORM.sub(" ", line).strip().lower()
+	return _NORM.sub(" ", _plain(line)).strip().lower()
 
 
 def _is_signoff_footer_row(line: str) -> bool:
@@ -95,35 +112,64 @@ def _strip_page_residue(md: str) -> str:
 	]
 	while kept and not kept[-1].strip():
 		kept.pop()
-	if kept and _PAGE_NUMBER.match(kept[-1]):
+	while kept and not kept[0].strip():
+		kept.pop(0)
+	if kept and _PAGE_NUMBER.match(_plain(kept[-1])):
 		kept.pop()
 	return "\n".join(kept)
 
 
+def _edge_lines(md: str) -> list[str]:
+	content = [line for line in md.splitlines() if _norm(line) and not _STRUCTURAL_LINE.match(line)]
+	return content[:EDGE_LINES] + content[-EDGE_LINES:]
+
+
 def find_boilerplate(pages: list[tuple[int, str]]) -> set[str]:
-	"""Normalized lines that recur on a large fraction of pages."""
+	"""Normalized lines that recur at the top or bottom edge of a large fraction of pages."""
 	counts: Counter[str] = Counter()
 	for _, md in pages:
-		for nl in {_norm(line) for line in md.splitlines() if _norm(line)}:
+		for nl in {_norm(line) for line in _edge_lines(md)}:
 			counts[nl] += 1
 	threshold = max(3, int(0.30 * len(pages)))
 	return {line for line, c in counts.items() if c >= threshold and len(line) <= 90}
 
 
-def _is_varying(line: str) -> bool:
-	return any(p.search(line) for p in _VARYING)
+def _is_page_of(line: str) -> bool:
+	plain = _plain(line)
+	return any(pattern.search(plain) for pattern in _PAGE_OF)
+
+
+def _is_page_furniture(line: str, boilerplate: set[str], at_top: bool) -> bool:
+	plain = _plain(line)
+	return (
+		(_norm(line) in boilerplate and not _NUMBERED_HEADING.match(line))
+		or any(pattern.search(plain) for pattern in _HEADER_FIELDS)
+		or bool(_PAGE_NUMBER.match(plain))
+		or (at_top and "-" in line and bool(_SEP_ONLY.match(line)))
+	)
+
+
+def _edge_furniture(lines: list[str], boilerplate: set[str]) -> set[int]:
+	"""The unbroken header/footer run at each page edge; a label that also recurs mid-page survives."""
+	drop: set[int] = set()
+	for at_top, indexes in ((True, range(len(lines))), (False, range(len(lines) - 1, -1, -1))):
+		for index in indexes:
+			line = lines[index]
+			if not line.strip() or _IMAGE_LINE.match(line):
+				continue
+			if not _is_page_furniture(line, boilerplate, at_top):
+				break
+			drop.add(index)
+	return drop
 
 
 def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> list[tuple[int, str]]:
 	out: list[tuple[int, str]] = []
 	for pno, md in pages:
-		kept = [
-			line
-			for line in md.splitlines()
-			if not (_norm(line) and _norm(line) in boilerplate and not _NUMBERED_HEADING.match(line))
-			and not _is_varying(line)
-		]
-		out.append((pno, _strip_page_residue(_strip_footer_blocks("\n".join(kept)))))
+		lines = [line for line in _strip_footer_blocks(md).splitlines() if not _is_page_of(line)]
+		drop = _edge_furniture(lines, boilerplate)
+		kept = [line for index, line in enumerate(lines) if index not in drop]
+		out.append((pno, _strip_page_residue("\n".join(kept))))
 	return out
 
 
@@ -153,7 +199,9 @@ def join_page_breaks(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 
 
 def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
-	return join_page_breaks(strip_boilerplate(pages, find_boilerplate(pages)))
+	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
+	stitched = stitch_cross_page_tables(strip_boilerplate(pages, find_boilerplate(pages)))
+	return join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
 
 
 def strip_outer_markdown_fence(text: str) -> str:

@@ -395,6 +395,98 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("- more body", cleaned[2])
 		self.assertIn("approved by the HOD", cleaned[3])
 
+	def test_clean_pages_keeps_html_tables_that_recur_on_every_page(self):
+		header = "PROCEDURE MANUAL - NEPHROLOGY\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398\n\n"
+		table = (
+			"<table>\n<tr>\n<th>Nursing Action</th>\n<th>Rationale</th>\n</tr>\n"
+			"<tr>\n<td>1. Check doctor's order.</td>\n<td>Gains cooperation</td>\n</tr>\n"
+			"<tr><td>2. Administer inj. calcium gluconate.</td><td>Prevents hypocalcemia\n"
+			"<tr><td>3. Remove sutures.</td><td>Avoids blood loss</td></tr>\n</table>"
+		)
+		pages = [
+			(page, header.format(page=page) + f"## Step {page}\n\n{table}\n\nNotes {page}.")
+			for page in (1, 2, 3)
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertIn(
+			"| Nursing Action | Rationale |\n|---|---|\n"
+			"| 1. Check doctor's order. | Gains cooperation |\n"
+			"| 2. Administer inj. calcium gluconate. | Prevents hypocalcemia |\n"
+			"| 3. Remove sutures. | Avoids blood loss |",
+			cleaned[2],
+		)
+
+	def test_clean_pages_stitches_a_table_row_split_by_a_page_break(self):
+		header = "PROCEDURE MANUAL - NEPHROLOGY\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398\n\n"
+		first = (
+			"|**Nursing Action**|**Rationale**|\n|---|---|\n"
+			"|1. Inspect the previous dressing|Confirms the need.|\n"
+			"|2. Explain the procedure and<br>position him according to the|Helps gain co-operation.|\n"
+			"|**MAN/RPT/NEPH/001 Ver.:**|**1 Issue :1**<br>Pg.**2 of 398**|\n"
+			"|convenience to access the site.||\n"
+			"|3. Send blood for investigations|Electrolytes are removed during the process of|"
+		)
+		second = (
+			"<table>\n<tr>\n<td>(Ca, PO4, Na, K)</td>\n<td>plasmapheresis.</td>\n</tr>\n"
+			"<tr>\n<td>4. Check BP.</td>\n<td>Identifies complications.</td>\n</tr>\n</table>\n\n"
+			"# **Specific Instructions:**\n\n- Avoid swimming."
+		)
+		pages = [
+			(1, header.format(page=1) + first),
+			(2, header.format(page=2) + second),
+			(3, header.format(page=3)),
+		]
+		secs = sectionize(clean_pages(pages))
+		self.assertEqual(
+			secs[0].markdown,
+			"|**Nursing Action**|**Rationale**|\n|---|---|\n"
+			"|1. Inspect the previous dressing|Confirms the need.|\n"
+			"| 2. Explain the procedure and<br>position him according to the convenience to access the site. "
+			"| Helps gain co-operation. |\n"
+			"| 3. Send blood for investigations (Ca, PO4, Na, K) "
+			"| Electrolytes are removed during the process of plasmapheresis. |\n"
+			"| 4. Check BP. | Identifies complications. |\n\n"
+			"**Specific Instructions:**\n\n- Avoid swimming.",
+		)
+
+	def test_clean_pages_strips_running_headers_wrapped_in_markup(self):
+		pages = [
+			(
+				1,
+				"PROCEDURE MANUAL\n\n> **MAN/RPT/NEPH/001 Ver.: 1**\n\n> **Date:10/11/2023** Pg. **321 of 398**\n\n- First.",
+			),
+			(
+				2,
+				"||PROCEDURE MANUAL||\n|---|---|---|\n|**MAN/RPT/NEPH/001**|<br>**Ver.: 1**|Pg.**322 of 398**|\n\n- Second.",
+			),
+			(
+				3,
+				"PROCEDURE MANUAL\n\n**MAN/RPT/NEPH/001 Ver.: 1 Date:10/11/2023** Pg. **323 of 398**\n\n- Third.",
+			),
+			(
+				4,
+				"PROCEDURE MANUAL **MAN/RPT/NEPH/001 Ver.: 1 Date:10/11/2023** Pg. **324 of 398**\n\n- Fourth.\n\n**324**",
+			),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(cleaned, {1: "- First.", 2: "- Second.", 3: "- Third.", 4: "- Fourth."})
+
+	def test_clean_pages_keeps_a_label_that_recurs_mid_page(self):
+		header = "PROCEDURE MANUAL\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398\n\n"
+		body = "## 6.4.{page} Step {page}\n\n**Definition**\n\nText {page}.\n\n## Procedure\n\n1. Do {page}.\n\nFooter note"
+		pages = [(page, header.format(page=page) + body.format(page=page)) for page in range(1, 6)]
+		cleaned = dict(clean_pages(pages))
+		for page in range(1, 6):
+			self.assertEqual(
+				cleaned[page],
+				f"## 6.4.{page} Step {page}\n\n**Definition**\n\nText {page}.\n\n## Procedure\n\n1. Do {page}.",
+			)
+
+	def test_stray_bold_markers_are_stripped_from_titles(self):
+		secs = sectionize([(1, "# 3. **Other equipment:\n- Gloves\n# **CRRT Order sheet** :\n- Form")])
+		self.assertEqual([s.title for s in secs], ["3. Other equipment:"])
+		self.assertIn("**CRRT Order sheet :**", secs[0].markdown)
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):

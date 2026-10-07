@@ -31,7 +31,9 @@ TOC_MIN_ASCENDING_SHARE = 0.75
 
 
 def _clean_title(raw: str) -> str:
-	title = _GLUED_NUM.sub(r"\1 ", _LINK.sub(r"\1", raw.strip().strip("*_").strip()).strip())
+	title = _GLUED_NUM.sub(
+		r"\1 ", _LINK.sub(r"\1", raw.replace("**", "").strip().strip("*_").strip()).strip()
+	)
 	if title.endswith(".") and not title.endswith(".."):
 		title = title[:-1].rstrip()
 	if len(title) <= MAX_TITLE_LENGTH:
@@ -179,6 +181,10 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 			sections.append(current)
 
 	for page_no, md in pages:
+		# Without a blank line, GFM reads the next page's first line as another row of a table, more
+		# raw HTML, or a lazy continuation of a list item that ended the previous page.
+		if buf and buf[-1].strip():
+			buf.append("")
 		lines = md.splitlines()
 		toc_end = toc_end_line(lines)
 		for line_index, line in enumerate(lines):
