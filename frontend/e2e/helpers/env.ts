@@ -30,4 +30,4 @@ export const FIXTURE_PDF = FIXTURE_PDF_OVERRIDDEN
 	? path.resolve(import.meta.dirname, "../..", process.env.E2E_FIXTURE_PDF!)
 	: path.resolve(import.meta.dirname, "../fixtures/openstax-anatomy-ch24-25.pdf");
 export const FIXTURE_PDF_SHA256 =
-	"62d650cf40e02faea4395dc2301891c9e5165f88630713d4d92b7f704d0d6fcf";
+	"1ec2fc07da77527624ed607c3acbd7b2184ad1b575d07f0d1f157f5764e06c52";
