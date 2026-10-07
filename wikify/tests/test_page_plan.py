@@ -21,9 +21,13 @@ def _sec(path, page_start, page_end=None, markdown=None):
 	)
 
 
+def _words(count):
+	return " ".join(["word"] * count)
+
+
 def _outline():
 	return [
-		_sec(["Preamble"], 1),
+		_sec(["Preamble"], 1, markdown=_words(60)),
 		_sec(["5.8 Care"], 2, markdown=""),
 		_sec(["5.8 Care", "5.8.1 Chaperone"], 2),
 		_sec(["5.8 Care", "5.8.4 Sedation"], 3),
@@ -37,10 +41,6 @@ def _outline():
 		_sec(["6.1 Protocols", "6.1.2 Lupus nephritis", "Class IV"], 9, markdown=""),
 		_sec(["6.1 Protocols", "6.1.2 Lupus nephritis", "Class V"], 10),
 	]
-
-
-def _words(count):
-	return " ".join(["word"] * count)
 
 
 def _llm_reply(payload):
@@ -149,7 +149,15 @@ class TestLlmPagePlan(FrappeTestCase):
 	def test_a_json_encoded_page_list_is_accepted(self):
 		pages, _ = self._plan(_llm_reply({"pages": "[3, 7]"}))
 		self.assertEqual(
-			_titles(pages), ["Preamble", "5.8 Care", "5.8.4 Sedation", "5.8.9 Grievances", "6.1 Protocols"]
+			_titles(pages),
+			[
+				"Preamble",
+				"5.8 Care",
+				"5.8.1 Chaperone",
+				"5.8.4 Sedation",
+				"5.8.9 Grievances",
+				"6.1 Protocols",
+			],
 		)
 
 	def test_top_level_sections_are_pages_even_when_the_llm_skips_them(self):
@@ -203,7 +211,7 @@ class TestLlmPagePlan(FrappeTestCase):
 
 	def test_an_unnumbered_top_level_fragment_folds_into_the_page_before_it(self):
 		sections = [
-			_sec(["Preamble"], 1),
+			_sec(["Preamble"], 1, markdown=_words(60)),
 			_sec(["IMMEDIATE PRE-OPERATIVE PROTOCOLS"], 7, 9, markdown=_words(60)),
 			_sec(["Pre transplant day"], 9, markdown=""),
 			_sec(["PRE-TRANSPLANT RECIPIENT ORDER SHEET"], 9, 10, markdown=_words(60)),
@@ -250,3 +258,76 @@ class TestLlmPagePlan(FrappeTestCase):
 			],
 		)
 		self.assertIn("## 6.2.2.2 Note", pages[0].markdown)
+
+	def test_a_long_page_without_numbered_children_splits_at_its_sub_headings(self):
+		access = "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS"
+		sections = [
+			_sec([access], 3, markdown=""),
+			_sec([access, "AV FISTULA/AV GRAFT"], 3, markdown=_words(60)),
+			_sec([access, "A. Skin Preparation"], 3, 4, markdown=_words(230)),
+			_sec([access, "CENTRAL VENOUS CATHETER"], 5, markdown=""),
+			_sec([access, "CATHETER CARE"], 5, markdown=_words(260)),
+			_sec([access, "I. EXIT SITE CARE"], 6, 7, markdown=_words(140)),
+			_sec([access, "DIALYZER REUSE"], 7, markdown=_words(30)),
+			_sec([access, "IDENTIFYING AND MANAGING COMPLICATIONS"], 7, markdown=""),
+			_sec([access, "1. INTRA DIALYTIC HYPOTENSION"], 7, 8, markdown=_words(110)),
+			_sec([access, "2. HYPERKALEMIA"], 9, 10, markdown=_words(80)),
+			_sec([access, "Peritoneal Dialysis"], 11, markdown=""),
+			_sec([access, "1 Dialysis Prescription"], 11, markdown=_words(30)),
+			_sec([access, "2 Peritonitis"], 11, markdown=_words(90)),
+			_sec([access, "4 Exit Site Infection"], 11, markdown=_words(40)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": []}), sections)
+		self.assertEqual(
+			_titles(pages),
+			[
+				access,
+				"AV FISTULA/AV GRAFT",
+				"CENTRAL VENOUS CATHETER",
+				"IDENTIFYING AND MANAGING COMPLICATIONS",
+				"Peritoneal Dialysis",
+			],
+		)
+		self.assertEqual(pages[0].markdown, "")
+		self.assertIn("## CATHETER CARE", pages[2].markdown)
+		self.assertTrue(pages[2].markdown.endswith(f"## DIALYZER REUSE\n\n{_words(30)}"))
+		self.assertEqual(pages[4].hierarchy_path, [access, "Peritoneal Dialysis"])
+		self.assertEqual((pages[4].page_start, pages[4].page_end), (11, 11))
+
+	def test_a_short_leading_preamble_joins_the_page_after_it(self):
+		sections = [
+			_sec(["Preamble"], 1, markdown="Saline dialysis is reserved for bleeding patients."),
+			_sec(["6.2.1 POLICIES"], 1, markdown=""),
+			_sec(["6.2.1 POLICIES", "6.2.1.3 ASSESSMENT"], 1, 2),
+			_sec(["6.2.1 POLICIES", "6.2.1.4 VASCULAR ACCESS"], 3),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [0, 1, 2, 3]}), sections)
+		self.assertEqual(_titles(pages), ["6.2.1 POLICIES", "6.2.1.3 ASSESSMENT", "6.2.1.4 VASCULAR ACCESS"])
+		self.assertEqual(pages[0].markdown, "")
+		self.assertEqual(
+			pages[1].markdown,
+			"Saline dialysis is reserved for bleeding patients.\n\nbody of 6.2.1.3 ASSESSMENT",
+		)
+
+	def test_numbered_siblings_follow_the_majority_into_pages(self):
+		sections = [
+			_sec(["5.8 Policies on patient care"], 1, markdown=_words(20)),
+			_sec(["5.8 Policies on patient care", "5.8.1 Chaperone"], 1, markdown=_words(90)),
+			_sec(["5.8 Policies on patient care", "5.8.2 Antibiotic policy"], 1, markdown=_words(29)),
+			_sec(["5.8 Policies on patient care", "5.8.3 Consent"], 2, markdown=_words(200)),
+			_sec(["5.8 Policies on patient care", "5.8.4 Sedation"], 3, markdown=_words(300)),
+			_sec(["5.8 Policies on patient care", "5.8.4 Sedation", "Contraindications"], 3),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [1, 3, 4]}), sections)
+		self.assertEqual(
+			_titles(pages),
+			[
+				"5.8 Policies on patient care",
+				"5.8.1 Chaperone",
+				"5.8.2 Antibiotic policy",
+				"5.8.3 Consent",
+				"5.8.4 Sedation",
+			],
+		)
+		pages, _ = self._plan(_llm_reply({"pages": [4]}), sections)
+		self.assertEqual(_titles(pages), ["5.8 Policies on patient care", "5.8.4 Sedation"])

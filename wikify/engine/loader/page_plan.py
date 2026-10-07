@@ -6,21 +6,26 @@ wiki page granularity is set.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 
 import frappe
 
 from wikify.engine import llm, settings
 from wikify.engine.loader.context import context_block
-from wikify.engine.loader.sectionizer import Section, _section_number
+from wikify.engine.loader.sectionizer import PREAMBLE_TITLE, Section, _section_number
 from wikify.engine.store import resolve_parent_indexes
 
 FALLBACK_PAGE_NUMBER_DEPTH = 3
 FALLBACK_PAGE_TREE_DEPTH = 1
 FRAGMENT_WORDS = 40
+LEADING_FRAGMENT_WORDS = 60
+MIN_SPLIT_PART_WORDS = 150
 MAX_PAGE_WORDS = 2500
 MAX_PAGE_PDF_PAGES = 6
 OUTLINE_BATCH_LINES = 250
+
+_LIST_ITEM_TITLE = re.compile(r"^(?:\d+[.)]?|[A-Za-z][.)]|[IVXivx]+[.)])\s")
 
 _PROMPT = (
 	"You are planning how a PDF document becomes a wiki. Below is its section outline in "
@@ -48,7 +53,8 @@ _PROMPT = (
 def plan_pages(sections: list[Section], project_context: str = "", use_llm: bool = False) -> list[Section]:
 	parents = resolve_parent_indexes(sections)
 	chosen = llm_pages(sections, parents, project_context) if use_llm else fallback_pages(sections, parents)
-	return fold_sections(sections, parents, enforce_invariants(sections, parents, chosen))
+	pages, parents = enforce_invariants(sections, parents, chosen)
+	return fold_sections(sections, parents, pages)
 
 
 def tree_depths(parents: list[int | None]) -> list[int]:
@@ -99,32 +105,62 @@ def ancestors(parents: list[int | None], index: int):
 		parent = parents[parent]
 
 
-def enforce_invariants(sections: list[Section], parents: list[int | None], chosen: set[int]) -> set[int]:
+def enforce_invariants(
+	sections: list[Section], parents: list[int | None], chosen: set[int]
+) -> tuple[set[int], list[int | None]]:
 	numbers = outline_numbers(sections, parents)
 	child_counts = Counter(parent for parent in parents if parent is not None)
 	pages: set[int] = set()
 	for index, parent in enumerate(parents):
 		if parent is None:
-			fragment = index not in child_counts and len(sections[index].markdown.split()) < FRAGMENT_WORDS
-			if index == 0 or numbers[index] or (index in chosen and not fragment):
+			words = len(sections[index].markdown.split())
+			fragment = index not in child_counts and words < FRAGMENT_WORDS
+			leading_fragment = (
+				index == 0
+				and len(sections) > 1
+				and index not in child_counts
+				and not numbers[index]
+				and words < LEADING_FRAGMENT_WORDS
+			)
+			if not leading_fragment and (index == 0 or numbers[index] or (index in chosen and not fragment)):
 				pages.add(index)
 		elif index in chosen and parent in pages:
 			pages.add(index)
-	pages = split_long_pages(sections, parents, numbers, pages)
-	return {
+	pages = add_numbered_siblings(parents, numbers, pages)
+	pages, parents = split_long_pages(sections, parents, numbers, pages)
+	child_counts = Counter(parent for parent in parents if parent is not None)
+	pages = {
 		index
 		for index in pages
 		if parents[index] is None
 		or index in child_counts
 		or (sections[index].markdown.strip() and child_counts[parents[index]] > 1)
 	}
+	return pages, parents
+
+
+def add_numbered_siblings(
+	parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
+) -> set[int]:
+	"""Numbered siblings are pages alike: once most of them are, the rest follow."""
+	numbered_children: dict[int, list[int]] = defaultdict(list)
+	for index, parent in enumerate(parents):
+		if parent is not None and numbers[index]:
+			numbered_children[parent].append(index)
+	pages = set(pages)
+	for parent in sorted(numbered_children):
+		siblings = numbered_children[parent]
+		if parent in pages and 2 * len(pages.intersection(siblings)) > len(siblings):
+			pages.update(siblings)
+	return pages
 
 
 def split_long_pages(
 	sections: list[Section], parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
-) -> set[int]:
+) -> tuple[set[int], list[int | None]]:
 	"""A page too long to read in one scroll is split at its numbered children, recursively; tiny
-	children stay folded."""
+	children stay folded. Without numbered children it splits at its sub-headings instead."""
+	parents = list(parents)
 	children: dict[int, list[int]] = defaultdict(list)
 	subtree_words = [len(section.markdown.split()) for section in sections]
 	for index in reversed(range(len(sections))):
@@ -147,19 +183,66 @@ def split_long_pages(
 			for child in children[page]
 			if numbers[child] and child not in pages and subtree_words[child] >= FRAGMENT_WORDS
 		]
+		if not split:
+			for part in heading_parts(sections, children[page], subtree_words):
+				split.append(part[0])
+				for member in part[1:]:
+					parents[member] = part[0]
+					children[part[0]].append(member)
+				children[page] = [child for child in children[page] if child not in part[1:]]
 		pages.update(split)
 		queue.extend(split)
-	return pages
+	return pages, parents
+
+
+def heading_parts(sections: list[Section], children: list[int], subtree_words: list[int]) -> list[list[int]]:
+	"""Runs of children that each start at a sub-heading and hold at least MIN_SPLIT_PART_WORDS; a
+	tiny run joins the run before it, or the run after it when it is a bare heading."""
+	starts = [child for child in children if not _LIST_ITEM_TITLE.match(sections[child].title)]
+	if len(starts) < 2:
+		starts = children
+	parts: list[list[int]] = []
+	for child in children:
+		if child in starts:
+			parts.append([child])
+		elif parts:
+			parts[-1].append(child)
+	merged: list[list[int]] = []
+	carried: list[int] = []
+	for part in parts:
+		part = carried + part
+		carried = []
+		if sum(subtree_words[child] for child in part) >= MIN_SPLIT_PART_WORDS:
+			merged.append(part)
+		elif merged and sections[part[0]].markdown.strip():
+			merged[-1].extend(part)
+		else:
+			carried = part
+	if carried and merged:
+		merged[-1].extend(carried)
+	elif carried:
+		merged.append(carried)
+	return merged if len(merged) > 1 else []
 
 
 def fold_sections(sections: list[Section], parents: list[int | None], pages: set[int]) -> list[Section]:
 	owner: dict[int, int] = {}
 	depth_below_page: dict[int, int] = {}
+	page_parents = {parents[index] for index in pages}
+	leading: list[str] = []
 	for index, section in enumerate(sections):
 		if index in pages:
 			owner[index], depth_below_page[index] = index, 0
+			if leading and index not in page_parents:
+				section.markdown = "\n\n".join(part for part in (*leading, section.markdown.strip()) if part)
+				section.page_start = min(section.page_start, sections[0].page_start)
+				leading = []
 			continue
 		parent = parents[index]
+		if parent is None and index - 1 not in owner:
+			title = "" if section.title == PREAMBLE_TITLE else f"**{section.title}**"
+			leading.extend(part for part in (title, section.markdown.strip()) if part)
+			continue
 		if parent is None:
 			owner[index], depth_below_page[index] = owner[index - 1], 1
 		else:
