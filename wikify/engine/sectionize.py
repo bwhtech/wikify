@@ -22,7 +22,7 @@ import frappe
 
 from wikify.engine import llm, store
 from wikify.engine.classify import classify_document
-from wikify.engine.lint import fix_table_separators
+from wikify.engine.lint import repair_markdown
 from wikify.engine.loader.cleanup import clean_pages
 from wikify.engine.loader.page_plan import plan_pages
 from wikify.engine.loader.sectionizer import _HEADING_RE, _clean_title, sectionize
@@ -38,10 +38,10 @@ def sectionize_document(source_document: str, pdf_path: str, project_context: st
 		project_context,
 		use_llm=llm.has_openrouter() and not frappe.flags.in_test,
 	)
-	# 0.6 auto-fix boundary: repair separator-less tables in the assembled section
+	# 0.6 auto-fix boundary: mechanical markdown repairs in the assembled section
 	# product, pre-review. Page canonical stays untouched — pages are evidence.
 	for sec in sections:
-		sec.markdown = fix_table_separators(sec.markdown)
+		sec.markdown = repair_markdown(sec.markdown)
 	return store.replace_sections(source_document, sections)
 
 
@@ -158,7 +158,7 @@ def rebuild_section_markdown(section_name: str) -> dict:
 		raise ValueError(f"No pages found in range {sec.page_start}-{sec.page_end}.")
 
 	cleaned = clean_pages(pages)
-	markdown = fix_table_separators("\n\n".join(md.strip() for _, md in cleaned if md.strip()))
+	markdown = repair_markdown("\n\n".join(md.strip() for _, md in cleaned if md.strip()))
 	first_line, _, body = markdown.partition("\n")
 	heading = _HEADING_RE.match(first_line)
 	if heading and _clean_title(heading.group(2)) == sec.title:

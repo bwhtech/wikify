@@ -17,7 +17,13 @@ from frappe.tests.utils import FrappeTestCase
 
 from wikify.api import sections as api
 from wikify.engine import store
-from wikify.engine.lint import fix_table_separators, lint_markdown, table_artifacts
+from wikify.engine.lint import (
+	escape_fill_in_blanks,
+	fix_glued_emphasis,
+	fix_table_separators,
+	lint_markdown,
+	table_artifacts,
+)
 from wikify.engine.loader.sectionizer import Section
 from wikify.engine.sectionize import rebuild_section_markdown
 from wikify.engine.verify.deterministic import parser_artifacts
@@ -81,6 +87,46 @@ class TestFixTableSeparators(FrappeTestCase):
 		self.assertEqual(fix_table_separators(LONE_PIPE), LONE_PIPE)
 		fenced = "```\n| A | B |\n| 1 | 2 |\n```"
 		self.assertEqual(fix_table_separators(fenced), fenced)
+
+
+class TestFormBlanks(FrappeTestCase):
+	def test_fill_in_blanks_are_escaped_outside_code_and_html(self):
+		row = "| | Replacement fluid | ______________________@_____ ___mL/h Additives_______ |"
+		untouched = "___\n\n`a___b`\n\n<td>Rate_____</td>"
+		blank = "\\_"
+		fixed = escape_fill_in_blanks(f"{row}\n\n{untouched}")
+		self.assertEqual(
+			fixed,
+			f"| | Replacement fluid | {blank * 22}@{blank * 5} {blank * 3}mL/h Additives{blank * 7} |\n\n{untouched}",
+		)
+		self.assertEqual(escape_fill_in_blanks(fixed), fixed)
+
+
+class TestGluedEmphasis(FrappeTestCase):
+	def test_bold_glued_to_its_neighbours_is_separated(self):
+		md = (
+			"|1. Inspect the dressing|**To**confirm the need.|\n"
+			"|3. Explain the procedure|Helps**to**gain co-operation.|\n"
+			"|8. Clean the site|**P**revents contamination.|\n"
+			"- **Postpheresis: H**ypokalemia, Bleeding tendencies\n"
+			"Saves time and improves efficiency**.**\n"
+			"**Date:10/11/2023 **Pg. 337\n"
+			"Continuous Renal Replacement Therapy Order sheet :**"
+		)
+		self.assertEqual(
+			fix_glued_emphasis(md),
+			"|1. Inspect the dressing|**To** confirm the need.|\n"
+			"|3. Explain the procedure|Helps **to** gain co-operation.|\n"
+			"|8. Clean the site|Prevents contamination.|\n"
+			"- **Postpheresis:** Hypokalemia, Bleeding tendencies\n"
+			"Saves time and improves efficiency.\n"
+			"**Date:10/11/2023** Pg. 337\n"
+			"Continuous Renal Replacement Therapy Order sheet :",
+		)
+		self.assertEqual(
+			fix_glued_emphasis("**AVF**s and **Artero Venous Fistula (AVF**) is"),
+			"**AVF**s and **Artero Venous Fistula (AVF**) is",
+		)
 
 
 class TestPageArtifacts(FrappeTestCase):

@@ -132,3 +132,85 @@ def fix_table_separators(markdown: str) -> str:
 		if i in insertions:
 			out.append(insertions[i])
 	return "\n".join(out)
+
+
+_BLANK_RUN_RE = re.compile(r"(?<![\\_])_{3,}")
+_RULE_LINE_RE = re.compile(r"^\s*(?:_\s*){3,}$")
+_HTML_LINE_RE = re.compile(r"^\s*</?[a-zA-Z]")
+_LETTER_START_RE = re.compile(r"^[a-z]{2,}")
+
+
+def _prose_lines(lines: list[str]):
+	"""Indexes of lines whose inline markdown is rendered: outside code fences and HTML blocks."""
+	in_fence = in_html = False
+	for index, line in enumerate(lines):
+		if _FENCE_RE.match(line):
+			in_fence = not in_fence
+			continue
+		if in_fence:
+			continue
+		if _HTML_LINE_RE.match(line):
+			in_html = True
+		if in_html:
+			in_html = bool(line.strip())
+			continue
+		if "`" not in line:
+			yield index
+
+
+def escape_fill_in_blanks(markdown: str) -> str:
+	"""Escape form blanks (runs of 3+ underscores) so markdown can't read them as emphasis and eat
+	the text between two blanks. Idempotent; a line that is only underscores (a rule) is left alone."""
+	lines = (markdown or "").split("\n")
+	for index in _prose_lines(lines):
+		if not _RULE_LINE_RE.match(lines[index]):
+			lines[index] = _BLANK_RUN_RE.sub(lambda match: "\\_" * len(match.group(0)), lines[index])
+	return "\n".join(lines)
+
+
+def _fix_bold_span(before: str, content: str, after: str) -> tuple[str, str, str]:
+	stripped = content.strip()
+	if not any(char.isalnum() for char in stripped):
+		return before + content, "", after
+	if len(stripped) == 1 and stripped.isalpha() and after[:1].islower() and not before[-1:].isalnum():
+		return before + stripped, "", after
+	if len(stripped) > 2 and stripped[-2] == " " and stripped[-1].isupper() and after[:1].islower():
+		stripped, after = stripped[:-2], f" {stripped[-1]}{after}"
+	if content[:1].isspace() or (before[-1:].isalpha() and stripped[:1].isalpha() and len(stripped) > 1):
+		before += " "
+	if (content[-1:].isspace() and not after[:1].isspace()) or (
+		_LETTER_START_RE.match(after) and len(stripped) > 1
+	):
+		after = f" {after}"
+	return before, f"**{stripped}**", after
+
+
+def _fix_bold_spans(text: str) -> str:
+	parts = text.split("**")
+	if len(parts) % 2 == 0:
+		return _fix_bold_spans(text.rstrip()[:-2]) if text.rstrip().endswith("**") else text
+	for index in range(1, len(parts), 2):
+		parts[index - 1], parts[index], parts[index + 1] = _fix_bold_span(
+			parts[index - 1], parts[index], parts[index + 1]
+		)
+	return "".join(parts)
+
+
+def fix_glued_emphasis(markdown: str) -> str:
+	"""Repair bold the PDF extraction glued to its neighbours: `**To**confirm`, `Helps**to**gain`,
+	`**P**revents`, `**Post: H**ypo`, `efficiency**.**`, a stray trailing `**`. Cell by cell in tables."""
+	lines = (markdown or "").split("\n")
+	for index in _prose_lines(lines):
+		line = lines[index]
+		if "**" not in line:
+			continue
+		if _is_table_row(line):
+			lines[index] = "|".join(_fix_bold_spans(cell) for cell in _UNESCAPED_PIPE_RE.split(line))
+		else:
+			lines[index] = _fix_bold_spans(line)
+	return "\n".join(lines)
+
+
+def repair_markdown(markdown: str) -> str:
+	"""Every mechanical repair, in one pass, for the assembled section product."""
+	return fix_glued_emphasis(escape_fill_in_blanks(fix_table_separators(markdown)))
