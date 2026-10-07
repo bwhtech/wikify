@@ -177,8 +177,9 @@ class TestLlmPagePlan(FrappeTestCase):
 
 	def test_unusable_indices_are_ignored(self):
 		pages, _ = self._plan(_llm_reply({"pages": ["2", 99, -1, True, 3]}))
-		self.assertEqual(_titles(pages), ["Preamble", "5.8 Care", "5.8.4 Sedation", "6.1 Protocols"])
-		self.assertIn("5.8.9 Grievances", pages[2].markdown)
+		self.assertEqual(
+			_titles(pages), ["Preamble", "5.8 Care", "5.8.4 Sedation", "5.8.9 Grievances", "6.1 Protocols"]
+		)
 
 	def test_invalid_reply_falls_back_to_the_numbering_rule(self):
 		expected = _titles(plan_pages(_outline()))
@@ -207,7 +208,15 @@ class TestLlmPagePlan(FrappeTestCase):
 		self.assertNotIn("6.1 Protocols", chat.call_args_list[0].args[1][0]["content"])
 		self.assertEqual(
 			_titles(pages),
-			["Preamble", "5.8 Care", "5.8.1 Chaperone", "6.1 Protocols", "6.1.2 Lupus nephritis"],
+			[
+				"Preamble",
+				"5.8 Care",
+				"5.8.1 Chaperone",
+				"5.8.4 Sedation",
+				"5.8.9 Grievances",
+				"6.1 Protocols",
+				"6.1.2 Lupus nephritis",
+			],
 		)
 
 	def test_an_unnumbered_top_level_fragment_folds_into_the_page_before_it(self):
@@ -256,9 +265,9 @@ class TestLlmPagePlan(FrappeTestCase):
 				"6.2.2.1.1 Counselling",
 				"6.2.2.1.2 Pre-op evaluation",
 				"6.2.2.1.3 Intra-op",
+				"6.2.2.2 Note",
 			],
 		)
-		self.assertIn("6.2.2.2 Note", pages[-1].markdown)
 		self.assertNotIn("6.2.2.2 Note", pages[0].markdown)
 
 	def test_a_long_page_without_numbered_children_splits_at_its_sub_headings(self):
@@ -334,7 +343,7 @@ class TestLlmPagePlan(FrappeTestCase):
 		pages, _ = self._plan(_llm_reply({"pages": [4]}), sections)
 		self.assertEqual(_titles(pages), ["5.8 Policies on patient care", "5.8.4 Sedation"])
 
-	def test_numbered_siblings_after_a_page_are_pages_so_the_order_holds(self):
+	def test_numbered_siblings_after_a_page_are_pages_even_when_short(self):
 		sections = [
 			_sec(["2. Organogram"], 1, markdown=_words(20)),
 			_sec(["2. Organogram", "2.1 The staff"], 1, markdown=_words(200)),
@@ -347,7 +356,44 @@ class TestLlmPagePlan(FrappeTestCase):
 		pages, _ = self._plan(_llm_reply({"pages": [0, 2]}), sections)
 		self.assertEqual(
 			_titles(pages),
-			["2. Organogram", "2.2 Hierarchy", "2.3 Staff list", "2.4 Laboratory staff", "2.5 Office staff"],
+			[
+				"2. Organogram",
+				"2.2 Hierarchy",
+				"2.3 Staff list",
+				"2.4 Laboratory staff",
+				"2.5 Office staff",
+				"2.6 Support staff",
+			],
 		)
-		self.assertIn("## 2.6 Support staff", pages[-1].markdown)
-		self.assertNotIn("2.6 Support staff", pages[0].markdown)
+		self.assertNotIn("2.6 Support staff", pages[0].markdown + pages[-2].markdown)
+
+	def test_a_long_page_never_splits_at_a_form_letterhead_or_a_step(self):
+		training = "6.2.2.1.5 PD TRAINING PROCEDURE"
+		sections = [
+			_sec([training], 227, markdown=""),
+			_sec([training, "CHRISTIAN MEDICAL COLLEGE"], 227, markdown=""),
+			_sec([training, "DEPARTMENT OF NEPHROLOGY"], 227, markdown=""),
+			_sec([training, "PD TRAINING OBJECTIVES"], 227, 228, markdown=_words(200)),
+			_sec([training, "DAY WISE SCHEDULE OF TRAINING"], 229, 231, markdown=_words(300)),
+			_sec([training, "CHRISTIAN MEDICAL COLLEGE VELLORE"], 232, markdown=""),
+			_sec([training, "PROCEDURE MANUAL - NEPHROLOGY"], 232, markdown=""),
+			_sec([training, "PD EXCHANGE PROCEDURE"], 232, 233, markdown=_words(229)),
+			_sec([training, "Step 11: Check, measure, Record and Discard"], 233, 234, markdown=_words(191)),
+			_sec([training, "DISCHARGE CHECKLIST"], 239, 240, markdown=_words(193)),
+			_sec([training, "CONTACT INFORMATION SHEET"], 240, markdown=""),
+			_sec([training, "CHRISTIAN MEDICAL COLLEGE"], 240, markdown=""),
+			_sec([training, "DEPARTMENT OF NEPHROLOGY"], 240, markdown=_words(178)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": []}), sections)
+		self.assertEqual(
+			_titles(pages),
+			[
+				training,
+				"PD TRAINING OBJECTIVES",
+				"DAY WISE SCHEDULE OF TRAINING",
+				"PD EXCHANGE PROCEDURE",
+				"DISCHARGE CHECKLIST",
+			],
+		)
+		self.assertIn("## Step 11: Check, measure, Record and Discard", pages[3].markdown)
+		self.assertIn("## CONTACT INFORMATION SHEET", pages[4].markdown)

@@ -25,7 +25,7 @@ MAX_PAGE_WORDS = 2500
 MAX_PAGE_PDF_PAGES = 6
 OUTLINE_BATCH_LINES = 250
 
-_LIST_ITEM_TITLE = re.compile(r"^(?:\d+[.)]?|[A-Za-z][.)]|[IVXivx]+[.)])\s")
+_LIST_ITEM_TITLE = re.compile(r"^(?:\d+[.)]?|[A-Za-z][.)]|[IVXivx]+[.)]|[Ss]tep\s+\d+[:.)]?)\s")
 
 _PROMPT = (
 	"You are planning how a PDF document becomes a wiki. Below is its section outline in "
@@ -160,7 +160,7 @@ def keep_sibling_order(
 	sections: list[Section], parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
 ) -> tuple[set[int], list[int | None]]:
 	"""A numbered sibling after a page must not fold into the parent, which would show it before that
-	page: it becomes a page, or joins the last page before it when it is only a fragment."""
+	page: it becomes a page, or joins the last page before it when it is only a list-item fragment."""
 	parents = list(parents)
 	subtree_words = [len(section.markdown.split()) for section in sections]
 	for index in reversed(range(len(sections))):
@@ -176,7 +176,10 @@ def keep_sibling_order(
 		for sibling in siblings:
 			if sibling in pages:
 				previous_page = sibling
-			elif previous_page is not None and subtree_words[sibling] >= FRAGMENT_WORDS:
+			elif previous_page is not None and (
+				subtree_words[sibling] >= FRAGMENT_WORDS
+				or not _LIST_ITEM_TITLE.match(sections[sibling].title)
+			):
 				pages.add(sibling)
 				previous_page = sibling
 			elif previous_page is not None:
@@ -229,8 +232,17 @@ def split_long_pages(
 
 def heading_parts(sections: list[Section], children: list[int], subtree_words: list[int]) -> list[list[int]]:
 	"""Runs of children that each start at a sub-heading and hold at least MIN_SPLIT_PART_WORDS; a
-	tiny run joins the run before it, or the run after it when it is a bare heading."""
-	starts = [child for child in children if not _LIST_ITEM_TITLE.match(sections[child].title)]
+	tiny run joins the run before it, or the run after it when it is a bare heading. A title the
+	document repeats, or a stack of bare headings, is a form letterhead, never a part's title."""
+	title_counts = Counter(section.title.lower() for section in sections)
+	bare = [not sections[child].markdown.strip() for child in children]
+	starts = [
+		child
+		for position, child in enumerate(children)
+		if not _LIST_ITEM_TITLE.match(sections[child].title)
+		and title_counts[sections[child].title.lower()] == 1
+		and not in_bare_stack(bare, position)
+	]
 	if len(starts) < 2:
 		starts = children
 	parts: list[list[int]] = []
@@ -255,6 +267,12 @@ def heading_parts(sections: list[Section], children: list[int], subtree_words: l
 	elif carried:
 		merged.append(carried)
 	return merged if len(merged) > 1 else []
+
+
+def in_bare_stack(bare: list[bool], position: int) -> bool:
+	before = position > 0 and bare[position - 1]
+	after = position + 1 < len(bare) and bare[position + 1]
+	return bare[position] and (before or after)
 
 
 def fold_sections(sections: list[Section], parents: list[int | None], pages: set[int]) -> list[Section]:
