@@ -234,6 +234,13 @@ class TestSectionizer(FrappeTestCase):
 		self.assertTrue(all("Pg" not in s.markdown for s in secs))
 		self.assertEqual([s.title for s in secs], ["1. Intro", "2. Next"])
 
+	def test_clean_pages_strips_a_header_style_that_covers_only_part_of_a_long_document(self):
+		pages = [
+			(number, f"{'NEPHROLOGY MANUAL' if number % 4 == 0 else 'PROCEDURE MANUAL'}\n\nbody {number}")
+			for number in range(1, 101)
+		]
+		self.assertTrue(all("MANUAL" not in markdown for _, markdown in clean_pages(pages)))
+
 	def test_clean_pages_strips_signoff_footer_block(self):
 		footer = "|**Prepared by - Dr. A**|**Issued by: QMC**|**Approved by - Dr. B**|\n|---|---|---|"
 		pages = [(1, f"## 1. Intro\nreal body\n{footer}"), (2, f"## 2. Next\nmore body\n{footer}")]
