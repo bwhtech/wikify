@@ -630,6 +630,164 @@ class TestSectionizer(FrappeTestCase):
 			"- 3) Instruct patient not to touch the sterile area\n- 4) Explain it is a temporary access\n\n## Procedure",
 		)
 
+	def test_a_chapter_the_body_never_opens_becomes_the_group_of_its_sections(self):
+		chapter = "6. PROTOCOLS FOR CLINICAL NEPHROLOGY"
+		contents = "\n".join(
+			[
+				"| S.No | CONTENTS | Pg No |",
+				"|---|---|---|",
+				"| 5 | Procedures for access | 96 |",
+				"| 5.9 | Policies on reporting | 136 |",
+				"| 6.1 | Protocols for clinical nephrology | 140 |",
+				"| 6.2 | Procedures in dialysis | 158 |",
+				"| 6.3 | Transplantation | 267 |",
+				"| 6.3.3 | Policies for pre-transplant evaluation | 270 |",
+			]
+		)
+		transplantation = (
+			f"## {chapter}\n\n### 6.3.0 TRANSPLANTATION\n\nKidney transplants.\n\n"
+			"## 6.3.2 Organ donation\n\nBrain death.\n\n## POLICIES FOR PRE-TRANSPLANT EVALUATION\n\n"
+			"### 6.3.3.1 RECIPIENT WORKUP\n\nPreliminary evaluation."
+		)
+		pages = [
+			(2, contents),
+			(91, "# 5. PROCEDURES FOR ACCESS\n\n## 5.9 Policies on reporting\n\nReport incidents."),
+			(137, "# 6.1 PROTOCOLS FOR CLINICAL NEPHROLOGY\n\n## 6.1.1 IgA nephropathy\n\nGive steroids."),
+			(138, f"# {chapter}\n\n## 6.1.2 Lupus nephritis\n\nBiopsy first."),
+			(155, f"## {chapter}\n\n### 6.2 PROCEDURES IN DIALYSIS\n\nThe dialysis unit."),
+			(275, transplantation),
+		]
+		protocols = [chapter, "6.1 PROTOCOLS FOR CLINICAL NEPHROLOGY"]
+		transplant = [chapter, "6.3 Transplantation"]
+		evaluation = [*transplant, "6.3.3 Policies for pre-transplant evaluation"]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)[1:]],
+			[
+				["5. PROCEDURES FOR ACCESS"],
+				["5. PROCEDURES FOR ACCESS", "5.9 Policies on reporting"],
+				[chapter],
+				protocols,
+				[*protocols, "6.1.1 IgA nephropathy"],
+				[*protocols, "6.1.2 Lupus nephritis"],
+				[chapter, "6.2 PROCEDURES IN DIALYSIS"],
+				transplant,
+				[*transplant, "6.3.0 TRANSPLANTATION"],
+				[*transplant, "6.3.2 Organ donation"],
+				evaluation,
+				[*evaluation, "6.3.3.1 RECIPIENT WORKUP"],
+			],
+		)
+
+	def test_a_list_heading_numbered_like_the_next_chapter_stays_in_its_section(self):
+		complications = (
+			"## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\n# IDENTIFYING AND MANAGING COMPLICATIONS\n\n"
+			"## 4. AIR EMBOLISM\n\nClamp the line.\n\n# 7. HYPERKALEMIA\n\nGive calcium.\n\n"
+			"## CENTRAL VENOUS CATHETER BLOCK\n\nUse urokinase."
+		)
+		pages = [
+			(91, "# 5. PROCEDURES FOR ACCESS\n\n## 5.1 Policies for access\n\nRegister patients."),
+			(137, "# 6. PROTOCOLS\n\n## 6.2 PROCEDURES IN DIALYSIS\n\n### 6.2.1 HEMODIALYSIS\n\nThe unit."),
+			(167, complications),
+			(172, "## 6.2.1.5 HEPATITIS B VACCINATION\n\nVaccinate."),
+			(179, "## 6.2.1POLICIES FOR HEMODIALYSIS\n\n### 6.2.1.8 Emergency Dialysis\n\nDialyse now."),
+			(180, "## 6.2.1 POLICIES FOR HEMODIALYSIS\n\n### 6.2.1.9 Temporary Access\n\nFemoral line."),
+			(371, "# 7. PATIENT RIGHTS AND EDUCATION\n\n## 7.1 Privacy\n\nScreens are used."),
+		]
+		hemodialysis = ["6. PROTOCOLS", "6.2 PROCEDURES IN DIALYSIS", "6.2.1 HEMODIALYSIS"]
+		access = [*hemodialysis, "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS"]
+		paths = {section.title: section.hierarchy_path for section in sectionize(pages)}
+		self.assertEqual(paths["7. HYPERKALEMIA"], [*access, "7. HYPERKALEMIA"])
+		self.assertEqual(paths["CENTRAL VENOUS CATHETER BLOCK"], [*access, "CENTRAL VENOUS CATHETER BLOCK"])
+		self.assertEqual(
+			paths["6.2.1.5 HEPATITIS B VACCINATION"], [*hemodialysis, "6.2.1.5 HEPATITIS B VACCINATION"]
+		)
+		self.assertEqual(paths["6.2.1.9 Temporary Access"], [*hemodialysis, "6.2.1.9 Temporary Access"])
+		self.assertNotIn("6.2.1 POLICIES FOR HEMODIALYSIS", paths)
+
+	def test_a_lettered_running_header_of_the_open_section_is_dropped(self):
+		policies = "6.2.1 POLICIES FOR MANAGEMENT OF HEMODIALYSIS"
+		introduction = (
+			"### 6.2.1HEMODIALYSIS\n\n#### 6.2.1.aIntroduction to the unit\n\nThe unit has 40 machines."
+		)
+		icu = (
+			"# ICU dialysis\n\nBedside dialysis.\n\n# 6.2.1.b POLICIES FOR MANAGEMENT OF HEMODIALYSIS\n\n"
+			"## 6.2.1.1 PROTOCOL FOR INITIATING\n\nCheck consent."
+		)
+		pages = [
+			(155, introduction),
+			(157, icu),
+			(179, f"## {policies}\n\n### 6.2.1.8 Emergency Dialysis\n\nDialyse within an hour."),
+			(180, f"## {policies}\n\n### 6.2.1.9 Temporary Vascular Access\n\nUse a femoral line."),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.title for section in sections],
+			[
+				"6.2.1 HEMODIALYSIS",
+				"6.2.1.aIntroduction to the unit",
+				"ICU dialysis",
+				"6.2.1.1 PROTOCOL FOR INITIATING",
+				"6.2.1.8 Emergency Dialysis",
+				"6.2.1.9 Temporary Vascular Access",
+			],
+		)
+		self.assertEqual(sections[2].markdown, "Bedside dialysis.")
+
+	def test_a_bold_list_item_numbered_like_the_next_chapter_does_not_take_the_chapter(self):
+		pages = [
+			(91, "# 5. PROCEDURES FOR ACCESS\n\n## 5.1 Policies for access\n\nRegister patients."),
+			(137, "# 6. PROTOCOLS\n\n## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\nCannulate with care."),
+			(169, "**6. PULMONARY EDEMA**\n\nGive oxygen.\n\n**7. HYPERKALEMIA**\n\nGive calcium."),
+			(170, "## 6.2.1.5 HEPATITIS B VACCINATION\n\nVaccinate."),
+			(
+				371,
+				"# **7. PATIENT RIGHTS AND EDUCATION** \n\nRights are displayed.\n\n# **7.1 Privacy**\n\nScreens.",
+			),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.hierarchy_path for section in sections if section.title.startswith("7")],
+			[["7. PATIENT RIGHTS AND EDUCATION"], ["7. PATIENT RIGHTS AND EDUCATION", "7.1 Privacy"]],
+		)
+		self.assertIn("**7. HYPERKALEMIA**", sections[3].markdown)
+
+	def test_a_misprinted_chapter_in_a_deep_number_is_read_as_the_current_chapter(self):
+		kinship = (
+			"## 6.5.3. PROCEDURES FOR TESTING\n\n### 6.5.3.1. KINSHIP TESTING PROTOCOL\n\nDNA test.\n\n"
+			"#### 6.5.3.1.4. Turn-Around-Time:\n\nTwo weeks.\n\n"
+			"#### 1.5.3.1.5. PATIENT'S RIGHTS & CONFIDENTIALITY\n\nReports are sealed."
+		)
+		endotoxin = (
+			"## 6.5.3.2.0. Endotoxin Testing Protocol\n\nLAL assay.\n\n"
+			"## 1.5.3.2.1 Pre Analytical Phase :\n\nCollect water.\n\n## 6.5.4 RECORDS MAINTAINED\n\nRegisters."
+		)
+		testing = "6.5.3. PROCEDURES FOR TESTING"
+		protocol = [testing, "6.5.3.1. KINSHIP TESTING PROTOCOL"]
+		endotoxin_group = [testing, "6.5.3.2. Endotoxin Testing Protocol"]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize([(356, kinship), (361, endotoxin)])],
+			[
+				[testing],
+				protocol,
+				[*protocol, "6.5.3.1.4. Turn-Around-Time:"],
+				[*protocol, "6.5.3.1.5. PATIENT'S RIGHTS & CONFIDENTIALITY"],
+				endotoxin_group,
+				[*endotoxin_group, "6.5.3.2.0. Endotoxin Testing Protocol"],
+				[*endotoxin_group, "6.5.3.2.1 Pre Analytical Phase :"],
+				["6.5.4 RECORDS MAINTAINED"],
+			],
+		)
+
+	def test_html_tags_are_stripped_from_heading_titles(self):
+		markdown = (
+			"## 2.3. STAFF LIST as on 24<sup>th</sup> May 2018\n\nNames.\n\n"
+			"## **<u>2.4 CODE RED PROTOCOL</u>** \n\nEvacuate."
+		)
+		self.assertEqual(
+			[section.title for section in sectionize([(29, markdown)])],
+			["2.3. STAFF LIST as on 24th May 2018", "2.4 CODE RED PROTOCOL"],
+		)
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):

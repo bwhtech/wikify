@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import pairwise
@@ -21,6 +22,9 @@ _DOUBLE_NUM = re.compile(r"^\d+\.\s+\d")
 _GLUED_NUM = re.compile(r"^(\d+(?:\.\d+)+\.?)(?=[A-Z])")
 _BOLD_LINE = re.compile(r"^\*\*([^*]+)\*\*$")
 _LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
+_LETTERED_NUM = re.compile(r"^(\d+(?:\.\d+)+)\.[a-z](?![a-z])\s*")
+_TOC_NUMBERED = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+(.*?)(?:\s*\.{3,})?(?:\s+\d{1,4})?$")
 _CONTENTS_TITLE = re.compile(r"(?i)^(?:table of )?contents$|^index$")
 _TOC_ENTRY = re.compile(
 	r"^(?:[-*+]\s+)?\|?\s*\d+(?:\.\d+)*\.?\s*\|?\s*[A-Za-z(].*?(?:\.{3,}|\s[-\u2013\u2014]\s|\||<br>|\s)\s*(\d{1,4})\s*\|?$"
@@ -32,9 +36,8 @@ TOC_MIN_ASCENDING_SHARE = 0.75
 
 
 def _clean_title(raw: str) -> str:
-	title = _GLUED_NUM.sub(
-		r"\1 ", _LINK.sub(r"\1", raw.replace("**", "").strip().strip("*_").strip()).strip()
-	)
+	text = _HTML_TAG.sub("", raw).replace("**", "").strip().strip("*_").strip()
+	title = _GLUED_NUM.sub(r"\1 ", _LINK.sub(r"\1", text).strip())
 	if title.endswith(".") and not title.endswith(".."):
 		title = title[:-1].rstrip()
 	if len(title) <= MAX_TITLE_LENGTH:
@@ -108,11 +111,12 @@ def dotted_heading_positions(pages: list[tuple[int, str]]) -> list[tuple[int, in
 def opens_next_chapter(
 	chapter: int, last_number: tuple[int, ...], next_dotted: tuple[int, ...] | None, title: str
 ) -> bool:
-	"""Inside a numbered sub-section, "4." is a list item unless it is the next chapter: its own
-	sub-sections follow, or, with none left to read, it is set in capitals like a chapter title."""
+	"""Inside a numbered sub-section, "4." is a list item unless it is the next chapter: the next dotted
+	heading no longer belongs to the current chapter, or, with none left to read, it is set in capitals
+	like a chapter title."""
 	if chapter != last_number[0] + 1:
 		return False
-	return next_dotted[0] == chapter if next_dotted else title.isupper()
+	return next_dotted[0] >= chapter if next_dotted else title.isupper()
 
 
 def adopt_preceding_descendants(
@@ -178,7 +182,9 @@ def _continues_numbering(number: tuple[int, ...], last_number: tuple[int, ...]) 
 	)
 
 
-def _promote_numbered_bold_line(line: str, last_number: tuple[int, ...]) -> str:
+def _promote_numbered_bold_line(
+	line: str, last_number: tuple[int, ...], next_dotted: tuple[int, ...] | None
+) -> str:
 	bold = _BOLD_LINE.match(line.strip())
 	if not (bold and last_number):
 		return line
@@ -186,7 +192,120 @@ def _promote_numbered_bold_line(line: str, last_number: tuple[int, ...]) -> str:
 	number = _section_number(title)
 	if number is None or not _continues_numbering(number, last_number):
 		return line
+	if (
+		len(number) == 1
+		and len(last_number) > 1
+		and not opens_next_chapter(number[0], last_number, next_dotted, title)
+	):
+		return line
 	return f"{'#' * min(6, len(number))} {title}"
+
+
+def next_dotted_number(
+	dotted_headings: list[tuple[int, int, tuple[int, ...]]], page_index: int, line_index: int
+) -> tuple[int, ...] | None:
+	index = bisect_right(dotted_headings, (page_index, line_index), key=lambda heading: heading[:2])
+	return dotted_headings[index][2] if index < len(dotted_headings) else None
+
+
+def correct_chapter_typo(title: str, last_number: tuple[int, ...]) -> str:
+	"""A deep number whose chapter jumps while its tail carries on the current numbering ("1.5.3.1.5"
+	after 6.5.3.1.4) is a misprint of the current chapter."""
+	match = _NUM_RE.match(title)
+	if not (match and last_number):
+		return title
+	number = tuple(int(part) for part in match.group(1).split("."))
+	corrected = (last_number[0], *number[1:])
+	if len(number) < 3 or number[0] == last_number[0] or not _continues_numbering(corrected, last_number):
+		return title
+	return ".".join(str(part) for part in corrected) + title[match.end(1) :]
+
+
+def toc_section_titles(pages: list[tuple[int, str]]) -> dict[tuple[int, ...], str]:
+	titles: dict[tuple[int, ...], str] = {}
+	for _, md in pages:
+		lines = md.splitlines()
+		for line in lines[: toc_end_line(lines) + 1]:
+			text = " ".join(_HTML_TAG.sub(" ", line).replace("|", " ").split()).lstrip("-*+ ")
+			entry = _TOC_NUMBERED.match(text)
+			if entry and entry.group(2):
+				number = tuple(int(part) for part in entry.group(1).split("."))
+				titles.setdefault(number, _clean_title(f"{entry.group(1)} {entry.group(2)}"))
+	return titles
+
+
+def recurring_section_titles(pages: list[tuple[int, str]]) -> dict[tuple[int, ...], list[str]]:
+	"""Numbered heading titles printed on more than one page, in reading order: running headers that
+	name a section even where the body never opens it."""
+	pages_seen: dict[str, set[int]] = defaultdict(set)
+	for page_no, md in pages:
+		for line in md.splitlines():
+			match = _HEADING_RE.match(line)
+			if match:
+				pages_seen[_clean_title(match.group(2))].add(page_no)
+	recurring: dict[tuple[int, ...], list[str]] = defaultdict(list)
+	for title, seen in pages_seen.items():
+		number = _section_number(title)
+		if number and len(seen) > 1:
+			recurring[number].append(title)
+	return recurring
+
+
+def repeats_running_header(
+	title: str, stack: list[tuple[int, str, bool]], recurring: dict[tuple[int, ...], list[str]]
+) -> bool:
+	"""A lettered number ("6.2.1.b POLICIES…") under its open section 6.2.1 is that section's running
+	header "6.2.1 POLICIES…" printed with a suffix."""
+	lettered = _LETTERED_NUM.match(title)
+	if not lettered:
+		return False
+	base = tuple(int(part) for part in lettered.group(1).split("."))
+	words = _title_words(title[lettered.end() :])
+	return any(numbered and _section_number(open_title) == base for _, open_title, numbered in stack) and any(
+		_title_words(running) == words for running in recurring.get(base, ())
+	)
+
+
+def missing_ancestors(
+	number: tuple[int, ...], stack: list[tuple[int, str, bool]], last_at_depth: dict[int, tuple[int, ...]]
+) -> list[tuple[int, ...]]:
+	"""Numeric ancestors of a heading that the body never opened, where the numbering shows they belong:
+	the last number read at that depth is the ancestor's predecessor (6.1 after chapter 5)."""
+	deepest = max(
+		(len(_section_number(open_title)) for _, open_title, numbered in stack if numbered), default=0
+	)
+	missing = []
+	for depth in range(deepest + 1, len(number)):
+		prefix = number[:depth]
+		previous = last_at_depth.get(depth)
+		if previous and previous[:-1] == prefix[:-1] and previous[-1] + 1 == prefix[-1]:
+			missing.append(prefix)
+	return missing
+
+
+def ancestor_title(
+	prefix: tuple[int, ...],
+	recurring: dict[tuple[int, ...], list[str]],
+	toc_titles: dict[tuple[int, ...], str],
+	child_title: str,
+) -> str:
+	if recurring.get(prefix):
+		return recurring[prefix][0]
+	if prefix in toc_titles:
+		return toc_titles[prefix]
+	label = ".".join(str(part) for part in prefix)
+	child = _NUM_RE.match(child_title)
+	if _section_number(child_title) == (*prefix, 0):
+		return label + child_title[child.end(1) :]
+	return label
+
+
+def is_bare_heading_for(section: Section, title: str) -> bool:
+	return (
+		not section.markdown
+		and not _NUM_RE.match(section.title)
+		and _title_words(section.title) == _title_words(title)
+	)
 
 
 def toc_end_line(lines: list[str]) -> int:
@@ -253,6 +372,9 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 	running_headers = running_header_titles(pages)
 	opened_headers: set[str] = set()
 	dotted_headings = dotted_heading_positions(pages)
+	recurring_titles = recurring_section_titles(pages)
+	toc_titles = toc_section_titles(pages)
+	last_at_depth: dict[int, tuple[int, ...]] = {}
 
 	def flush():
 		if current is not None:
@@ -269,7 +391,10 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 		first_line = next((index for index, line in enumerate(lines) if line.strip()), -1)
 		for line_index, line in enumerate(lines):
 			in_toc = line_index <= toc_end and bool(line.strip())
-			m = _HEADING_RE.match(line if in_toc else _promote_numbered_bold_line(line, last_number))
+			next_dotted = next_dotted_number(dotted_headings, page_index, line_index)
+			m = _HEADING_RE.match(
+				line if in_toc else _promote_numbered_bold_line(line, last_number, next_dotted)
+			)
 			title = _clean_title(m.group(2)) if m else ""
 			if in_toc:
 				if not (current and _CONTENTS_TITLE.match(current.title)):
@@ -290,7 +415,10 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 			elif m and _is_label(title, level_map):
 				line, m = f"**{title}**", None
 			if m:
-				if _repeats_open_section(title, stack):
+				title = correct_chapter_typo(title, last_number)
+				if _repeats_open_section(title, stack) or repeats_running_header(
+					title, stack, recurring_titles
+				):
 					if current is not None:
 						current.page_end = page_no
 					continue
@@ -320,21 +448,13 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 				if level == 1 and title not in level_map:
 					cnum = _chapter_num(title)
 					if cnum is not None:
-						next_dotted = next(
-							(
-								dotted_number
-								for dotted_page, dotted_line, dotted_number in dotted_headings
-								if (dotted_page, dotted_line) > (page_index, line_index)
-							),
-							None,
-						)
 						if (
 							_looks_like_list_item(title)
 							or cnum <= max_chapter
 							or (last_number and cnum <= last_number[0])
 							or (
-								not max_chapter
-								and len(last_number) > 1
+								len(last_number) > 1
+								and (next_dotted or not max_chapter)
 								and not opens_next_chapter(cnum, last_number, next_dotted, title)
 							)
 							or (max_chapter and capital_chapters and not title.isupper())
@@ -359,9 +479,30 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 					)
 				):
 					stack.pop()
+				if numbered_heading:
+					for prefix in missing_ancestors(number, stack, last_at_depth):
+						group_title = ancestor_title(prefix, recurring_titles, toc_titles, title)
+						group_level = max(1, level - len(number) + len(prefix))
+						group_start = page_no
+						if sections and is_bare_heading_for(sections[-1], group_title):
+							group_start = sections.pop().page_start
+						stack.append((group_level, group_title, True))
+						sections.append(
+							Section(
+								title=group_title,
+								level=group_level,
+								hierarchy_path=[t for _, t, _ in stack],
+								page_start=group_start,
+								page_end=page_no,
+							)
+						)
+						last_at_depth[len(prefix)] = prefix
+						if len(prefix) == 1:
+							max_chapter = max(max_chapter, prefix[0])
 				stack.append((level, title, numbered_heading))
 				if numbered_heading:
 					last_number = number
+					last_at_depth[len(number)] = number
 				current = Section(
 					title=title,
 					level=level,
