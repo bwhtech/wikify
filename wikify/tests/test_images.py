@@ -69,6 +69,21 @@ class TestFigureDetection(FrappeTestCase):
 		self.assertEqual(chart.text_before, TEXT_BEFORE)
 		self.assertEqual(chart.text_after, TEXT_AFTER)
 
+	def test_the_crop_leaves_out_a_title_line_its_padding_would_cut_in_half(self):
+		document = fitz.open()
+		page = document.new_page(width=612, height=792)
+		page.insert_text(
+			(100, CHART_RECT.y0 - 2), "DOSES OF IP ANTIBIOTICS (ISPD 2016 GUIDELINES)", fontsize=11
+		)
+		page.insert_image(CHART_RECT, pixmap=solid_pixmap(600, 400, (200, 60, 30)))
+		title_bottom = images.text_line_boxes(page)[0][3]
+
+		clip = images.figure_clip(page, images.find_figures(page, set())[0])
+
+		self.assertGreater(title_bottom, CHART_RECT.y0 - images.CROP_PADDING)
+		self.assertEqual(clip.y0, title_bottom)
+		self.assertEqual(clip.y1, CHART_RECT.y1 + images.CROP_PADDING)
+
 
 class TestFigurePlacement(FrappeTestCase):
 	def test_places_the_figure_after_the_text_that_precedes_it(self):

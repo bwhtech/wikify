@@ -4,6 +4,8 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
+import fitz
+
 from wikify.engine import pdf_utils, regions, store
 
 FIGURE_DPI = 200
@@ -143,15 +145,34 @@ def find_figures(page, repeated: set[bytes]) -> list[Figure]:
 	return figures
 
 
-def crop_figure(page, figure: Figure) -> bytes:
+def text_line_boxes(page) -> list[tuple]:
+	return [
+		tuple(float(value) for value in line["bbox"])
+		for block in page.get_text("dict")["blocks"]
+		if block["type"] == 0
+		for line in block["lines"]
+		if "".join(span["text"] for span in line["spans"]).strip()
+	]
+
+
+def figure_clip(page, figure: Figure) -> fitz.Rect:
+	"""The padded figure box, moved off any text line its top or bottom edge would cut in half: a line
+	mostly inside the picture is taken in whole, a line outside it (a title above) is left out whole."""
 	box = figure.bbox
-	clip = page.rect & (
-		box[0] - CROP_PADDING,
-		box[1] - CROP_PADDING,
-		box[2] + CROP_PADDING,
-		box[3] + CROP_PADDING,
-	)
-	return pdf_utils.render_png(page, dpi=FIGURE_DPI, clip=clip)
+	top, bottom = box[1] - CROP_PADDING, box[3] + CROP_PADDING
+	for line in text_line_boxes(page):
+		if not overlaps_horizontally(line, box):
+			continue
+		inside = max(0.0, min(line[3], box[3]) - max(line[1], box[1])) / max(line[3] - line[1], 1.0)
+		if line[1] < top < line[3]:
+			top = line[1] if inside >= 0.5 else line[3]
+		if line[1] < bottom < line[3]:
+			bottom = line[3] if inside >= 0.5 else line[1]
+	return page.rect & fitz.Rect(box[0] - CROP_PADDING, top, box[2] + CROP_PADDING, bottom)
+
+
+def crop_figure(page, figure: Figure) -> bytes:
+	return pdf_utils.render_png(page, dpi=FIGURE_DPI, clip=figure_clip(page, figure))
 
 
 def page_figures(page, repeated: set[bytes], page_name: str, page_no: int) -> list[Figure]:
