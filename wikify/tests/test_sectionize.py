@@ -487,6 +487,117 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual([s.title for s in secs], ["3. Other equipment:"])
 		self.assertIn("**CRRT Order sheet :**", secs[0].markdown)
 
+	def test_numbered_list_items_inside_a_sub_section_stay_under_it(self):
+		pages = [
+			(5, "## 3.6.8 CAPD Nurse Educator\n\nThe CAPD nurse educator trains patients."),
+			(
+				7,
+				"# 3. Responsibilities of the CAPD Nurse Educator towards inpatients\n\n- Check the log-book",
+			),
+			(
+				8,
+				"# 4. Extra procedures to be performed by the CAPD nurse educator:\n\n- Assist PET\n\n"
+				"# 5. Other responsibilities of the CAPD Nurse educator\n\n- Attend meetings",
+			),
+			(
+				9,
+				"## 11. Administration\n\n- Plan duty rosters\n\n"
+				"## 3.6.9 RENAL TRANSPLANT CO-ORDINATOR\n\n**Qualification:** nurse",
+			),
+			(13, "## 3.7 Allied Health Staff\n\n### 3.7.1 Pharmacist\n\n- Dispensing"),
+			(14, "# 4. PROTOCOLS\n\n## 4.1 Dialysis\n\n- Prime the circuit"),
+		]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)],
+			[
+				["3.6.8 CAPD Nurse Educator"],
+				[
+					"3.6.8 CAPD Nurse Educator",
+					"3. Responsibilities of the CAPD Nurse Educator towards inpatients",
+				],
+				[
+					"3.6.8 CAPD Nurse Educator",
+					"4. Extra procedures to be performed by the CAPD nurse educator:",
+				],
+				["3.6.8 CAPD Nurse Educator", "5. Other responsibilities of the CAPD Nurse educator"],
+				["3.6.8 CAPD Nurse Educator", "11. Administration"],
+				["3.6.9 RENAL TRANSPLANT CO-ORDINATOR"],
+				["3.7 Allied Health Staff"],
+				["3.7 Allied Health Staff", "3.7.1 Pharmacist"],
+				["4. PROTOCOLS"],
+				["4. PROTOCOLS", "4.1 Dialysis"],
+			],
+		)
+
+	def test_a_parent_heading_met_after_its_sub_sections_becomes_their_group(self):
+		policies = "6.2.1 POLICIES FOR MANAGEMENT OF HEMODIALYSIS"
+		pages = [
+			(
+				1,
+				"Saline dialysis is reserved for bleeding patients.\n\n"
+				"## 6.2.1.3ASSESSMENT AND MONITORING\n\nPatients develop complications.",
+			),
+			(3, "## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\n### AV FISTULA\n\nCannulate with care."),
+			(19, f"# {policies}\n\n## 6.2.1.8 Emergency Dialysis\n\nDialyse within an hour."),
+			(20, f"## {policies}\n\n### 6.2.1.9 Temporary Vascular Access\n\nUse a femoral catheter."),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.hierarchy_path for section in sections],
+			[
+				["Preamble"],
+				[policies],
+				[policies, "6.2.1.3 ASSESSMENT AND MONITORING"],
+				[policies, "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS"],
+				[policies, "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS", "AV FISTULA"],
+				[policies, "6.2.1.8 Emergency Dialysis"],
+				[policies, "6.2.1.9 Temporary Vascular Access"],
+			],
+		)
+		self.assertEqual((sections[1].level, sections[1].markdown, sections[1].page_start), (3, "", 1))
+		self.assertEqual(sections[4].markdown, "Cannulate with care.")
+
+	def test_running_chapter_header_at_a_page_top_is_dropped(self):
+		pages = [
+			(10, "## 3.6.9 RENAL TRANSPLANT CO-ORDINATOR\n\n- Maintain the registry."),
+			(
+				13,
+				"# 3. JOB DESCRIPTIONS\n\n## 3.7 Allied Health Staff\n\n### 3.7.1 Pharmacist\n\n- Dispensing",
+			),
+			(14, "### 3.7.2 Transplant Coordinator\n\n- Counsel donors."),
+			(15, "# 3. JOB DESCRIPTION\n\n## 3.7.3 Dialysis therapists\n\n- Prime the circuit."),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.title for section in sections],
+			[
+				"3.6.9 RENAL TRANSPLANT CO-ORDINATOR",
+				"3.7 Allied Health Staff",
+				"3.7.1 Pharmacist",
+				"3.7.2 Transplant Coordinator",
+				"3.7.3 Dialysis therapists",
+			],
+		)
+		self.assertFalse(any("JOB DESCRIPTION" in section.markdown for section in sections))
+
+	def test_a_numbered_section_never_nests_under_another_chapter(self):
+		pages = [
+			(
+				1,
+				"# 3. **Other equipment:** \n\n- Gloves\n\n## Patient Preparation\n\nExplain the procedure.\n\n"
+				"# **6.4.2. CENTRAL VENOUS CATHETERIZATION** \n\n# **Definition** \n\nA double lumen catheter.",
+			)
+		]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)],
+			[
+				["3. Other equipment:"],
+				["3. Other equipment:", "Patient Preparation"],
+				["6.4.2. CENTRAL VENOUS CATHETERIZATION"],
+				["6.4.2. CENTRAL VENOUS CATHETERIZATION", "Definition"],
+			],
+		)
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):

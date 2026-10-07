@@ -9,6 +9,7 @@ from wikify.engine.loader.cleanup import _SEP_ONLY
 from wikify.engine.loader.toc import correct_level
 
 MAX_TITLE_LENGTH = 140
+PREAMBLE_TITLE = "Preamble"
 
 RUNNING_HEADER_MIN_PAGES = 3
 TOP_OF_PAGE_LINES = 3
@@ -87,6 +88,83 @@ def _repeats_open_section(title: str, stack: list[tuple[int, str, bool]]) -> boo
 		and _title_words(open_title) == words
 		for _, open_title, numbered in stack
 	)
+
+
+def extends_number(number: tuple[int, ...] | None, prefix: tuple[int, ...]) -> bool:
+	return bool(number) and len(number) > len(prefix) and number[: len(prefix)] == prefix
+
+
+def dotted_heading_positions(pages: list[tuple[int, str]]) -> list[tuple[int, int, tuple[int, ...]]]:
+	positions = []
+	for page_index, (_, md) in enumerate(pages):
+		for line_index, line in enumerate(md.splitlines()):
+			match = _HEADING_RE.match(line)
+			number = _section_number(_clean_title(match.group(2))) if match else None
+			if number and len(number) > 1:
+				positions.append((page_index, line_index, number))
+	return positions
+
+
+def opens_next_chapter(
+	chapter: int, last_number: tuple[int, ...], next_dotted: tuple[int, ...] | None, title: str
+) -> bool:
+	"""Inside a numbered sub-section, "4." is a list item unless it is the next chapter: its own
+	sub-sections follow, or, with none left to read, it is set in capitals like a chapter title."""
+	if chapter != last_number[0] + 1:
+		return False
+	return next_dotted[0] == chapter if next_dotted else title.isupper()
+
+
+def adopt_preceding_descendants(
+	sections: list[Section],
+	current: Section | None,
+	stack: list[tuple[int, str, bool]],
+	title: str,
+	level: int,
+	page_no: int,
+) -> None:
+	"""A parent heading that resurfaces after its sub-sections were read (an excerpt that starts
+	mid-section) becomes their group instead of a new section after them."""
+	number = _section_number(title)
+
+	def descends(section: Section) -> bool:
+		return any(
+			extends_number(_section_number(path_title), number) for path_title in section.hierarchy_path
+		)
+
+	run = [*sections, current] if current else list(sections)
+	start = len(run)
+	while start and descends(run[start - 1]):
+		start -= 1
+	if start == len(run):
+		return
+	for section in run[start:]:
+		depth = next(
+			index
+			for index, path_title in enumerate(section.hierarchy_path)
+			if extends_number(_section_number(path_title), number)
+		)
+		section.hierarchy_path.insert(depth, title)
+	group_path = run[start].hierarchy_path[: run[start].hierarchy_path.index(title) + 1]
+	sections.insert(
+		start,
+		Section(
+			title=title,
+			level=level,
+			hierarchy_path=list(group_path),
+			page_start=run[start].page_start,
+			page_end=page_no,
+		),
+	)
+	stack_index = next(
+		(
+			index
+			for index, (_, open_title, numbered) in enumerate(stack)
+			if numbered and extends_number(_section_number(open_title), number)
+		),
+		len(stack),
+	)
+	stack.insert(stack_index, (level, title, True))
 
 
 def _continues_numbering(number: tuple[int, ...], last_number: tuple[int, ...]) -> bool:
@@ -174,19 +252,21 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 	last_number: tuple[int, ...] = ()
 	running_headers = running_header_titles(pages)
 	opened_headers: set[str] = set()
+	dotted_headings = dotted_heading_positions(pages)
 
 	def flush():
 		if current is not None:
 			current.markdown = "\n".join(buf).strip()
 			sections.append(current)
 
-	for page_no, md in pages:
+	for page_index, (page_no, md) in enumerate(pages):
 		# Without a blank line, GFM reads the next page's first line as another row of a table, more
 		# raw HTML, or a lazy continuation of a list item that ended the previous page.
 		if buf and buf[-1].strip():
 			buf.append("")
 		lines = md.splitlines()
 		toc_end = toc_end_line(lines)
+		first_line = next((index for index, line in enumerate(lines) if line.strip()), -1)
 		for line_index, line in enumerate(lines):
 			in_toc = line_index <= toc_end and bool(line.strip())
 			m = _HEADING_RE.match(line if in_toc else _promote_numbered_bold_line(line, last_number))
@@ -214,6 +294,19 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 					if current is not None:
 						current.page_end = page_no
 					continue
+				number = _section_number(title)
+				if number and extends_number(last_number, number):
+					# Numbering that steps back to an ancestor is that ancestor's running header.
+					if len(number) > 1:
+						if not any(_section_number(open_title) == number for _, open_title, _ in stack):
+							level = correct_level(title, _infer_level(title, len(m.group(1))), level_map)
+							adopt_preceding_descendants(sections, current, stack, title, level, page_no)
+						if current is not None:
+							current.page_end = page_no
+						continue
+					next_line = next((text for text in lines[line_index + 1 :] if text.strip()), "")
+					if line_index == first_line and _HEADING_RE.match(next_line):
+						continue
 				if title in running_headers:
 					if title in opened_headers:
 						if current is not None:
@@ -227,10 +320,23 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 				if level == 1 and title not in level_map:
 					cnum = _chapter_num(title)
 					if cnum is not None:
+						next_dotted = next(
+							(
+								dotted_number
+								for dotted_page, dotted_line, dotted_number in dotted_headings
+								if (dotted_page, dotted_line) > (page_index, line_index)
+							),
+							None,
+						)
 						if (
 							_looks_like_list_item(title)
 							or cnum <= max_chapter
 							or (last_number and cnum <= last_number[0])
+							or (
+								not max_chapter
+								and len(last_number) > 1
+								and not opens_next_chapter(cnum, last_number, next_dotted, title)
+							)
 							or (max_chapter and capital_chapters and not title.isupper())
 							or (page_no, cnum - 1) == last_list_item
 						):
@@ -245,11 +351,17 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 					if anchor is not None:
 						level = min(6, max(level, anchor + 1))
 				numbered_heading = not demoted and bool(_NUM_RE.match(title))
-				while stack and (stack[-1][0] >= level or (numbered_heading and not stack[-1][2])):
+				while stack and (
+					stack[-1][0] >= level
+					or (
+						numbered_heading
+						and not (stack[-1][2] and extends_number(number, _section_number(stack[-1][1])))
+					)
+				):
 					stack.pop()
 				stack.append((level, title, numbered_heading))
 				if numbered_heading:
-					last_number = _section_number(title)
+					last_number = number
 				current = Section(
 					title=title,
 					level=level,
@@ -260,9 +372,9 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 			else:
 				if current is None and line.strip():
 					current = Section(
-						title="Preamble",
+						title=PREAMBLE_TITLE,
 						level=1,
-						hierarchy_path=["Preamble"],
+						hierarchy_path=[PREAMBLE_TITLE],
 						page_start=page_no,
 						page_end=page_no,
 					)
