@@ -128,6 +128,7 @@ def enforce_invariants(
 			pages.add(index)
 	pages = add_numbered_siblings(parents, numbers, pages)
 	pages, parents = split_long_pages(sections, parents, numbers, pages)
+	pages, parents = keep_sibling_order(sections, parents, numbers, pages)
 	child_counts = Counter(parent for parent in parents if parent is not None)
 	pages = {
 		index
@@ -153,6 +154,34 @@ def add_numbered_siblings(
 		if parent in pages and 2 * len(pages.intersection(siblings)) > len(siblings):
 			pages.update(siblings)
 	return pages
+
+
+def keep_sibling_order(
+	sections: list[Section], parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
+) -> tuple[set[int], list[int | None]]:
+	"""A numbered sibling after a page must not fold into the parent, which would show it before that
+	page: it becomes a page, or joins the last page before it when it is only a fragment."""
+	parents = list(parents)
+	subtree_words = [len(section.markdown.split()) for section in sections]
+	for index in reversed(range(len(sections))):
+		if parents[index] is not None:
+			subtree_words[parents[index]] += subtree_words[index]
+	numbered_children: dict[int, list[int]] = defaultdict(list)
+	for index, parent in enumerate(parents):
+		if parent in pages and numbers[index]:
+			numbered_children[parent].append(index)
+	pages = set(pages)
+	for siblings in numbered_children.values():
+		previous_page = None
+		for sibling in siblings:
+			if sibling in pages:
+				previous_page = sibling
+			elif previous_page is not None and subtree_words[sibling] >= FRAGMENT_WORDS:
+				pages.add(sibling)
+				previous_page = sibling
+			elif previous_page is not None:
+				parents[sibling] = max(page for page in pages if page < sibling)
+	return pages, parents
 
 
 def split_long_pages(

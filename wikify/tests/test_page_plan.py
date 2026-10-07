@@ -178,6 +178,7 @@ class TestLlmPagePlan(FrappeTestCase):
 	def test_unusable_indices_are_ignored(self):
 		pages, _ = self._plan(_llm_reply({"pages": ["2", 99, -1, True, 3]}))
 		self.assertEqual(_titles(pages), ["Preamble", "5.8 Care", "5.8.4 Sedation", "6.1 Protocols"])
+		self.assertIn("5.8.9 Grievances", pages[2].markdown)
 
 	def test_invalid_reply_falls_back_to_the_numbering_rule(self):
 		expected = _titles(plan_pages(_outline()))
@@ -257,7 +258,8 @@ class TestLlmPagePlan(FrappeTestCase):
 				"6.2.2.1.3 Intra-op",
 			],
 		)
-		self.assertIn("## 6.2.2.2 Note", pages[0].markdown)
+		self.assertIn("6.2.2.2 Note", pages[-1].markdown)
+		self.assertNotIn("6.2.2.2 Note", pages[0].markdown)
 
 	def test_a_long_page_without_numbered_children_splits_at_its_sub_headings(self):
 		access = "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS"
@@ -331,3 +333,21 @@ class TestLlmPagePlan(FrappeTestCase):
 		)
 		pages, _ = self._plan(_llm_reply({"pages": [4]}), sections)
 		self.assertEqual(_titles(pages), ["5.8 Policies on patient care", "5.8.4 Sedation"])
+
+	def test_numbered_siblings_after_a_page_are_pages_so_the_order_holds(self):
+		sections = [
+			_sec(["2. Organogram"], 1, markdown=_words(20)),
+			_sec(["2. Organogram", "2.1 The staff"], 1, markdown=_words(200)),
+			_sec(["2. Organogram", "2.2 Hierarchy"], 1, markdown=_words(200)),
+			_sec(["2. Organogram", "2.3 Staff list"], 2, markdown=_words(200)),
+			_sec(["2. Organogram", "2.4 Laboratory staff"], 3, markdown=_words(60)),
+			_sec(["2. Organogram", "2.5 Office staff"], 3, markdown=_words(60)),
+			_sec(["2. Organogram", "2.6 Support staff"], 3, markdown=_words(10)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [0, 2]}), sections)
+		self.assertEqual(
+			_titles(pages),
+			["2. Organogram", "2.2 Hierarchy", "2.3 Staff list", "2.4 Laboratory staff", "2.5 Office staff"],
+		)
+		self.assertIn("## 2.6 Support staff", pages[-1].markdown)
+		self.assertNotIn("2.6 Support staff", pages[0].markdown)
