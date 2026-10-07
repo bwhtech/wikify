@@ -53,6 +53,8 @@ _MIN_BROKEN_LINE_LENGTH = 40
 # A numbered heading repeated as a running sub-header is still the real section start on its first
 # page; the sectionizer folds the repeats, so stripping them here would lose the section itself.
 _NUMBERED_HEADING = re.compile(r"^\s*#{1,6}\s+[*_]*\d+(?:\.\d+)*\.?\s*[A-Za-z]")
+_LIST_ITEM = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+\S")
+_ENUMERATED_TEXT = re.compile(r"^(\d+)[.)]\s")
 
 
 def _plain(line: str) -> str:
@@ -198,10 +200,72 @@ def join_page_breaks(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 	return [(page_no, "\n".join(lines)) for (page_no, _), lines in zip(pages, page_lines, strict=True)]
 
 
+def list_kind(marker: str) -> str:
+	return "bullet" if marker in "-*+" else "ordered"
+
+
+def last_list_item(lines: list[str]) -> re.Match | None:
+	for line in reversed(lines):
+		if not line.strip():
+			continue
+		item = _LIST_ITEM.match(line)
+		if item or not line[0].isspace():
+			return item
+	return None
+
+
+def continuation_prefix(item: re.Match, first_line: str) -> str:
+	"""What a list cut by a page break needs in front of its items on the next page, where it restarts
+	at the margin: the nesting it had, or the bullet it had when the bullets carried their own numbers."""
+	follow = _LIST_ITEM.match(first_line)
+	if not follow or follow.group(1):
+		return ""
+	indent, marker = item.group(1), item.group(2)
+	if indent and list_kind(marker) == list_kind(follow.group(2)):
+		return indent
+	numbered_text = _ENUMERATED_TEXT.match(item.string[item.end(2) :].lstrip())
+	if (
+		list_kind(marker) == "bullet"
+		and list_kind(follow.group(2)) == "ordered"
+		and numbered_text
+		and int(follow.group(2)[:-1]) == int(numbered_text.group(1)) + 1
+	):
+		return f"{indent}{marker} "
+	return ""
+
+
+def reindent_list_continuations(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+	"""Put a list continued across a page break back under the item it belongs to, up to the first
+	block that is not part of the list."""
+	page_lines = [md.splitlines() for _, md in pages]
+	for index in range(1, len(pages)):
+		if pages[index][0] != pages[index - 1][0] + 1:
+			continue
+		item = last_list_item(page_lines[index - 1])
+		lines = page_lines[index]
+		first = next((line for line in lines if line.strip()), "")
+		prefix = continuation_prefix(item, first) if item else ""
+		if not prefix:
+			continue
+		kind = list_kind(_LIST_ITEM.match(first).group(2))
+		for line_index, line in enumerate(lines):
+			if not line.strip():
+				continue
+			if line[0].isspace():
+				lines[line_index] = " " * len(prefix) + line
+				continue
+			follow = _LIST_ITEM.match(line)
+			if not follow or list_kind(follow.group(2)) != kind:
+				break
+			lines[line_index] = prefix + line
+	return [(page_no, "\n".join(lines)) for (page_no, _), lines in zip(pages, page_lines, strict=True)]
+
+
 def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
 	stitched = stitch_cross_page_tables(strip_boilerplate(pages, find_boilerplate(pages)))
-	return join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
+	joined = join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
+	return reindent_list_continuations(joined)
 
 
 def strip_outer_markdown_fence(text: str) -> str:

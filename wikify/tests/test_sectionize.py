@@ -598,6 +598,37 @@ class TestSectionizer(FrappeTestCase):
 			],
 		)
 
+	def test_clean_pages_keeps_a_list_continued_on_the_next_page_in_its_place(self):
+		pages = [
+			(
+				169,
+				"## 7. HYPERKALEMIA\n\n4. **Drugs:** given on verbal order\n"
+				"   - Administer Inj. Dextrose 50% with Inj. Actrapid.\n"
+				"   - Administer Salbutamol nebulization 5mg.\n\n169",
+			),
+			(
+				170,
+				"- Keep Inj.Calcium Gluconate 10% ready.\n\n## CENTRAL VENOUS CATHETER BLOCK\n\n- Flush it.\n\n170",
+			),
+			(
+				323,
+				"# **2.  Patient/family**\n\n- 1) Explain the cost to the patient\n\n- 2) Obtain consent\n\n323",
+			),
+			(
+				324,
+				"3) Instruct patient not to touch the sterile area\n4) Explain it is a temporary access\n\n## Procedure",
+			),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(
+			cleaned[170],
+			"   - Keep Inj.Calcium Gluconate 10% ready.\n\n## CENTRAL VENOUS CATHETER BLOCK\n\n- Flush it.",
+		)
+		self.assertEqual(
+			cleaned[324],
+			"- 3) Instruct patient not to touch the sterile area\n- 4) Explain it is a temporary access\n\n## Procedure",
+		)
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):
