@@ -34,6 +34,10 @@ _HEADER_FIELDS = [
 	re.compile(r"(?i)^\s*date\s*:"),
 ]
 _STRUCTURAL_LINE = re.compile(r"^\s*(?:<|```|~~~|!\[)")
+_HTML_TABLE = re.compile(r"<table\b[^>]*>.*?</table\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TAG = re.compile(r"<[^>]+>")
+_TABLE_CELL_SPLIT = re.compile(r"(?<!\\)\||<br\s*/?>")
 _IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\([^)]*\)\s*$")
 EDGE_LINES = 4
 
@@ -167,9 +171,73 @@ def _edge_furniture(lines: list[str], boilerplate: set[str]) -> set[int]:
 	return drop
 
 
+def _is_header_text(text: str) -> bool:
+	plain = _plain(text)
+	return _is_page_of(text) or any(pattern.search(plain) for pattern in _HEADER_FIELDS)
+
+
+def _is_header_cell(cell: str, boilerplate: set[str]) -> bool:
+	return _is_header_text(cell) or _is_page_furniture(cell, boilerplate, False)
+
+
+def _is_header_block(cells: list[str], boilerplate: set[str]) -> bool:
+	"""Cells that only carry a running header (title, doc code, version, page x of y) and name at least
+	one field of it, so a body table that merely repeats the document title is never mistaken for one."""
+	filled = [cell for cell in cells if _plain(cell)]
+	return any(_is_header_text(cell) for cell in filled) and all(
+		_is_header_cell(cell, boilerplate) for cell in filled
+	)
+
+
+def _row_cells(line: str) -> list[str]:
+	return [cell for cell in _TABLE_CELL_SPLIT.split(line.strip()) if cell.strip()]
+
+
+def _is_header_row(line: str, boilerplate: set[str]) -> bool:
+	cells = [cell for cell in _row_cells(line) if not _SEP_ONLY.match(f"|{cell}|")]
+	return all(_is_header_cell(cell, boilerplate) for cell in cells)
+
+
+def _strip_html_header_tables(md: str, boilerplate: set[str]) -> str:
+	def strip(match: re.Match) -> str:
+		cells = [_HTML_TAG.sub(" ", cell) for cell in _HTML_CELL.findall(match.group(0))]
+		return "" if _is_header_block(cells, boilerplate) else match.group(0)
+
+	return _HTML_TABLE.sub(strip, md)
+
+
+def _split_at_header_rows(md: str, boilerplate: set[str]) -> list[str]:
+	"""Split a page where a running header sits inside a table, which happens when an earlier pass
+	stitched the next page's table onto this one before its header was stripped."""
+	lines = md.splitlines()
+	pieces: list[str] = []
+	start = index = 0
+	while index < len(lines):
+		end = index
+		while end < len(lines) and _is_table_row(lines[end]) and _is_header_row(lines[end], boilerplate):
+			end += 1
+		if end > index and _is_header_block(
+			[cell for line in lines[index:end] for cell in _row_cells(line)], boilerplate
+		):
+			pieces.append("\n".join(lines[start:index]))
+			start = end
+		index = max(end, index + 1)
+	pieces.append("\n".join(lines[start:]))
+	return pieces
+
+
+def _strip_header_rows(md: str, boilerplate: set[str]) -> str:
+	pieces = _split_at_header_rows(md, boilerplate)
+	if len(pieces) == 1:
+		return md
+	rejoined = stitch_cross_page_tables(list(enumerate(pieces)))
+	return "\n\n".join(piece for _, piece in rejoined if piece.strip())
+
+
 def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> list[tuple[int, str]]:
 	out: list[tuple[int, str]] = []
 	for pno, md in pages:
+		md = _strip_header_rows(_strip_html_header_tables(md, boilerplate), boilerplate)
 		lines = [line for line in _strip_footer_blocks(md).splitlines() if not _is_page_of(line)]
 		drop = _edge_furniture(lines, boilerplate)
 		kept = [line for index, line in enumerate(lines) if index not in drop]

@@ -788,6 +788,39 @@ class TestSectionizer(FrappeTestCase):
 			["2.3. STAFF LIST as on 24th May 2018", "2.4 CODE RED PROTOCOL"],
 		)
 
+	def test_clean_pages_drops_a_running_header_stitched_inside_a_table(self):
+		header = "NEPHROLOGY MANUAL\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Issue : 1 | Pg. {page} of 398\n\n"
+		timeline = (
+			"| Year | Milestone |\n|---|---|\n"
+			"| 2005 | Nephrology Laboratory Started |\n"
+			"| 2007 | DNA fingerprinting facility established to ascertain genetic relationship between |\n"
+			"||NEPHROLOGY MANUAL<br>|\n"
+			"||**MAN/RPT/NEPH/001**<br>**Ver.: 1**<br>**Issue : 1**<br>**Date:10/11/2023**<br>Pg.**14 of 398**|\n"
+			"||transplant patient & prospective donor|\n"
+			"|2008|First CAPD catheterization done by percutaneous method|"
+		)
+		header_box = (
+			'<table>\n<tr>\n<th colspan="4">NEPHROLOGY MANUAL</th>\n</tr>\n<tr>\n'
+			"<td>MAN/RPT/NEPH/001</td>\n<td>Ver.: 1</td>\n<td>Issue : 1</td>\n<td>Pg. 15 of 398</td>\n"
+			"</tr>\n</table>\n\n"
+		)
+		pages = [
+			(13, header.format(page=13) + timeline),
+			(14, header.format(page=14) + "# Education\n\nTwo programmes."),
+			(15, header_box + "Every staff member keeps this manual correct."),
+			(16, header.format(page=16) + "Closing notes."),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(
+			cleaned[13],
+			"| Year | Milestone |\n|---|---|\n"
+			"| 2005 | Nephrology Laboratory Started |\n"
+			"| 2007 | DNA fingerprinting facility established to ascertain genetic relationship between "
+			"transplant patient & prospective donor |\n"
+			"|2008|First CAPD catheterization done by percutaneous method|",
+		)
+		self.assertEqual(cleaned[15], "Every staff member keeps this manual correct.")
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):

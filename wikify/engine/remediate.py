@@ -7,7 +7,6 @@ import fitz
 
 from wikify.engine import diagrams, images, llm, pdf_utils, regions, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
-from wikify.engine.loader.table_stitch import stitch_cross_page_tables
 from wikify.engine.parsers import vlm
 from wikify.engine.sectionize import rebuild_and_classify
 from wikify.engine.verify import deterministic as det
@@ -202,11 +201,10 @@ def remediate_pdf(  # noqa: C901
 			if progress_cb:
 				progress_cb(i + 1, total)
 
-	stitched = dict(stitch_cross_page_tables([(p["page_no"], canon_md[p["page_no"]]) for p in pages]))
 	with events.suspended_indexing():
 		for p in pages:
 			pno = p["page_no"]
-			store.set_canonical(p["name"], stitched[pno], canon_comp[pno], canon_src[pno])
+			store.set_canonical(p["name"], canon_md[pno], canon_comp[pno], canon_src[pno])
 
 	comps = [c for c in canon_comp.values() if c is not None]
 	canonical_mean = round(sum(comps) / len(comps), 3) if comps else None
