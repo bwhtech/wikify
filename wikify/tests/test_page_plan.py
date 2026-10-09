@@ -71,9 +71,9 @@ class TestFallbackPagePlan(FrappeTestCase):
 	def test_unnumbered_document_keeps_its_top_two_heading_levels(self):
 		sections = [
 			_sec(["Guide"], 1),
-			_sec(["Guide", "Setup"], 1),
-			_sec(["Guide", "Setup", "Prerequisites"], 2),
-			_sec(["Guide", "Usage"], 3),
+			_sec(["Guide", "Setup"], 2),
+			_sec(["Guide", "Setup", "Prerequisites"], 3),
+			_sec(["Guide", "Usage"], 4),
 		]
 		self.assertEqual(_titles(plan_pages(sections)), ["Guide", "Setup", "Usage"])
 
@@ -82,8 +82,8 @@ class TestFallbackPagePlan(FrappeTestCase):
 			_sec(["5.7 Billing"], 1, markdown=""),
 			_sec(["5.7 Billing", "5.7.2 Inpatient billing"], 1, 2),
 			_sec(["5.8 Care"], 2),
-			_sec(["5.8 Care", "5.8.1 Chaperone"], 2),
-			_sec(["5.8 Care", "5.8.1 Chaperone", "5.8.1.1 Escort"], 3),
+			_sec(["5.8 Care", "5.8.1 Chaperone"], 3),
+			_sec(["5.8 Care", "5.8.1 Chaperone", "5.8.1.1 Escort"], 4),
 		]
 		pages = plan_pages(sections)
 		self.assertEqual(_titles(pages), ["5.7 Billing", "5.8 Care", "5.8.1 Chaperone"])
@@ -110,7 +110,7 @@ class TestFallbackPagePlan(FrappeTestCase):
 
 	def test_heading_depth_is_capped_at_six(self):
 		path = [f"Level {depth}" for depth in range(1, 9)]
-		sections = [_sec(path[:depth], 1) for depth in range(1, 9)]
+		sections = [_sec(path[:depth], min(depth, 2)) for depth in range(1, 9)]
 		child = plan_pages(sections)[1]
 		self.assertEqual(child.title, "Level 2")
 		self.assertIn("###### Level 7\n\nbody of Level 7\n\n###### Level 8", child.markdown)
@@ -295,21 +295,23 @@ class TestLlmPagePlan(FrappeTestCase):
 				access,
 				"AV FISTULA/AV GRAFT",
 				"CENTRAL VENOUS CATHETER",
-				"IDENTIFYING AND MANAGING COMPLICATIONS",
 				"Peritoneal Dialysis",
 			],
 		)
 		self.assertEqual(pages[0].markdown, "")
 		self.assertIn("## CATHETER CARE", pages[2].markdown)
-		self.assertTrue(pages[2].markdown.endswith(f"## DIALYZER REUSE\n\n{_words(30)}"))
-		self.assertEqual(pages[4].hierarchy_path, [access, "Peritoneal Dialysis"])
-		self.assertEqual((pages[4].page_start, pages[4].page_end), (11, 11))
+		self.assertIn(
+			f"## DIALYZER REUSE\n\n{_words(30)}\n\n## IDENTIFYING AND MANAGING COMPLICATIONS",
+			pages[2].markdown,
+		)
+		self.assertEqual(pages[3].hierarchy_path, [access, "Peritoneal Dialysis"])
+		self.assertEqual((pages[3].page_start, pages[3].page_end), (11, 11))
 
 	def test_a_short_leading_preamble_joins_the_page_after_it(self):
 		sections = [
 			_sec(["Preamble"], 1, markdown="Saline dialysis is reserved for bleeding patients."),
-			_sec(["6.2.1 POLICIES"], 1, markdown=""),
-			_sec(["6.2.1 POLICIES", "6.2.1.3 ASSESSMENT"], 1, 2),
+			_sec(["6.2.1 POLICIES"], 2, markdown=""),
+			_sec(["6.2.1 POLICIES", "6.2.1.3 ASSESSMENT"], 2),
 			_sec(["6.2.1 POLICIES", "6.2.1.4 VASCULAR ACCESS"], 3),
 		]
 		pages, _ = self._plan(_llm_reply({"pages": [0, 1, 2, 3]}), sections)
@@ -323,11 +325,11 @@ class TestLlmPagePlan(FrappeTestCase):
 	def test_numbered_siblings_follow_the_majority_into_pages(self):
 		sections = [
 			_sec(["5.8 Policies on patient care"], 1, markdown=_words(20)),
-			_sec(["5.8 Policies on patient care", "5.8.1 Chaperone"], 1, markdown=_words(90)),
-			_sec(["5.8 Policies on patient care", "5.8.2 Antibiotic policy"], 1, markdown=_words(29)),
-			_sec(["5.8 Policies on patient care", "5.8.3 Consent"], 2, markdown=_words(200)),
-			_sec(["5.8 Policies on patient care", "5.8.4 Sedation"], 3, markdown=_words(300)),
-			_sec(["5.8 Policies on patient care", "5.8.4 Sedation", "Contraindications"], 3),
+			_sec(["5.8 Policies on patient care", "5.8.1 Chaperone"], 2, markdown=_words(90)),
+			_sec(["5.8 Policies on patient care", "5.8.2 Antibiotic policy"], 3, markdown=_words(29)),
+			_sec(["5.8 Policies on patient care", "5.8.3 Consent"], 4, markdown=_words(200)),
+			_sec(["5.8 Policies on patient care", "5.8.4 Sedation"], 5, markdown=_words(300)),
+			_sec(["5.8 Policies on patient care", "5.8.4 Sedation", "Contraindications"], 5),
 		]
 		pages, _ = self._plan(_llm_reply({"pages": [1, 3, 4]}), sections)
 		self.assertEqual(
@@ -347,12 +349,12 @@ class TestLlmPagePlan(FrappeTestCase):
 		sections = [
 			_sec(["2. Organogram"], 1, markdown=_words(20)),
 			_sec(["2. Organogram", "2.1 The staff"], 1, markdown=_words(200)),
-			_sec(["2. Organogram", "2.2 Hierarchy"], 1, markdown=_words(200)),
-			_sec(["2. Organogram", "2.3 Staff list"], 2, markdown=_words(200)),
-			_sec(["2. Organogram", "2.4 Laboratory staff"], 3, markdown=_words(60)),
-			_sec(["2. Organogram", "2.5 Office staff"], 3, markdown=_words(60)),
-			_sec(["2. Organogram", "2.6 Support staff"], 3, markdown=_words(25)),
-			_sec(["2. Organogram", "2.7 Attendants"], 3, markdown=_words(5)),
+			_sec(["2. Organogram", "2.2 Hierarchy"], 2, markdown=_words(200)),
+			_sec(["2. Organogram", "2.3 Staff list"], 3, markdown=_words(200)),
+			_sec(["2. Organogram", "2.4 Laboratory staff"], 4, markdown=_words(60)),
+			_sec(["2. Organogram", "2.5 Office staff"], 5, markdown=_words(60)),
+			_sec(["2. Organogram", "2.6 Support staff"], 6, markdown=_words(25)),
+			_sec(["2. Organogram", "2.7 Attendants"], 6, markdown=_words(5)),
 		]
 		pages, _ = self._plan(_llm_reply({"pages": [0, 2]}), sections)
 		self.assertEqual(
@@ -399,3 +401,38 @@ class TestLlmPagePlan(FrappeTestCase):
 		)
 		self.assertIn("## Step 11: Check, measure, Record and Discard", pages[3].markdown)
 		self.assertIn("## CONTACT INFORMATION SHEET", pages[4].markdown)
+
+	def test_sections_sharing_a_pdf_page_share_a_wiki_page(self):
+		sections = [
+			_sec(["2. Organogram"], 25, markdown=_words(12)),
+			_sec(["2. Organogram", "2.1 The staff"], 25, markdown=_words(50)),
+			_sec(["2. Organogram", "2.2 Staff hierarchy"], 26, 28, markdown=_words(390)),
+			_sec(["2. Organogram", "2.3 Staff list"], 29, 32, markdown=_words(1000)),
+			_sec(["2. Organogram", "2.4 Laboratory staff"], 33, markdown=_words(5)),
+			_sec(["2. Organogram", "2.5 Research staff"], 33, markdown=_words(5)),
+			_sec(["2. Organogram", "2.6 Office staff"], 33, markdown=_words(25)),
+			_sec(["2. Organogram", "2.7 Support staff"], 33, markdown=_words(30)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [0, 1, 2, 3, 4, 5, 6, 7]}), sections)
+		self.assertEqual(
+			_titles(pages),
+			["2. Organogram", "2.2 Staff hierarchy", "2.3 Staff list", "2.4 Laboratory staff"],
+		)
+		self.assertIn("## 2.1 The staff", pages[0].markdown)
+		for title in ("2.5 Research staff", "2.6 Office staff", "2.7 Support staff"):
+			self.assertIn(f"## {title}", pages[-1].markdown)
+
+	def test_a_long_numbered_section_keeps_its_page_when_it_starts_mid_page(self):
+		sections = [
+			_sec(["3. Job descriptions"], 34, markdown=_words(80)),
+			_sec(["3. Job descriptions", "3.1 Head of the department"], 34, 36, markdown=_words(600)),
+			_sec(["3. Job descriptions", "3.2 Head of the unit"], 37, 38, markdown=_words(300)),
+			_sec(["3. Job descriptions", "3.3 Consultant"], 38, 39, markdown=_words(180)),
+			_sec(["3. Job descriptions", "3.4 Registrar"], 39, markdown=_words(90)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [0, 1, 2, 3, 4]}), sections)
+		self.assertEqual(
+			_titles(pages),
+			["3. Job descriptions", "3.1 Head of the department", "3.2 Head of the unit", "3.3 Consultant"],
+		)
+		self.assertIn("## 3.4 Registrar", pages[-1].markdown)

@@ -24,6 +24,7 @@ LEADING_FRAGMENT_WORDS = 60
 MIN_SPLIT_PART_WORDS = 150
 MAX_PAGE_WORDS = 2500
 MAX_PAGE_PDF_PAGES = 6
+OWN_PAGE_WORDS = 150
 OUTLINE_BATCH_LINES = 250
 
 _LIST_ITEM_TITLE = re.compile(r"^(?:\d+[.)]?|[A-Za-z][.)]|[IVXivx]+[.)]|[Ss]tep\s+\d+[:.)]?)\s")
@@ -130,6 +131,7 @@ def enforce_invariants(
 	pages = add_numbered_siblings(parents, numbers, pages)
 	pages, parents = split_long_pages(sections, parents, numbers, pages)
 	pages, parents = keep_sibling_order(sections, parents, numbers, pages)
+	pages, parents = keep_pdf_pages_whole(sections, parents, numbers, pages)
 	child_counts = Counter(parent for parent in parents if parent is not None)
 	pages = {
 		index
@@ -180,7 +182,7 @@ def keep_sibling_order(
 			elif previous_page is not None and (
 				subtree_words[sibling] >= FRAGMENT_WORDS
 				or (
-					subtree_words[sibling] >= STUB_WORDS
+					(subtree_words[sibling] >= STUB_WORDS or opens_pdf_page(sections, sibling))
 					and not _LIST_ITEM_TITLE.match(sections[sibling].title)
 				)
 			):
@@ -189,6 +191,63 @@ def keep_sibling_order(
 			elif previous_page is not None:
 				parents[sibling] = max(page for page in pages if page < sibling)
 	return pages, parents
+
+
+def keep_pdf_pages_whole(
+	sections: list[Section], parents: list[int | None], numbers: list[tuple[int, ...] | None], pages: set[int]
+) -> tuple[set[int], list[int | None]]:
+	"""A short section that shares a PDF page joins the wiki page before it, unless that makes the page too
+	long to read in one scroll. A numbered section long enough to stand alone keeps its own page."""
+	parents = list(parents)
+	page_parents = {parents[page] for page in pages}
+	words: Counter[int] = Counter()
+	last_pdf_page: dict[int, int] = {}
+	for index, owner in enumerate(page_owners(parents, pages)):
+		if owner is not None:
+			words[owner] += len(sections[index].markdown.split())
+			last_pdf_page[owner] = max(last_pdf_page.get(owner, 0), sections[index].page_end)
+	pages = set(pages)
+	for index in sorted(pages):
+		if (
+			parents[index] is None
+			or index in page_parents
+			or (numbers[index] and words[index] >= OWN_PAGE_WORDS)
+			or opens_pdf_page(sections, index)
+		):
+			continue
+		target = max((page for page in pages if page < index), default=None)
+		if target is None:
+			continue
+		joined_pdf_pages = max(last_pdf_page[target], last_pdf_page[index]) - sections[target].page_start + 1
+		if words[target] + words[index] > MAX_PAGE_WORDS or joined_pdf_pages > MAX_PAGE_PDF_PAGES:
+			continue
+		pages.discard(index)
+		parents[index] = target
+		words[target] += words[index]
+		last_pdf_page[target] = max(last_pdf_page[target], last_pdf_page[index])
+	return pages, parents
+
+
+def page_owners(parents: list[int | None], pages: set[int]) -> list[int | None]:
+	owners: list[int | None] = []
+	for index, parent in enumerate(parents):
+		if index in pages:
+			owners.append(index)
+		elif parent is not None:
+			owners.append(owners[parent])
+		else:
+			owners.append(owners[-1] if owners else None)
+	return owners
+
+
+def opens_pdf_page(sections: list[Section], index: int) -> bool:
+	page_start = sections[index].page_start
+	for earlier in reversed(sections[:index]):
+		if earlier.page_end < page_start:
+			return True
+		if earlier.markdown.strip():
+			return False
+	return True
 
 
 def split_long_pages(
