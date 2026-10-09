@@ -38,10 +38,13 @@ watch(
 );
 
 const data = computed(() => (detail.data?.name === props.section ? detail.data : null));
-const ancestors = computed(() => {
-	const path = data.value?.hierarchy_path || "";
-	return path.split(" > ").slice(0, -1);
-});
+const ancestors = computed(() => data.value?.ancestors || []);
+const lastPage = computed(() => data.value?.page_count || Infinity);
+const pdfPageLabel = computed(() =>
+	data.value?.page_count
+		? `page ${pdfPage.value} of ${data.value.page_count}`
+		: `page ${pdfPage.value}`
+);
 
 function go(name) {
 	history.value.push(props.section);
@@ -67,7 +70,7 @@ function openPdfTab() {
 }
 
 function showPdf(page) {
-	pdfPage.value = Math.max(1, page);
+	pdfPage.value = Math.min(Math.max(1, page), lastPage.value);
 }
 </script>
 
@@ -181,7 +184,7 @@ function showPdf(page) {
 					<div class="flex items-center gap-1 border-b border-outline-gray-1 px-3 py-2">
 						<span class="lucide-file-text size-4 text-ink-gray-5" aria-hidden="true" />
 						<span class="min-w-0 flex-1 truncate text-sm text-ink-gray-8">
-							Original PDF · page {{ pdfPage }}
+							Original PDF · {{ pdfPageLabel }}
 						</span>
 						<Button
 							variant="ghost"
@@ -194,6 +197,7 @@ function showPdf(page) {
 							variant="ghost"
 							icon="lucide-chevron-right"
 							tooltip="Next page"
+							:disabled="pdfPage >= lastPage"
 							@click="showPdf(pdfPage + 1)"
 						/>
 						<Button

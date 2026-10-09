@@ -4,13 +4,14 @@ from collections import Counter, defaultdict
 
 import frappe
 
-from wikify.api.explore import UNTAGGED
+from wikify.api.explore import UNTAGGED, UNTAGGED_COLOR, UNTAGGED_LABEL
 from wikify.api.permission import assert_readable, readable_projects
 
 
-def _subcategory(section: dict) -> str:
-	path = section.get("hierarchy_path") or section.get("title") or ""
-	return path.split(" > ")[0].strip() or "Untitled"
+def _subcategory(section: dict, by_name: dict[str, dict]) -> str:
+	while (parent := by_name.get(section["parent_source_section"])) is not None:
+		section = parent
+	return (section["title"] or "").strip() or "Untitled"
 
 
 @frappe.whitelist()
@@ -40,6 +41,7 @@ def summary(
 				"hierarchy_path",
 				"section_type",
 				"source_document",
+				"parent_source_section",
 				"page_start",
 				"page_end",
 			],
@@ -48,20 +50,23 @@ def summary(
 		if docs
 		else []
 	)
+	by_name = {s["name"]: s for s in sections}
 	for s in sections:
 		s["project"] = doc_by_name[s["source_document"]]["project"]
 		s["section_type"] = s["section_type"] or UNTAGGED
-		s["subcategory"] = _subcategory(s)
+		s["subcategory"] = _subcategory(s, by_name)
+	docs_with_sections = {s["source_document"] for s in sections}
+	parsed_docs = [d for d in docs if d["name"] in docs_with_sections]
 
 	in_project = [s for s in sections if not project or s["project"] == project]
 	in_type = [s for s in in_project if not section_type or s["section_type"] == section_type]
 	in_sub = [s for s in in_type if not subcategory or s["subcategory"] == subcategory]
 
-	docs_per_project = Counter(d["project"] for d in docs)
+	docs_per_project = Counter(d["project"] for d in parsed_docs)
 	return {
 		"cards": {
 			"projects": len(projects),
-			"documents": len(docs),
+			"documents": len(parsed_docs),
 			"categories": len({s["section_type"] for s in sections}),
 			"sections": len(sections),
 		},
@@ -86,7 +91,7 @@ def _category_rows(sections: list[dict]) -> list[dict]:
 		fields=["type_name", "label", "color"],
 		order_by="is_other asc, creation asc",
 	)
-	types.append({"type_name": UNTAGGED, "label": "Untagged", "color": "#cbd5e1"})
+	types.append({"type_name": UNTAGGED, "label": UNTAGGED_LABEL, "color": UNTAGGED_COLOR})
 	rows = [
 		{
 			"type_name": t["type_name"],
@@ -142,20 +147,32 @@ def section_detail(name: str) -> dict:
 			"markdown",
 			"section_type",
 			"source_document",
+			"lft",
+			"rgt",
 		],
 		as_dict=True,
 	)
 	if not section:
 		raise frappe.DoesNotExistError
 	doc = frappe.db.get_value(
-		"Source Document", section.source_document, ["title", "project", "pdf"], as_dict=True
+		"Source Document", section.source_document, ["title", "project", "pdf", "page_count"], as_dict=True
 	)
 	assert_readable(doc.project)
 	section_type = (
 		frappe.get_cached_value("Section Type", section.section_type, ["label", "color"], as_dict=True)
 		if section.section_type
-		else None
+		else {"label": UNTAGGED_LABEL, "color": UNTAGGED_COLOR}
 	) or {}
+	ancestors = frappe.get_all(
+		"Source Section",
+		filters={
+			"source_document": section.source_document,
+			"lft": ["<", section.lft],
+			"rgt": [">", section.rgt],
+		},
+		pluck="title",
+		order_by="lft asc",
+	)
 	children = frappe.get_all(
 		"Source Section",
 		filters={"parent_source_section": name},
@@ -168,9 +185,11 @@ def section_detail(name: str) -> dict:
 		"hierarchy_path": section.hierarchy_path,
 		"page_start": section.page_start,
 		"page_end": section.page_end,
+		"ancestors": ancestors,
 		"markdown": section.markdown,
 		"doc_title": doc.title,
 		"pdf": doc.pdf,
+		"page_count": doc.page_count,
 		"project_name": frappe.get_cached_value("Wikify Project", doc.project, "project_name"),
 		"category": section_type.get("label") or section.section_type,
 		"category_color": section_type.get("color"),

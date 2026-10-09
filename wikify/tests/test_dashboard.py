@@ -96,3 +96,39 @@ class TestDashboard(FrappeTestCase):
 			dashboard.summary(project=self.project)
 		with self.assertRaises(frappe.PermissionError):
 			dashboard.section_detail(self.names["Storage"])
+
+	def test_heading_containing_the_path_separator_stays_whole(self):
+		store.replace_sections(
+			self.sd.name,
+			[
+				_sec("Temperature > 25C", 1, ["Temperature > 25C"], 1, 2),
+				_sec("Fridge", 2, ["Temperature > 25C", "Fridge"], 2, 2),
+			],
+		)
+		frappe.db.set_value(
+			"Source Section", {"source_document": self.sd.name}, "section_type", "medication_management"
+		)
+		result = dashboard.summary(project=self.project, section_type="medication_management")
+		self.assertEqual([s["title"] for s in result["subcategories"]], ["Temperature > 25C"])
+		fridge = frappe.db.get_value("Source Section", {"source_document": self.sd.name, "title": "Fridge"})
+		self.assertEqual(dashboard.section_detail(fridge)["ancestors"], ["Temperature > 25C"])
+
+	def test_section_detail_returns_ancestors_and_page_count(self):
+		frappe.db.set_value("Source Document", self.sd.name, "page_count", 6)
+		detail = dashboard.section_detail(self.names["Storage"])
+		self.assertEqual(detail["ancestors"], ["Medicines"])
+		self.assertEqual(detail["page_count"], 6)
+		self.assertEqual(dashboard.section_detail(self.names["Medicines"])["ancestors"], [])
+
+	def test_documents_without_sections_are_not_counted(self):
+		frappe.get_doc(
+			{"doctype": "Source Document", "title": f"Failed {self.tag}", "project": self.project}
+		).insert(ignore_permissions=True)
+		row = next(p for p in dashboard.summary()["projects"] if p["name"] == self.project)
+		self.assertEqual(row["documents"], 1)
+
+	def test_untagged_section_detail_has_a_category(self):
+		frappe.db.set_value("Source Section", self.names["Disposal"], "section_type", None)
+		detail = dashboard.section_detail(self.names["Disposal"])
+		self.assertEqual(detail["category"], "Untagged")
+		self.assertEqual(detail["category_color"], "#cbd5e1")

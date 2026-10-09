@@ -57,7 +57,7 @@ const projectRows = computed(() => [
 	{
 		name: "",
 		project_name: "All projects",
-		documents: projects.value.length,
+		documents: data.value.cards?.documents,
 		icon: "lucide-layers",
 	},
 	...visibleProjects.value.map((p) => ({ ...p, icon: "lucide-folder" })),
