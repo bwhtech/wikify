@@ -1,9 +1,9 @@
 """Strip repeated page headers/footers before sectionizing.
 
 Real manuals repeat a running header/footer on every page (doc title, doc code,
-"Pg X of Y", version/date). Left in, each becomes a fake heading. We remove lines
-that recur across many pages, plus a few varying-boilerplate patterns (page
-numbers, doc codes) that won't match exactly page-to-page.
+"Pg X of Y", version/date). Left in, each becomes a fake heading. We remove the run of
+lines at each page edge that recur at the edges of many pages, plus a few
+varying-boilerplate patterns (page numbers, doc codes) that won't match exactly page-to-page.
 
 Ported verbatim from the POC `loader/cleanup.py` (pure markdown, no I/O). Wired into
 the pipeline at sectionize time (Slice 4); shipped here per the Slice 3 cleanup port.
@@ -13,16 +13,33 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from itertools import groupby
 
-_NORM = re.compile(r"[#*_`>\-\s]+")
-_VARYING = [
+from wikify.engine.loader.table_stitch import (
+	html_tables_to_markdown,
+	merge_continuation_rows,
+	stitch_cross_page_tables,
+)
+
+_NORM = re.compile(r"[#*_`>|\-\s]+")
+_MARKUP = re.compile(r"(?:<br\s*/?>|[*_`|]|^[\s>#]+)")
+_PAGE_OF = [
 	re.compile(r"(?i)\bpg\.?\s*\d+\s*of\s*\d+"),
 	re.compile(r"(?i)\bpage\s*\d+\s*of\s*\d+"),
+]
+_HEADER_FIELDS = [
 	re.compile(r"(?i)^man/[a-z0-9/]+"),
 	re.compile(r"(?i)\bver\.?\s*:"),
 	re.compile(r"(?i)\bissue\s*:\s*\d"),
 	re.compile(r"(?i)^\s*date\s*:"),
 ]
+_STRUCTURAL_LINE = re.compile(r"^\s*(?:<|```|~~~|!\[)")
+_HTML_TABLE = re.compile(r"<table\b[^>]*>.*?</table\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TAG = re.compile(r"<[^>]+>")
+_TABLE_CELL_SPLIT = re.compile(r"(?<!\\)\||<br\s*/?>")
+_IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\([^)]*\)\s*$")
+EDGE_LINES = 4
 
 # Approval / sign-off footer block — QMS-manual page furniture rendered as a one- or
 # two-row Markdown table, e.g. `|Prepared by - Dr X|Issued by: QMC|Approved by - Dr Y|`.
@@ -31,24 +48,59 @@ _VARYING = [
 # carrying >=2 distinct sign-off phrases (a lone "approved by" in a data row is kept).
 _SEP_ONLY = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _SIGNOFF = ("prepared by", "issued by", "approved by", "reviewed by", "authorized by")
+_SIGNOFF_LABEL = re.compile(r"(?i)\b(prepared|issued|approved|reviewed|authori[sz]ed) by\s*[:\-\u2013]")
+_SIGNOFF_LINE = re.compile(r"(?i)^[*_\s]*(prepared|issued|approved|reviewed|authori[sz]ed) by\s*[:\-\u2013]")
+_PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
+_SENTENCE_START = re.compile(r"^[a-z]")
+# A sentence cut by a page break ran to the page edge, so its last line is never a short label.
+_MIN_BROKEN_LINE_LENGTH = 40
+BOILERPLATE_MAX_PAGES = 10
+# A numbered heading repeated as a running sub-header is still the real section start on its first
+# page; the sectionizer folds the repeats, so stripping them here would lose the section itself.
+_NUMBERED_HEADING = re.compile(r"^\s*#{1,6}\s+[*_]*\d+(?:\.\d+)*\.?\s*[A-Za-z]")
+_LIST_ITEM = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+\S")
+_ENUMERATED_TEXT = re.compile(r"^(\d+)[.)]\s")
+_CONTENTS_LINE = re.compile(r"^(\d+(?:\.\d+)+\.?|\d+)\s+(\S.*?)\s*(?:\.{2,}\s*)?(\d{1,4})\s*$")
+MIN_CONTENTS_LINES = 5
+_MERMAID_OPEN = re.compile(r"^\s*```\s*mermaid\b")
+_FENCE_CLOSE = re.compile(r"^\s*```\s*$")
+MAX_TABLE_TITLE_LINES = 2
+MAX_TABLE_TITLE_CHARS = 120
+MIN_TRANSCRIBED_ROWS = 4
+
+
+def _plain(line: str) -> str:
+	"""The line's visible text: emphasis, table pipes, <br>, blockquote and heading markers removed."""
+	return " ".join(_MARKUP.sub(" ", line).split())
 
 
 def _norm(line: str) -> str:
-	return _NORM.sub(" ", line).strip().lower()
+	return _NORM.sub(" ", _plain(line)).strip().lower()
 
 
 def _is_signoff_footer_row(line: str) -> bool:
 	s = line.strip()
 	if not (s.startswith("|") and s.endswith("|")):
-		return False
+		return len({label.lower() for label in _SIGNOFF_LABEL.findall(s)}) >= 2
 	low = s.lower()
 	return sum(kw in low for kw in _SIGNOFF) >= 2
+
+
+def _signoff_line_runs(lines: list[str]) -> set[int]:
+	"""Sign-off labels laid out one per paragraph, e.g. "Prepared by: …" then "Issued by: …"."""
+	drop: set[int] = set()
+	non_blank = [index for index, line in enumerate(lines) if line.strip()]
+	for is_signoff, group in groupby(non_blank, key=lambda index: bool(_SIGNOFF_LINE.match(lines[index]))):
+		run = list(group)
+		if is_signoff and len({_SIGNOFF_LINE.match(lines[index]).group(1).lower() for index in run}) >= 2:
+			drop.update(run)
+	return drop
 
 
 def _strip_footer_blocks(md: str) -> str:
 	"""Drop sign-off footer rows and any separator row orphaned next to them."""
 	lines = md.splitlines()
-	drop: set[int] = set()
+	drop = _signoff_line_runs(lines)
 	for i, line in enumerate(lines):
 		if _is_signoff_footer_row(line):
 			drop.add(i)
@@ -60,34 +112,324 @@ def _strip_footer_blocks(md: str) -> str:
 	return "\n".join(line for k, line in enumerate(lines) if k not in drop)
 
 
+def _is_table_row(line: str) -> bool:
+	return line.strip().startswith("|")
+
+
+def _strip_page_residue(md: str) -> str:
+	"""Drop separator rows left headless by a stripped header box, and the closing page number."""
+	lines = md.splitlines()
+	kept = [
+		line
+		for index, line in enumerate(lines)
+		if not (_SEP_ONLY.match(line) and "-" in line and not (index and _is_table_row(lines[index - 1])))
+	]
+	while kept and not kept[-1].strip():
+		kept.pop()
+	while kept and not kept[0].strip():
+		kept.pop(0)
+	if kept and _PAGE_NUMBER.match(_plain(kept[-1])):
+		kept.pop()
+	return "\n".join(kept)
+
+
+def _edge_lines(md: str) -> list[str]:
+	content = [line for line in md.splitlines() if _norm(line) and not _STRUCTURAL_LINE.match(line)]
+	return content[:EDGE_LINES] + content[-EDGE_LINES:]
+
+
 def find_boilerplate(pages: list[tuple[int, str]]) -> set[str]:
-	"""Normalized lines that recur on a large fraction of pages."""
+	"""Normalized lines that recur at the top or bottom edge of a large fraction of pages."""
 	counts: Counter[str] = Counter()
 	for _, md in pages:
-		for nl in {_norm(line) for line in md.splitlines() if _norm(line)}:
+		for nl in {_norm(line) for line in _edge_lines(md)}:
 			counts[nl] += 1
-	threshold = max(3, int(0.30 * len(pages)))
+	# Capped so a header that alternates between styles across a long document still counts.
+	threshold = max(3, min(int(0.30 * len(pages)), BOILERPLATE_MAX_PAGES))
 	return {line for line, c in counts.items() if c >= threshold and len(line) <= 90}
 
 
-def _is_varying(line: str) -> bool:
-	return any(p.search(line) for p in _VARYING)
+def _is_page_of(line: str) -> bool:
+	plain = _plain(line)
+	return any(pattern.search(plain) for pattern in _PAGE_OF)
+
+
+def _is_page_furniture(line: str, boilerplate: set[str], at_top: bool) -> bool:
+	plain = _plain(line)
+	return (
+		(_norm(line) in boilerplate and not _NUMBERED_HEADING.match(line))
+		or any(pattern.search(plain) for pattern in _HEADER_FIELDS)
+		or bool(_PAGE_NUMBER.match(plain))
+		or (at_top and "-" in line and bool(_SEP_ONLY.match(line)))
+	)
+
+
+def _edge_furniture(lines: list[str], boilerplate: set[str]) -> set[int]:
+	"""The unbroken header/footer run at each page edge; a label that also recurs mid-page survives."""
+	drop: set[int] = set()
+	for at_top, indexes in ((True, range(len(lines))), (False, range(len(lines) - 1, -1, -1))):
+		for index in indexes:
+			line = lines[index]
+			if not line.strip() or _IMAGE_LINE.match(line):
+				continue
+			if not _is_page_furniture(line, boilerplate, at_top):
+				break
+			drop.add(index)
+	return drop
+
+
+def _is_header_text(text: str) -> bool:
+	plain = _plain(text)
+	return _is_page_of(text) or any(pattern.search(plain) for pattern in _HEADER_FIELDS)
+
+
+def _is_header_cell(cell: str, boilerplate: set[str]) -> bool:
+	return _is_header_text(cell) or _is_page_furniture(cell, boilerplate, False)
+
+
+def _is_header_block(cells: list[str], boilerplate: set[str]) -> bool:
+	"""Cells that only carry a running header (title, doc code, version, page x of y) and name at least
+	one field of it, so a body table that merely repeats the document title is never mistaken for one."""
+	filled = [cell for cell in cells if _plain(cell)]
+	return any(_is_header_text(cell) for cell in filled) and all(
+		_is_header_cell(cell, boilerplate) for cell in filled
+	)
+
+
+def _row_cells(line: str) -> list[str]:
+	return [cell for cell in _TABLE_CELL_SPLIT.split(line.strip()) if cell.strip()]
+
+
+def _is_header_row(line: str, boilerplate: set[str]) -> bool:
+	cells = [cell for cell in _row_cells(line) if not _SEP_ONLY.match(f"|{cell}|")]
+	return all(_is_header_cell(cell, boilerplate) for cell in cells)
+
+
+def _strip_html_header_tables(md: str, boilerplate: set[str]) -> str:
+	def strip(match: re.Match) -> str:
+		cells = [_HTML_TAG.sub(" ", cell) for cell in _HTML_CELL.findall(match.group(0))]
+		return "" if _is_header_block(cells, boilerplate) else match.group(0)
+
+	return _HTML_TABLE.sub(strip, md)
+
+
+def _split_at_header_rows(md: str, boilerplate: set[str]) -> list[str]:
+	"""Split a page where a running header sits inside a table, which happens when an earlier pass
+	stitched the next page's table onto this one before its header was stripped."""
+	lines = md.splitlines()
+	pieces: list[str] = []
+	start = index = 0
+	while index < len(lines):
+		end = index
+		while end < len(lines) and _is_table_row(lines[end]) and _is_header_row(lines[end], boilerplate):
+			end += 1
+		if end > index and _is_header_block(
+			[cell for line in lines[index:end] for cell in _row_cells(line)], boilerplate
+		):
+			pieces.append("\n".join(lines[start:index]))
+			start = end
+		index = max(end, index + 1)
+	pieces.append("\n".join(lines[start:]))
+	return pieces
+
+
+def _strip_header_rows(md: str, boilerplate: set[str]) -> str:
+	pieces = _split_at_header_rows(md, boilerplate)
+	if len(pieces) == 1:
+		return md
+	rejoined = stitch_cross_page_tables(list(enumerate(pieces)))
+	return "\n\n".join(piece for _, piece in rejoined if piece.strip())
 
 
 def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> list[tuple[int, str]]:
 	out: list[tuple[int, str]] = []
 	for pno, md in pages:
-		kept = [
-			line
-			for line in md.splitlines()
-			if not (_norm(line) and _norm(line) in boilerplate) and not _is_varying(line)
-		]
-		out.append((pno, _strip_footer_blocks("\n".join(kept))))
+		md = _strip_header_rows(_strip_html_header_tables(md, boilerplate), boilerplate)
+		lines = [line for line in _strip_footer_blocks(md).splitlines() if not _is_page_of(line)]
+		drop = _edge_furniture(lines, boilerplate)
+		kept = [line for index, line in enumerate(lines) if index not in drop]
+		out.append((pno, _strip_page_residue("\n".join(kept))))
 	return out
 
 
+def _ends_mid_sentence(line: str) -> bool:
+	text = line.strip()
+	return (
+		len(text) >= _MIN_BROKEN_LINE_LENGTH
+		and text[0] not in "#|<"
+		and (text[-1].isalnum() or text[-1] == ",")
+	)
+
+
+def join_page_breaks(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+	"""Rejoin a sentence the PDF split across a page break onto the page it started on."""
+	page_lines = [md.splitlines() for _, md in pages]
+	for index in range(len(pages) - 1):
+		if pages[index + 1][0] != pages[index][0] + 1:
+			continue
+		lines, next_lines = page_lines[index], page_lines[index + 1]
+		last = next((i for i in range(len(lines) - 1, -1, -1) if lines[i].strip()), None)
+		first = next((i for i, line in enumerate(next_lines) if line.strip()), None)
+		if last is None or first is None:
+			continue
+		if _ends_mid_sentence(lines[last]) and _SENTENCE_START.match(next_lines[first].strip()):
+			lines[last] = f"{lines[last].rstrip()} {next_lines.pop(first).strip()}"
+	return [(page_no, "\n".join(lines)) for (page_no, _), lines in zip(pages, page_lines, strict=True)]
+
+
+def list_kind(marker: str) -> str:
+	return "bullet" if marker in "-*+" else "ordered"
+
+
+def last_list_item(lines: list[str]) -> re.Match | None:
+	for line in reversed(lines):
+		if not line.strip():
+			continue
+		item = _LIST_ITEM.match(line)
+		if item or not line[0].isspace():
+			return item
+	return None
+
+
+def continuation_prefix(item: re.Match, first_line: str) -> str:
+	"""What a list cut by a page break needs in front of its items on the next page, where it restarts
+	at the margin: the nesting it had, or the bullet it had when the bullets carried their own numbers."""
+	follow = _LIST_ITEM.match(first_line)
+	if not follow or follow.group(1):
+		return ""
+	indent, marker = item.group(1), item.group(2)
+	if indent and list_kind(marker) == list_kind(follow.group(2)):
+		return indent
+	numbered_text = _ENUMERATED_TEXT.match(item.string[item.end(2) :].lstrip())
+	if (
+		list_kind(marker) == "bullet"
+		and list_kind(follow.group(2)) == "ordered"
+		and numbered_text
+		and int(follow.group(2)[:-1]) == int(numbered_text.group(1)) + 1
+	):
+		return f"{indent}{marker} "
+	return ""
+
+
+def reindent_list_continuations(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+	"""Put a list continued across a page break back under the item it belongs to, up to the first
+	block that is not part of the list."""
+	page_lines = [md.splitlines() for _, md in pages]
+	for index in range(1, len(pages)):
+		if pages[index][0] != pages[index - 1][0] + 1:
+			continue
+		item = last_list_item(page_lines[index - 1])
+		lines = page_lines[index]
+		first = next((line for line in lines if line.strip()), "")
+		prefix = continuation_prefix(item, first) if item else ""
+		if not prefix:
+			continue
+		kind = list_kind(_LIST_ITEM.match(first).group(2))
+		for line_index, line in enumerate(lines):
+			if not line.strip():
+				continue
+			if line[0].isspace():
+				lines[line_index] = " " * len(prefix) + line
+				continue
+			follow = _LIST_ITEM.match(line)
+			if not follow or list_kind(follow.group(2)) != kind:
+				break
+			lines[line_index] = prefix + line
+	return [(page_no, "\n".join(lines)) for (page_no, _), lines in zip(pages, page_lines, strict=True)]
+
+
+def _contents_run(lines: list[str], start: int) -> tuple[int, list[re.Match]]:
+	entries: list[re.Match] = []
+	end = start
+	while end < len(lines):
+		entry = _CONTENTS_LINE.match(lines[end].strip())
+		if lines[end].strip() and not entry:
+			break
+		if entry:
+			entries.append(entry)
+		end += 1
+	return end, entries
+
+
+def contents_lines_to_table(md: str) -> str:
+	"""Lay out a run of table-of-contents lines (number, title, page) as a headless table, so the page
+	stitches onto the contents table the pages around it were parsed as."""
+	lines = md.splitlines()
+	out: list[str] = []
+	index = 0
+	while index < len(lines):
+		end, entries = _contents_run(lines, index)
+		if len(entries) < MIN_CONTENTS_LINES:
+			out.append(lines[index])
+			index += 1
+			continue
+		out.extend(["|  |  |  |", "|---|---|---|"])
+		out.extend(f"| {entry.group(1)} | {entry.group(2)} | {entry.group(3)} |" for entry in entries)
+		out.append("")
+		index = end
+	return "\n".join(out)
+
+
+def _table_rows_from(lines: list[str], start: int) -> int:
+	if lines[start].lstrip().startswith("<table"):
+		rows = 0
+		for line in lines[start:]:
+			rows += line.count("<tr")
+			if "</table" in line:
+				break
+		return rows
+	end = start
+	while end < len(lines) and _is_table_row(lines[end]):
+		end += 1
+	return end - start
+
+
+def _transcription_after_figure(lines: list[str], figure: int) -> tuple[str, int, int] | None:
+	"""What the parser wrote for the picture straight after it: ("mermaid", fence start, fence end) for a
+	diagram redrawn from it, ("table", first line, rows) for a table typed out under its title."""
+	following = [index for index in range(figure + 1, len(lines)) if lines[index].strip()]
+	if not following:
+		return None
+	first = following[0]
+	if _MERMAID_OPEN.match(lines[first]):
+		close = next((index for index in following[1:] if _FENCE_CLOSE.match(lines[index])), None)
+		return ("mermaid", first, close) if close is not None else None
+	for index in following[: MAX_TABLE_TITLE_LINES + 1]:
+		if _is_table_row(lines[index]) or lines[index].lstrip().startswith("<table"):
+			return "table", index, _table_rows_from(lines, index)
+		if len(_plain(lines[index])) > MAX_TABLE_TITLE_CHARS or _STRUCTURAL_LINE.match(lines[index]):
+			return None
+	return None
+
+
+def drop_transcribed_figures(md: str) -> str:
+	"""Keep one copy of a picture the parser also transcribed: the crop for a diagram it redrew as mermaid,
+	the typed table for a table printed as an image, since that copy is exact and searchable."""
+	lines = md.splitlines()
+	drop: set[int] = set()
+	for index, line in enumerate(lines):
+		transcription = _IMAGE_LINE.match(line) and _transcription_after_figure(lines, index)
+		if not transcription:
+			continue
+		kind, start, end = transcription
+		if kind == "mermaid":
+			drop.update(range(start, end + 1))
+		elif end >= MIN_TRANSCRIBED_ROWS:
+			drop.add(index)
+	if not drop:
+		return md
+	return "\n".join(line for index, line in enumerate(lines) if index not in drop)
+
+
 def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
-	return strip_boilerplate(pages, find_boilerplate(pages))
+	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
+	stripped = [
+		(page_no, contents_lines_to_table(drop_transcribed_figures(md)))
+		for page_no, md in strip_boilerplate(pages, find_boilerplate(pages))
+	]
+	stitched = stitch_cross_page_tables(stripped)
+	joined = join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
+	return reindent_list_continuations(joined)
 
 
 def strip_outer_markdown_fence(text: str) -> str:

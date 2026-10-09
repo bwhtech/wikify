@@ -32,6 +32,9 @@ from wikify.engine.loader.wiki import rewrite_page_refs, slugify
 from wikify.engine.refs import smallest_covering
 
 DATA_MAX_LENGTH = 140
+OVERVIEW_TITLE = "Overview"
+CONTENTS_TITLE = "Contents"
+PRINTED_CONTENTS_TITLES = {"contents", "table of contents"}
 
 
 def _upsert_wiki_document(
@@ -92,6 +95,18 @@ def bounded_route(prefix: str, title: str, identifier: str) -> tuple[str, str]:
 	return f"{prefix}/{slug}", slug
 
 
+def overview_route(prefix: str, section_name: str) -> tuple[str, str]:
+	return bounded_route(prefix, OVERVIEW_TITLE, section_name)
+
+
+def contents_route(prefix: str, source_document: str) -> tuple[str, str]:
+	return bounded_route(prefix, CONTENTS_TITLE, source_document)
+
+
+def has_own_body(section: dict) -> bool:
+	return bool(section["is_group"] and (section["markdown"] or "").strip())
+
+
 class _WikiGenerator:
 	"""Projects one approved Source Document tree into a Wiki Space (see module doc)."""
 
@@ -113,6 +128,8 @@ class _WikiGenerator:
 		self.included = [s for s in self.sections if s["include_in_wiki"]]
 		self.wiki_name: dict[str, str] = {}  # section name → wiki document name
 		self.wiki_route: dict[str, str] = {}  # section name → wiki route
+		self.page_name: dict[str, str] = {}  # section name → wiki document showing its content
+		self.page_route: dict[str, str] = {}
 		self.content: dict[str, str] = {}  # section name → content written
 		self.deleted = 0
 		self.links = 0
@@ -124,6 +141,7 @@ class _WikiGenerator:
 		self._stage("Building wiki pages")
 		self._build_structure()
 		self._rollup_empty_groups()
+		self._add_contents()
 		self._stage("Resolving page references")
 		self._rewrite_links()
 		store.set_document_wiki(self.sd.name, self.space.name, self.root_group.name, status="Wiki-Generated")
@@ -152,7 +170,26 @@ class _WikiGenerator:
 		rest under the root group deepest-first (NestedSet needs leaves gone first).
 		"""
 		kept = {self.root_group.name}
+		if self._needs_contents():
+			kept |= set(
+				frappe.get_all(
+					"Wiki Document",
+					filters={"route": contents_route(self.root_group.route, self.sd.name)[0], "is_group": 0},
+					pluck="name",
+				)
+			)
 		kept |= {s["wiki_document"] for s in self.included if s["wiki_document"]}
+		overview_routes = [
+			overview_route(self.root_group.route, s["name"])[0] for s in self.included if has_own_body(s)
+		]
+		if overview_routes:
+			kept |= set(
+				frappe.get_all(
+					"Wiki Document",
+					filters={"route": ["in", overview_routes], "is_group": 0},
+					pluck="name",
+				)
+			)
 		descendants = get_descendants_of("Wiki Document", self.root_group.name, ignore_permissions=True)
 		stale = (
 			frappe.get_all(
@@ -189,7 +226,7 @@ class _WikiGenerator:
 		return "" if section["is_group"] else f"# {section['title']}\n"
 
 	def _build_structure(self) -> None:
-		sort_counter: dict[str, int] = {}  # parent wiki name → next sort_order
+		sort_counter: dict[str, int] = {self.root_group.name: 1 if self._needs_contents() else 0}
 		total = len(self.included)
 		for i, s in enumerate(self.included):
 			parent_name = self._parent_for(s)
@@ -200,7 +237,7 @@ class _WikiGenerator:
 			doc = _upsert_wiki_document(
 				s["wiki_document"],
 				title=s["title"],
-				content=content,
+				content="" if has_own_body(s) else content,
 				is_group=bool(s["is_group"]),
 				parent=parent_name,
 				route=route,
@@ -209,10 +246,33 @@ class _WikiGenerator:
 			)
 			self.wiki_name[s["name"]] = doc.name
 			self.wiki_route[s["name"]] = doc.route
+			self.page_name[s["name"]] = doc.name
+			self.page_route[s["name"]] = doc.route
 			self.content[s["name"]] = content
+			if has_own_body(s):
+				self._add_overview(s, doc)
+				sort_counter[doc.name] = 1
 			store.set_section_wiki_document(s["name"], doc.name)
 			if self.progress_cb:
 				self.progress_cb(i + 1, total)
+
+	def _add_overview(self, section: dict, group) -> None:
+		"""The live wiki redirects a group to its first page, so a group's own text would
+		never be shown; it goes on an Overview page sorted first instead."""
+		route, slug = overview_route(self.root_group.route, section["name"])
+		existing = frappe.db.get_value("Wiki Document", {"route": route, "is_group": 0}, "name")
+		doc = _upsert_wiki_document(
+			existing,
+			title=OVERVIEW_TITLE,
+			content=self.content[section["name"]],
+			is_group=False,
+			parent=group.name,
+			route=route,
+			slug=slug,
+			sort_order=0,
+		)
+		self.page_name[section["name"]] = doc.name
+		self.page_route[section["name"]] = doc.route
 
 	def _rollup_empty_groups(self) -> None:
 		"""Give container pages (groups with no own body) a Contents list linking to their
@@ -236,6 +296,42 @@ class _WikiGenerator:
 				"Wiki Document", self.wiki_name[s["name"]], "content", toc, update_modified=False
 			)
 
+	def _needs_contents(self) -> bool:
+		return bool(self.included) and not any(
+			s["title"].strip().lower() in PRINTED_CONTENTS_TITLES for s in self.included
+		)
+
+	def _add_contents(self) -> None:
+		"""The PDF printed no contents pages, so the space gets one built from the section tree."""
+		if not self._needs_contents():
+			return
+		depth: dict[str, int] = {}
+		lines = []
+		for s in self.included:
+			parent = self.by_name.get(s["parent_source_section"])
+			while parent is not None and parent["name"] not in depth:
+				parent = self.by_name.get(parent["parent_source_section"])
+			depth[s["name"]] = depth[parent["name"]] + 1 if parent else 0
+			pages = (
+				f"p. {s['page_start']}"
+				if s["page_end"] in (None, s["page_start"])
+				else f"pp. {s['page_start']}-{s['page_end']}"
+			)
+			lines.append(
+				f"{'  ' * depth[s['name']]}- [{s['title']}](/{self.wiki_route[s['name']]}) — {pages}\n"
+			)
+		route, slug = contents_route(self.root_group.route, self.sd.name)
+		doc = _upsert_wiki_document(
+			frappe.db.get_value("Wiki Document", {"route": route, "is_group": 0}, "name"),
+			title=CONTENTS_TITLE,
+			content=f"# {CONTENTS_TITLE}\n\n" + "".join(lines),
+			is_group=False,
+			parent=self.root_group.name,
+			route=route,
+			slug=slug,
+		)
+		frappe.db.set_value("Wiki Document", doc.name, "sort_order", 0, update_modified=False)
+
 	def _route_for_page(self, n: int) -> str | None:
 		"""Smallest-span included section whose PDF page range contains n → its route."""
 		best = smallest_covering(self.included, n)
@@ -249,11 +345,11 @@ class _WikiGenerator:
 				self.content[s["name"]],
 				page_count,
 				self._route_for_page,
-				current_route=self.wiki_route[s["name"]],
+				current_route=self.page_route[s["name"]],
 			)
 			if links:
 				frappe.db.set_value(
-					"Wiki Document", self.wiki_name[s["name"]], "content", new_md, update_modified=False
+					"Wiki Document", self.page_name[s["name"]], "content", new_md, update_modified=False
 				)
 				self.links += links
 
@@ -340,11 +436,16 @@ def sync_section(section_name: str) -> dict:
 		best = smallest_covering(routed, n)
 		return routes[best["name"]] if best else None
 
-	own_route = routes.get(section_name)
+	target, own_route = sec.wiki_document, routes.get(section_name)
+	if has_own_body(sec):
+		own_route = overview_route(own_route.rpartition("/")[0], section_name)[0]
+		target = frappe.db.get_value("Wiki Document", {"route": own_route, "is_group": 0}, "name")
+		if not target:
+			return {"synced": False, "reason": "needs_regenerate"}
 	page_count = frappe.db.get_value("Source Document", sec.source_document, "page_count")
 	content, links = rewrite_page_refs(content, page_count or 10**9, route_for_page, current_route=own_route)
 
-	frappe.db.set_value("Wiki Document", sec.wiki_document, "content", content, update_modified=False)
+	frappe.db.set_value("Wiki Document", target, "content", content, update_modified=False)
 	return {"synced": True, "chars": len(content), "links": links, "route": own_route}
 
 

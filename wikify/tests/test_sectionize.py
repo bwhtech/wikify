@@ -132,6 +132,90 @@ class TestSectionizer(FrappeTestCase):
 		self.assertEqual(secs[0].title, "Preamble")
 		self.assertEqual(secs[0].level, 1)
 
+	def test_content_before_the_first_heading_is_kept(self):
+		pages = [
+			(
+				1,
+				"- ✓ Concessions of Rs 2,500 are discussed.\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n## 5.7 Billing\nbill body",
+			),
+		]
+		secs = sectionize(pages)
+		self.assertEqual((secs[0].title, secs[0].hierarchy_path), ("Preamble", ["Preamble"]))
+		self.assertIn("Concessions of Rs 2,500", secs[0].markdown)
+		self.assertIn("| 1 | 2 |", secs[0].markdown)
+		self.assertEqual(secs[1].hierarchy_path, ["5.7 Billing"])
+
+	def test_running_sub_header_variants_fold_into_the_open_section(self):
+		running = "## 5.8 Policies on patient care"
+		pages = [
+			(1, f"{running}\n### 5.8.1 Chaperone\na\n{running}\n### 5.8.2 Antibiotics\nb"),
+			(2, f"{running}\n### 5.8.3 Pain\nc"),
+			(3, f"{running}\n### 5.8.4 Sedation\nd\n## 5.8Policies on patient care\n### 5.8.5 Restraints\ne"),
+		]
+		secs = sectionize(clean_pages(pages))
+		self.assertEqual([s.title for s in secs].count("5.8 Policies on patient care"), 1)
+		self.assertEqual(secs[0].title, "5.8 Policies on patient care")
+		self.assertTrue(all(s.hierarchy_path[0] == "5.8 Policies on patient care" for s in secs))
+
+	def test_repeated_chapter_title_with_another_number_or_plural_is_not_a_new_section(self):
+		protocols = [
+			(1, "# 6.1 PROTOCOLS FOR MANAGEMENT\n## 6.1.1 IgA nephropathy\na"),
+			(2, "# 6. PROTOCOLS FOR MANAGEMENT\n## 6.1.2 Lupus nephritis\n#### Hydroxychloroquine.\nb"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(protocols)}
+		self.assertNotIn("6. PROTOCOLS FOR MANAGEMENT", paths)
+		self.assertEqual(
+			paths["6.1.2 Lupus nephritis"], ["6.1 PROTOCOLS FOR MANAGEMENT", "6.1.2 Lupus nephritis"]
+		)
+		self.assertIn("Hydroxychloroquine", paths)
+
+		jobs = [
+			(1, "# 3. JOB DESCRIPTIONS\n## 3.1 Head\na"),
+			(2, "## 3. JOB DESCRIPTION\n## 3.2 Unit head\nb"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(jobs)}
+		self.assertNotIn("3. JOB DESCRIPTION", paths)
+		self.assertEqual(paths["3.2 Unit head"], ["3. JOB DESCRIPTIONS", "3.2 Unit head"])
+
+	def test_bold_line_continuing_the_numbering_is_a_heading(self):
+		markdown = (
+			"## 5.8.6 Blood Donation\na\n### 5.8.6.2 Donor criteria\nb\n"
+			"**5.8.6.3 Requesting blood from blood bank**\n**For use in ward**\nc\n"
+			"**5.8.6.4 For use in OR**\nd\n**1. Not a heading**\ne"
+		)
+		pages = [(1, markdown)]
+		secs = sectionize(pages)
+		self.assertEqual(
+			[(s.title, s.level) for s in secs],
+			[
+				("5.8.6 Blood Donation", 3),
+				("5.8.6.2 Donor criteria", 4),
+				("5.8.6.3 Requesting blood from blood bank", 4),
+				("5.8.6.4 For use in OR", 4),
+			],
+		)
+		self.assertNotIn("Requesting blood", secs[1].markdown)
+		self.assertIn("**For use in ward**", secs[2].markdown)
+		self.assertIn("**1. Not a heading**", secs[3].markdown)
+
+	def test_unnumbered_heading_never_parents_a_numbered_heading(self):
+		pages = [(1, "# Contraindications\na\n# 5.8.4.2 Patient Assessment\nb\n### 5.8.5 Restraints\nc")]
+		paths = {s.title: s.hierarchy_path for s in sectionize(pages)}
+		self.assertEqual(paths["5.8.4.2 Patient Assessment"], ["5.8.4.2 Patient Assessment"])
+		self.assertEqual(paths["5.8.5 Restraints"], ["5.8.5 Restraints"])
+
+	def test_numbered_list_headings_nest_under_a_deep_numbered_section(self):
+		pages = [
+			(1, "#### 5.9.2.2 Staff tested for HIV\na\n# 1. Drug Regimen\nb\n# 2. Testing for HBsAg\nc"),
+			(2, "# 6.1 PROTOCOLS\n## 6.1.1 IgA nephropathy\nd"),
+		]
+		paths = {s.title: s.hierarchy_path for s in sectionize(pages)}
+		self.assertEqual(paths["1. Drug Regimen"], ["5.9.2.2 Staff tested for HIV", "1. Drug Regimen"])
+		self.assertEqual(
+			paths["2. Testing for HBsAg"], ["5.9.2.2 Staff tested for HIV", "2. Testing for HBsAg"]
+		)
+		self.assertEqual(paths["6.1.1 IgA nephropathy"], ["6.1 PROTOCOLS", "6.1.1 IgA nephropathy"])
+
 	def test_emphasis_is_stripped_from_heading_titles(self):
 		pages = [
 			(1, "## _**Verbal Orders**_\nbody"),
@@ -150,6 +234,13 @@ class TestSectionizer(FrappeTestCase):
 		self.assertTrue(all("Pg" not in s.markdown for s in secs))
 		self.assertEqual([s.title for s in secs], ["1. Intro", "2. Next"])
 
+	def test_clean_pages_strips_a_header_style_that_covers_only_part_of_a_long_document(self):
+		pages = [
+			(number, f"{'NEPHROLOGY MANUAL' if number % 4 == 0 else 'PROCEDURE MANUAL'}\n\nbody {number}")
+			for number in range(1, 101)
+		]
+		self.assertTrue(all("MANUAL" not in markdown for _, markdown in clean_pages(pages)))
+
 	def test_clean_pages_strips_signoff_footer_block(self):
 		footer = "|**Prepared by - Dr. A**|**Issued by: QMC**|**Approved by - Dr. B**|\n|---|---|---|"
 		pages = [(1, f"## 1. Intro\nreal body\n{footer}"), (2, f"## 2. Next\nmore body\n{footer}")]
@@ -160,6 +251,38 @@ class TestSectionizer(FrappeTestCase):
 			self.assertNotIn("|---|---|---|", md)
 		self.assertIn("real body", cleaned[1])
 		self.assertIn("more body", cleaned[2])
+
+	def test_clean_pages_strips_page_numbers_and_headless_separator_rows(self):
+		header = "NEPHROLOGY MANUAL\n\n| MAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398 |\n|---|---|---|"
+		table = "| Health worker | Action |\n|---|---|\n| Antibody 100 | Reassure |"
+		pages = [
+			(1, header.format(page=121) + f"\n\n## 5.7 Billing\n\n- Pay 2500 by noon.\n\n{table}\n\n121"),
+			(2, header.format(page=122) + "\n\n- Second page item.\n\n122"),
+			(3, header.format(page=123) + "\n\n- Third page item.\n\n123"),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertFalse(cleaned[1].startswith("|"))
+		self.assertEqual(cleaned[2].strip(), "- Second page item.")
+		self.assertNotIn("121", cleaned[1])
+		self.assertIn(f"- Pay 2500 by noon.\n\n{table}", cleaned[1])
+
+	def test_clean_pages_rejoins_a_sentence_split_by_a_page_break(self):
+		pages = [
+			(1, "- Organs are retrieved after withdrawal of life-sustaining\n\n132"),
+			(
+				2,
+				"measures; the kidneys may be recovered.\n\n## 5.8.12 Grievances\n\n- Last item ends.\n\n133",
+			),
+			(3, "- New item starts the page.\n\n134"),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(
+			cleaned[1],
+			"- Organs are retrieved after withdrawal of life-sustaining measures; the kidneys may be recovered.",
+		)
+		self.assertNotIn("measures", cleaned[2])
+		self.assertIn("## 5.8.12 Grievances", cleaned[2])
+		self.assertEqual(cleaned[3], "- New item starts the page.")
 
 	def test_title_is_clipped_to_the_storable_length(self):
 		long_title = "DETERMINATION OF RESIDENTIAL STATUS OF " + "HINDU UNDIVIDED FAMILY " * 8
@@ -213,6 +336,543 @@ class TestSectionizer(FrappeTestCase):
 		cleaned = dict(clean_pages(pages))
 		self.assertIn("approved by committee", cleaned[1])
 		self.assertIn("|---|---|", cleaned[1])
+
+	def test_table_of_contents_is_one_section_that_never_opens_chapters(self):
+		table_rows = "\n".join(f"| 1.{n} | Scope of service {n} | {18 + n} |" for n in range(1, 7))
+		procedure_rows = "\n".join(f"| 5.{n} | Policies for topic {n} | {95 + n} |" for n in range(1, 7))
+		list_rows = "\n".join(f"  - 6.1.{n} Protocol {n} — {200 + n}" for n in range(1, 7))
+		pages = [
+			(1, "# PROCEDURE MANUAL\n\n## REVISION HISTORY\nrevisions"),
+			(2, f"## Contents\n\n| S.No | CONTENTS | Pg No |\n|---|---|---|\n{table_rows}"),
+			(
+				3,
+				f"## 5 Procedures for access of the patients\n\n| No. | Topic | Page |\n|---|---|---|\n{procedure_rows}",
+			),
+			(4, f"- 6.1 Protocols — 199\n{list_rows}\n\n**4**"),
+			(5, "# 1. PROFILE OF THE DEPARTMENT\n\n## Overview\nIn the year 1900 the institution began."),
+		]
+		secs = sectionize(pages)
+		self.assertEqual(
+			[(s.title, s.level) for s in secs],
+			[
+				("PROCEDURE MANUAL", 1),
+				("REVISION HISTORY", 2),
+				("Contents", 1),
+				("1. PROFILE OF THE DEPARTMENT", 1),
+				("Overview", 2),
+			],
+		)
+		contents = secs[2]
+		self.assertEqual((contents.page_start, contents.page_end), (2, 4))
+		self.assertIn("5 Procedures for access of the patients", contents.markdown)
+		self.assertIn("6.1.6 Protocol 6 — 206", contents.markdown)
+
+	def test_link_markup_is_stripped_from_heading_titles(self):
+		secs = sectionize([(1, "# [PROCEDURE MANUAL - NEPHROLOGY](#)\n\n## REVISION HISTORY\nrows")])
+		self.assertEqual(secs[0].title, "PROCEDURE MANUAL - NEPHROLOGY")
+
+	def test_lowercase_or_colon_heading_is_a_bold_label(self):
+		markdown = (
+			"# **IMMEDIATE PRE-OPERATIVE PROTOCOLS**\nintro\n# **are carried out as below:**\n"
+			"- PreHD: WBC\n# **Drug list:**\n- MMF 8 am\n# 5.1 Definitions:\nterms"
+		)
+		pages = [(1, markdown)]
+		secs = sectionize(pages)
+		self.assertEqual([s.title for s in secs], ["IMMEDIATE PRE-OPERATIVE PROTOCOLS", "5.1 Definitions:"])
+		self.assertIn("**are carried out as below:**\n- PreHD: WBC\n**Drug list:**", secs[0].markdown)
+
+	def test_clean_pages_strips_signoff_footer_written_as_text(self):
+		pipes = "Prepared by: Dr. A, Dr. B | Issued by: QMC | Approved by: Dr. C"
+		merged = "**Prepared by: Dr. A, Dr. Issued by: QMC Approved by: Dr. C B** "
+		paragraphs = "Prepared by: Dr. A, Dr. B\n\nIssued by: QMC\n\nApproved by: Dr. C"
+		pages = [
+			(1, f"## DONOR WITH OBESITY\nreal body\n\n{pipes}"),
+			(2, f"- more body\n\n{merged}\n"),
+			(3, f"## DIABETIC PATIENT\n\n{paragraphs}\n\nThe protocol is approved by the HOD."),
+		]
+		cleaned = dict(clean_pages(pages))
+		for md in cleaned.values():
+			self.assertNotIn("Prepared by", md)
+			self.assertNotIn("Issued by", md)
+		self.assertIn("real body", cleaned[1])
+		self.assertIn("- more body", cleaned[2])
+		self.assertIn("approved by the HOD", cleaned[3])
+
+	def test_clean_pages_keeps_html_tables_that_recur_on_every_page(self):
+		header = "PROCEDURE MANUAL - NEPHROLOGY\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398\n\n"
+		table = (
+			"<table>\n<tr>\n<th>Nursing Action</th>\n<th>Rationale</th>\n</tr>\n"
+			"<tr>\n<td>1. Check doctor's order.</td>\n<td>Gains cooperation</td>\n</tr>\n"
+			"<tr><td>2. Administer inj. calcium gluconate.</td><td>Prevents hypocalcemia\n"
+			"<tr><td>3. Remove sutures.</td><td>Avoids blood loss</td></tr>\n</table>"
+		)
+		pages = [
+			(page, header.format(page=page) + f"## Step {page}\n\n{table}\n\nNotes {page}.")
+			for page in (1, 2, 3)
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertIn(
+			"| Nursing Action | Rationale |\n|---|---|\n"
+			"| 1. Check doctor's order. | Gains cooperation |\n"
+			"| 2. Administer inj. calcium gluconate. | Prevents hypocalcemia |\n"
+			"| 3. Remove sutures. | Avoids blood loss |",
+			cleaned[2],
+		)
+
+	def test_clean_pages_stitches_a_table_row_split_by_a_page_break(self):
+		header = "PROCEDURE MANUAL - NEPHROLOGY\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398\n\n"
+		first = (
+			"|**Nursing Action**|**Rationale**|\n|---|---|\n"
+			"|1. Inspect the previous dressing|Confirms the need.|\n"
+			"|2. Explain the procedure and<br>position him according to the|Helps gain co-operation.|\n"
+			"|**MAN/RPT/NEPH/001 Ver.:**|**1 Issue :1**<br>Pg.**2 of 398**|\n"
+			"|convenience to access the site.||\n"
+			"|3. Send blood for investigations|Electrolytes are removed during the process of|"
+		)
+		second = (
+			"<table>\n<tr>\n<td>(Ca, PO4, Na, K)</td>\n<td>plasmapheresis.</td>\n</tr>\n"
+			"<tr>\n<td>4. Check BP.</td>\n<td>Identifies complications.</td>\n</tr>\n</table>\n\n"
+			"# **Specific Instructions:**\n\n- Avoid swimming."
+		)
+		pages = [
+			(1, header.format(page=1) + first),
+			(2, header.format(page=2) + second),
+			(3, header.format(page=3)),
+		]
+		secs = sectionize(clean_pages(pages))
+		self.assertEqual(
+			secs[0].markdown,
+			"|**Nursing Action**|**Rationale**|\n|---|---|\n"
+			"|1. Inspect the previous dressing|Confirms the need.|\n"
+			"| 2. Explain the procedure and<br>position him according to the convenience to access the site. "
+			"| Helps gain co-operation. |\n"
+			"| 3. Send blood for investigations (Ca, PO4, Na, K) "
+			"| Electrolytes are removed during the process of plasmapheresis. |\n"
+			"| 4. Check BP. | Identifies complications. |\n\n"
+			"**Specific Instructions:**\n\n- Avoid swimming.",
+		)
+
+	def test_clean_pages_strips_running_headers_wrapped_in_markup(self):
+		pages = [
+			(
+				1,
+				"PROCEDURE MANUAL\n\n> **MAN/RPT/NEPH/001 Ver.: 1**\n\n> **Date:10/11/2023** Pg. **321 of 398**\n\n- First.",
+			),
+			(
+				2,
+				"||PROCEDURE MANUAL||\n|---|---|---|\n|**MAN/RPT/NEPH/001**|<br>**Ver.: 1**|Pg.**322 of 398**|\n\n- Second.",
+			),
+			(
+				3,
+				"PROCEDURE MANUAL\n\n**MAN/RPT/NEPH/001 Ver.: 1 Date:10/11/2023** Pg. **323 of 398**\n\n- Third.",
+			),
+			(
+				4,
+				"PROCEDURE MANUAL **MAN/RPT/NEPH/001 Ver.: 1 Date:10/11/2023** Pg. **324 of 398**\n\n- Fourth.\n\n**324**",
+			),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(cleaned, {1: "- First.", 2: "- Second.", 3: "- Third.", 4: "- Fourth."})
+
+	def test_clean_pages_keeps_a_label_that_recurs_mid_page(self):
+		header = "PROCEDURE MANUAL\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Pg. {page} of 398\n\n"
+		body = "## 6.4.{page} Step {page}\n\n**Definition**\n\nText {page}.\n\n## Procedure\n\n1. Do {page}.\n\nFooter note"
+		pages = [(page, header.format(page=page) + body.format(page=page)) for page in range(1, 6)]
+		cleaned = dict(clean_pages(pages))
+		for page in range(1, 6):
+			self.assertEqual(
+				cleaned[page],
+				f"## 6.4.{page} Step {page}\n\n**Definition**\n\nText {page}.\n\n## Procedure\n\n1. Do {page}.",
+			)
+
+	def test_stray_bold_markers_are_stripped_from_titles(self):
+		secs = sectionize([(1, "# 3. **Other equipment:\n- Gloves\n# **CRRT Order sheet** :\n- Form")])
+		self.assertEqual([s.title for s in secs], ["3. Other equipment:"])
+		self.assertIn("**CRRT Order sheet :**", secs[0].markdown)
+
+	def test_numbered_list_items_inside_a_sub_section_stay_under_it(self):
+		extra_duties = (
+			"# 4. Extra procedures to be performed by the CAPD nurse educator:\n\n- Assist PET\n\n"
+			"# 5. Other responsibilities of the CAPD Nurse educator\n\n- Attend meetings"
+		)
+		administration = (
+			"## 11. Administration\n\n- Plan duty rosters\n\n"
+			"## 3.6.9 RENAL TRANSPLANT CO-ORDINATOR\n\n**Qualification:** nurse"
+		)
+		pages = [
+			(5, "## 3.6.8 CAPD Nurse Educator\n\nThe CAPD nurse educator trains patients."),
+			(
+				7,
+				"# 3. Responsibilities of the CAPD Nurse Educator towards inpatients\n\n- Check the log-book",
+			),
+			(8, extra_duties),
+			(9, administration),
+			(13, "## 3.7 Allied Health Staff\n\n### 3.7.1 Pharmacist\n\n- Dispensing"),
+			(14, "# 4. PROTOCOLS\n\n## 4.1 Dialysis\n\n- Prime the circuit"),
+		]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)],
+			[
+				["3.6.8 CAPD Nurse Educator"],
+				[
+					"3.6.8 CAPD Nurse Educator",
+					"3. Responsibilities of the CAPD Nurse Educator towards inpatients",
+				],
+				[
+					"3.6.8 CAPD Nurse Educator",
+					"4. Extra procedures to be performed by the CAPD nurse educator:",
+				],
+				["3.6.8 CAPD Nurse Educator", "5. Other responsibilities of the CAPD Nurse educator"],
+				["3.6.8 CAPD Nurse Educator", "11. Administration"],
+				["3.6.9 RENAL TRANSPLANT CO-ORDINATOR"],
+				["3.7 Allied Health Staff"],
+				["3.7 Allied Health Staff", "3.7.1 Pharmacist"],
+				["4. PROTOCOLS"],
+				["4. PROTOCOLS", "4.1 Dialysis"],
+			],
+		)
+
+	def test_a_parent_heading_met_after_its_sub_sections_becomes_their_group(self):
+		policies = "6.2.1 POLICIES FOR MANAGEMENT OF HEMODIALYSIS"
+		first_page = (
+			"Saline dialysis is reserved for bleeding patients.\n\n"
+			"## 6.2.1.3ASSESSMENT AND MONITORING\n\nPatients develop complications."
+		)
+		pages = [
+			(1, first_page),
+			(3, "## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\n### AV FISTULA\n\nCannulate with care."),
+			(19, f"# {policies}\n\n## 6.2.1.8 Emergency Dialysis\n\nDialyse within an hour."),
+			(20, f"## {policies}\n\n### 6.2.1.9 Temporary Vascular Access\n\nUse a femoral catheter."),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.hierarchy_path for section in sections],
+			[
+				["Preamble"],
+				[policies],
+				[policies, "6.2.1.3 ASSESSMENT AND MONITORING"],
+				[policies, "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS"],
+				[policies, "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS", "AV FISTULA"],
+				[policies, "6.2.1.8 Emergency Dialysis"],
+				[policies, "6.2.1.9 Temporary Vascular Access"],
+			],
+		)
+		self.assertEqual((sections[1].level, sections[1].markdown, sections[1].page_start), (3, "", 1))
+		self.assertEqual(sections[4].markdown, "Cannulate with care.")
+
+	def test_running_chapter_header_at_a_page_top_is_dropped(self):
+		pages = [
+			(10, "## 3.6.9 RENAL TRANSPLANT CO-ORDINATOR\n\n- Maintain the registry."),
+			(
+				13,
+				"# 3. JOB DESCRIPTIONS\n\n## 3.7 Allied Health Staff\n\n### 3.7.1 Pharmacist\n\n- Dispensing",
+			),
+			(14, "### 3.7.2 Transplant Coordinator\n\n- Counsel donors."),
+			(15, "# 3. JOB DESCRIPTION\n\n## 3.7.3 Dialysis therapists\n\n- Prime the circuit."),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.title for section in sections],
+			[
+				"3.6.9 RENAL TRANSPLANT CO-ORDINATOR",
+				"3.7 Allied Health Staff",
+				"3.7.1 Pharmacist",
+				"3.7.2 Transplant Coordinator",
+				"3.7.3 Dialysis therapists",
+			],
+		)
+		self.assertFalse(any("JOB DESCRIPTION" in section.markdown for section in sections))
+
+	def test_a_numbered_section_never_nests_under_another_chapter(self):
+		markdown = (
+			"# 3. **Other equipment:** \n\n- Gloves\n\n## Patient Preparation\n\nExplain the procedure.\n\n"
+			"# **6.4.2. CENTRAL VENOUS CATHETERIZATION** \n\n# **Definition** \n\nA double lumen catheter."
+		)
+		pages = [(1, markdown)]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)],
+			[
+				["3. Other equipment:"],
+				["3. Other equipment:", "Patient Preparation"],
+				["6.4.2. CENTRAL VENOUS CATHETERIZATION"],
+				["6.4.2. CENTRAL VENOUS CATHETERIZATION", "Definition"],
+			],
+		)
+
+	def test_clean_pages_keeps_a_list_continued_on_the_next_page_in_its_place(self):
+		hyperkalemia = (
+			"## 7. HYPERKALEMIA\n\n4. **Drugs:** given on verbal order\n"
+			"   - Administer Inj. Dextrose 50% with Inj. Actrapid.\n"
+			"   - Administer Salbutamol nebulization 5mg.\n\n169"
+		)
+		pages = [
+			(169, hyperkalemia),
+			(
+				170,
+				"- Keep Inj.Calcium Gluconate 10% ready.\n\n## CENTRAL VENOUS CATHETER BLOCK\n\n- Flush it.\n\n170",
+			),
+			(
+				323,
+				"# **2.  Patient/family**\n\n- 1) Explain the cost to the patient\n\n- 2) Obtain consent\n\n323",
+			),
+			(
+				324,
+				"3) Instruct patient not to touch the sterile area\n4) Explain it is a temporary access\n\n## Procedure",
+			),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(
+			cleaned[170],
+			"   - Keep Inj.Calcium Gluconate 10% ready.\n\n## CENTRAL VENOUS CATHETER BLOCK\n\n- Flush it.",
+		)
+		self.assertEqual(
+			cleaned[324],
+			"- 3) Instruct patient not to touch the sterile area\n- 4) Explain it is a temporary access\n\n## Procedure",
+		)
+
+	def test_a_chapter_the_body_never_opens_becomes_the_group_of_its_sections(self):
+		chapter = "6. PROTOCOLS FOR CLINICAL NEPHROLOGY"
+		contents = "\n".join(
+			[
+				"| S.No | CONTENTS | Pg No |",
+				"|---|---|---|",
+				"| 5 | Procedures for access | 96 |",
+				"| 5.9 | Policies on reporting | 136 |",
+				"| 6.1 | Protocols for clinical nephrology | 140 |",
+				"| 6.2 | Procedures in dialysis | 158 |",
+				"| 6.3 | Transplantation | 267 |",
+				"| 6.3.3 | Policies for pre-transplant evaluation | 270 |",
+			]
+		)
+		transplantation = (
+			f"## {chapter}\n\n### 6.3.0 TRANSPLANTATION\n\nKidney transplants.\n\n"
+			"## 6.3.2 Organ donation\n\nBrain death.\n\n## POLICIES FOR PRE-TRANSPLANT EVALUATION\n\n"
+			"### 6.3.3.1 RECIPIENT WORKUP\n\nPreliminary evaluation."
+		)
+		pages = [
+			(2, contents),
+			(91, "# 5. PROCEDURES FOR ACCESS\n\n## 5.9 Policies on reporting\n\nReport incidents."),
+			(137, "# 6.1 PROTOCOLS FOR CLINICAL NEPHROLOGY\n\n## 6.1.1 IgA nephropathy\n\nGive steroids."),
+			(138, f"# {chapter}\n\n## 6.1.2 Lupus nephritis\n\nBiopsy first."),
+			(155, f"## {chapter}\n\n### 6.2 PROCEDURES IN DIALYSIS\n\nThe dialysis unit."),
+			(275, transplantation),
+		]
+		protocols = [chapter, "6.1 PROTOCOLS FOR CLINICAL NEPHROLOGY"]
+		transplant = [chapter, "6.3 Transplantation"]
+		evaluation = [*transplant, "6.3.3 Policies for pre-transplant evaluation"]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)[1:]],
+			[
+				["5. PROCEDURES FOR ACCESS"],
+				["5. PROCEDURES FOR ACCESS", "5.9 Policies on reporting"],
+				[chapter],
+				protocols,
+				[*protocols, "6.1.1 IgA nephropathy"],
+				[*protocols, "6.1.2 Lupus nephritis"],
+				[chapter, "6.2 PROCEDURES IN DIALYSIS"],
+				transplant,
+				[*transplant, "6.3.0 TRANSPLANTATION"],
+				[*transplant, "6.3.2 Organ donation"],
+				evaluation,
+				[*evaluation, "6.3.3.1 RECIPIENT WORKUP"],
+			],
+		)
+
+	def test_a_list_heading_numbered_like_the_next_chapter_stays_in_its_section(self):
+		complications = (
+			"## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\n# IDENTIFYING AND MANAGING COMPLICATIONS\n\n"
+			"## 4. AIR EMBOLISM\n\nClamp the line.\n\n# 7. HYPERKALEMIA\n\nGive calcium.\n\n"
+			"## CENTRAL VENOUS CATHETER BLOCK\n\nUse urokinase."
+		)
+		pages = [
+			(91, "# 5. PROCEDURES FOR ACCESS\n\n## 5.1 Policies for access\n\nRegister patients."),
+			(137, "# 6. PROTOCOLS\n\n## 6.2 PROCEDURES IN DIALYSIS\n\n### 6.2.1 HEMODIALYSIS\n\nThe unit."),
+			(167, complications),
+			(172, "## 6.2.1.5 HEPATITIS B VACCINATION\n\nVaccinate."),
+			(179, "## 6.2.1POLICIES FOR HEMODIALYSIS\n\n### 6.2.1.8 Emergency Dialysis\n\nDialyse now."),
+			(180, "## 6.2.1 POLICIES FOR HEMODIALYSIS\n\n### 6.2.1.9 Temporary Access\n\nFemoral line."),
+			(371, "# 7. PATIENT RIGHTS AND EDUCATION\n\n## 7.1 Privacy\n\nScreens are used."),
+		]
+		hemodialysis = ["6. PROTOCOLS", "6.2 PROCEDURES IN DIALYSIS", "6.2.1 HEMODIALYSIS"]
+		access = [*hemodialysis, "6.2.1.4 PROTOCOL FOR VASCULAR ACCESS"]
+		paths = {section.title: section.hierarchy_path for section in sectionize(pages)}
+		self.assertEqual(paths["7. HYPERKALEMIA"], [*access, "7. HYPERKALEMIA"])
+		self.assertEqual(paths["CENTRAL VENOUS CATHETER BLOCK"], [*access, "CENTRAL VENOUS CATHETER BLOCK"])
+		self.assertEqual(
+			paths["6.2.1.5 HEPATITIS B VACCINATION"], [*hemodialysis, "6.2.1.5 HEPATITIS B VACCINATION"]
+		)
+		self.assertEqual(paths["6.2.1.9 Temporary Access"], [*hemodialysis, "6.2.1.9 Temporary Access"])
+		self.assertNotIn("6.2.1 POLICIES FOR HEMODIALYSIS", paths)
+
+	def test_a_lettered_running_header_of_the_open_section_is_dropped(self):
+		policies = "6.2.1 POLICIES FOR MANAGEMENT OF HEMODIALYSIS"
+		introduction = (
+			"### 6.2.1HEMODIALYSIS\n\n#### 6.2.1.aIntroduction to the unit\n\nThe unit has 40 machines."
+		)
+		icu = (
+			"# ICU dialysis\n\nBedside dialysis.\n\n# 6.2.1.b POLICIES FOR MANAGEMENT OF HEMODIALYSIS\n\n"
+			"## 6.2.1.1 PROTOCOL FOR INITIATING\n\nCheck consent."
+		)
+		pages = [
+			(155, introduction),
+			(157, icu),
+			(179, f"## {policies}\n\n### 6.2.1.8 Emergency Dialysis\n\nDialyse within an hour."),
+			(180, f"## {policies}\n\n### 6.2.1.9 Temporary Vascular Access\n\nUse a femoral line."),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.title for section in sections],
+			[
+				"6.2.1 HEMODIALYSIS",
+				"6.2.1.aIntroduction to the unit",
+				"ICU dialysis",
+				"6.2.1.1 PROTOCOL FOR INITIATING",
+				"6.2.1.8 Emergency Dialysis",
+				"6.2.1.9 Temporary Vascular Access",
+			],
+		)
+		self.assertEqual(sections[2].markdown, "Bedside dialysis.")
+
+	def test_a_bold_list_item_numbered_like_the_next_chapter_does_not_take_the_chapter(self):
+		pages = [
+			(91, "# 5. PROCEDURES FOR ACCESS\n\n## 5.1 Policies for access\n\nRegister patients."),
+			(137, "# 6. PROTOCOLS\n\n## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\nCannulate with care."),
+			(169, "**6. PULMONARY EDEMA**\n\nGive oxygen.\n\n**7. HYPERKALEMIA**\n\nGive calcium."),
+			(170, "## 6.2.1.5 HEPATITIS B VACCINATION\n\nVaccinate."),
+			(
+				371,
+				"# **7. PATIENT RIGHTS AND EDUCATION** \n\nRights are displayed.\n\n# **7.1 Privacy**\n\nScreens.",
+			),
+		]
+		sections = sectionize(pages)
+		self.assertEqual(
+			[section.hierarchy_path for section in sections if section.title.startswith("7")],
+			[["7. PATIENT RIGHTS AND EDUCATION"], ["7. PATIENT RIGHTS AND EDUCATION", "7.1 Privacy"]],
+		)
+		self.assertIn("**7. HYPERKALEMIA**", sections[3].markdown)
+
+	def test_a_misprinted_chapter_in_a_deep_number_is_read_as_the_current_chapter(self):
+		kinship = (
+			"## 6.5.3. PROCEDURES FOR TESTING\n\n### 6.5.3.1. KINSHIP TESTING PROTOCOL\n\nDNA test.\n\n"
+			"#### 6.5.3.1.4. Turn-Around-Time:\n\nTwo weeks.\n\n"
+			"#### 1.5.3.1.5. PATIENT'S RIGHTS & CONFIDENTIALITY\n\nReports are sealed."
+		)
+		endotoxin = (
+			"## 6.5.3.2.0. Endotoxin Testing Protocol\n\nLAL assay.\n\n"
+			"## 1.5.3.2.1 Pre Analytical Phase :\n\nCollect water.\n\n## 6.5.4 RECORDS MAINTAINED\n\nRegisters."
+		)
+		testing = "6.5.3. PROCEDURES FOR TESTING"
+		protocol = [testing, "6.5.3.1. KINSHIP TESTING PROTOCOL"]
+		endotoxin_group = [testing, "6.5.3.2. Endotoxin Testing Protocol"]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize([(356, kinship), (361, endotoxin)])],
+			[
+				[testing],
+				protocol,
+				[*protocol, "6.5.3.1.4. Turn-Around-Time:"],
+				[*protocol, "6.5.3.1.5. PATIENT'S RIGHTS & CONFIDENTIALITY"],
+				endotoxin_group,
+				[*endotoxin_group, "6.5.3.2.0. Endotoxin Testing Protocol"],
+				[*endotoxin_group, "6.5.3.2.1 Pre Analytical Phase :"],
+				["6.5.4 RECORDS MAINTAINED"],
+			],
+		)
+
+	def test_html_tags_are_stripped_from_heading_titles(self):
+		markdown = (
+			"## 2.3. STAFF LIST as on 24<sup>th</sup> May 2018\n\nNames.\n\n"
+			"## **<u>2.4 CODE RED PROTOCOL</u>** \n\nEvacuate."
+		)
+		self.assertEqual(
+			[section.title for section in sectionize([(29, markdown)])],
+			["2.3. STAFF LIST as on 24th May 2018", "2.4 CODE RED PROTOCOL"],
+		)
+
+	def test_clean_pages_drops_a_running_header_stitched_inside_a_table(self):
+		header = "NEPHROLOGY MANUAL\n\nMAN/RPT/NEPH/001 | Ver.: 1 | Issue : 1 | Pg. {page} of 398\n\n"
+		timeline = (
+			"| Year | Milestone |\n|---|---|\n"
+			"| 2005 | Nephrology Laboratory Started |\n"
+			"| 2007 | DNA fingerprinting facility established to ascertain genetic relationship between |\n"
+			"||NEPHROLOGY MANUAL<br>|\n"
+			"||**MAN/RPT/NEPH/001**<br>**Ver.: 1**<br>**Issue : 1**<br>**Date:10/11/2023**<br>Pg.**14 of 398**|\n"
+			"||transplant patient & prospective donor|\n"
+			"|2008|First CAPD catheterization done by percutaneous method|"
+		)
+		header_box = (
+			'<table>\n<tr>\n<th colspan="4">NEPHROLOGY MANUAL</th>\n</tr>\n<tr>\n'
+			"<td>MAN/RPT/NEPH/001</td>\n<td>Ver.: 1</td>\n<td>Issue : 1</td>\n<td>Pg. 15 of 398</td>\n"
+			"</tr>\n</table>\n\n"
+		)
+		pages = [
+			(13, header.format(page=13) + timeline),
+			(14, header.format(page=14) + "# Education\n\nTwo programmes."),
+			(15, header_box + "Every staff member keeps this manual correct."),
+			(16, header.format(page=16) + "Closing notes."),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertEqual(
+			cleaned[13],
+			"| Year | Milestone |\n|---|---|\n"
+			"| 2005 | Nephrology Laboratory Started |\n"
+			"| 2007 | DNA fingerprinting facility established to ascertain genetic relationship between "
+			"transplant patient & prospective donor |\n"
+			"|2008|First CAPD catheterization done by percutaneous method|",
+		)
+		self.assertEqual(cleaned[15], "Every staff member keeps this manual correct.")
+
+	def test_clean_pages_stitches_a_continuation_that_lost_an_empty_column_and_its_header(self):
+		checklist = (
+			"### PRE-OPERATIVE CHECKLIST FOR PD NURSE\n\n<table>\n<tr>\n<th></th>\n<th>Tick (√)</th>\n<th></th>\n</tr>\n"
+			"<tr>\n<td>PD education material given in patient's own language\n<ul>\n"
+			"<li>Introductory PD pamphlet</li>\n<li>PD patient information sheet</li>\n</ul>\n</td>\n"
+			"<td></td>\n<td></td>\n</tr>\n"
+			"<tr>\n<td>Patient's ability to do CAPD ensured</td>\n<td></td>\n<td></td>\n</tr>\n</table>\n\n212"
+		)
+		continuation = (
+			"| Care-giver identified | Specify |\n|---|---|\n"
+			"| Dedicated PD area at home identified | |\n"
+			"| Date of surgery decided | Date: |\n\n"
+			"Signature of the PD nurse."
+		)
+		cleaned = dict(clean_pages([(212, checklist), (213, continuation)]))
+		self.assertEqual(
+			cleaned[212],
+			"### PRE-OPERATIVE CHECKLIST FOR PD NURSE\n\n|  | Tick (√) |  |\n|---|---|---|\n"
+			"| PD education material given in patient's own language<br>• Introductory PD pamphlet"
+			"<br>• PD patient information sheet |  |  |\n"
+			"| Patient's ability to do CAPD ensured |  |  |\n"
+			"| Care-giver identified |  | Specify |\n"
+			"| Dedicated PD area at home identified |  |  |\n"
+			"| Date of surgery decided |  | Date: |",
+		)
+		self.assertEqual(cleaned[213], "Signature of the PD nurse.")
+
+	def test_clean_pages_lays_contents_lines_out_as_the_contents_table_they_continue(self):
+		contents_table = (
+			"# CONTENTS\n\n| S.No | CONTENTS | Pg No |\n|---|---|---|\n"
+			"| 3.5.4 | Fellow in Interventional Nephrology | 46 |\n"
+			"| 3.5.5 | Responsibilities of Dialysis Registrar | 47 |"
+		)
+		contents_lines = (
+			"3.5.6 Transplant registrar 50\n3.5.7 Fellow in Renal Transplantation 51\n3.6 Nursing staff 59\n"
+			"3.6.1 Nurse manager 57\n3.9.1 Hospital Attendant -Posted in clinical Area (A.K. Lab) 88\n"
+			"4 Records maintained 93"
+		)
+		cleaned = dict(clean_pages([(2, contents_table), (3, contents_lines)]))
+		self.assertEqual(
+			cleaned[2],
+			"# CONTENTS\n\n| S.No | CONTENTS | Pg No |\n|---|---|---|\n"
+			"| 3.5.4 | Fellow in Interventional Nephrology | 46 |\n"
+			"| 3.5.5 | Responsibilities of Dialysis Registrar | 47 |\n"
+			"| 3.5.6 | Transplant registrar | 50 |\n"
+			"| 3.5.7 | Fellow in Renal Transplantation | 51 |\n"
+			"| 3.6 | Nursing staff | 59 |\n"
+			"| 3.6.1 | Nurse manager | 57 |\n"
+			"| 3.9.1 | Hospital Attendant -Posted in clinical Area (A.K. Lab) | 88 |\n"
+			"| 4 | Records maintained | 93 |",
+		)
+		self.assertEqual(cleaned[3], "")
 
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):

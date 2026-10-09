@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import frappe
-from frappe.utils.file_manager import save_file
+from frappe.utils.file_manager import get_content_hash, save_file
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random
 
 from wikify.engine.verify.harness import get_verdict
@@ -49,6 +49,10 @@ def add_page(
 	)
 	page.db_set("image", file_doc.file_url)
 	return page.name
+
+
+def set_baseline_markdown(page_name: str, markdown: str) -> None:
+	frappe.db.set_value("Source Page", page_name, "baseline_markdown", markdown)
 
 
 def set_page_count(source_document: str, count: int) -> None:
@@ -166,6 +170,17 @@ def get_page(source_document: str, page_no: int) -> dict | None:
 
 
 def save_crop_file(page_name: str, page_no: int, png_bytes: bytes):
+	existing = frappe.db.get_value(
+		"File",
+		{
+			"attached_to_doctype": "Source Page",
+			"attached_to_name": page_name,
+			"content_hash": get_content_hash(png_bytes),
+		},
+		"name",
+	)
+	if existing:
+		return frappe.get_doc("File", existing)
 	return save_file(f"page-{page_no:04d}-crop.png", png_bytes, "Source Page", page_name, is_private=1)
 
 

@@ -73,6 +73,7 @@ def parse_pdf(
 
 	with fitz.open(pdf_path) as doc:
 		total = doc.page_count
+		repeated = images.repeated_images(doc)
 		sd = store.create_document(
 			title=title,
 			import_name=import_name,
@@ -85,11 +86,11 @@ def parse_pdf(
 			png = pdf_utils.render_png(page, dpi=dpi)
 			kind = pdf_utils.classify_page(page, min_chars, min_drawings)
 			markdown = baseline.parse_page(pdf_path, page_no)
-			# Rescue genuine graphics the baseline parser omits (diagrams/photos with no
-			# recoverable text) by embedding them inline; text-image placeholders are left
-			# for the cleanup pass. No-op on the common page with no genuine figure.
-			markdown = images.embed_genuine_images(page, markdown, sd, page_no, kind)
 			page_name = store.add_page(sd, page_no, kind, png, markdown)
+			figures = images.page_figures(page, repeated, page_name, page_no)
+			if figures:
+				markdown = images.place_figures(markdown, figures, page_no)
+				store.set_baseline_markdown(page_name, markdown)
 
 			# Visual pages MUST be judged (text GT is unreliable on diagrams); text
 			# pages are judged only when the operator opted in (cost/latency).

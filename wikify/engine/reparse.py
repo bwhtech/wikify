@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fitz
 
-from wikify.engine import diagrams, llm, pdf_utils, regions, remediate, settings, store
+from wikify.engine import diagrams, images, llm, pdf_utils, regions, remediate, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
 from wikify.engine.parsers import vlm
 from wikify.engine.tags import find_tag_spans
@@ -36,6 +36,7 @@ def reparse_page(
 		fpage = doc[page_no - 1]
 		gt = fpage.get_text("text")
 		shape_hint = regions.shape_hint(regions.find_regions(fpage))
+		figures = images.page_figures(fpage, images.repeated_images(doc), page["name"], page_no)
 		data_url = pdf_utils.png_to_data_url(pdf_utils.render_png(fpage, dpi=dpi))
 
 	kind = page["kind"]
@@ -47,11 +48,16 @@ def reparse_page(
 	llm.reset_metrics()
 	new_md = (
 		vlm.parse_page_image(
-			data_url, project_context=project_context, instruction=instruction, shape_hint=shape_hint
+			data_url,
+			project_context=project_context,
+			instruction=instruction,
+			shape_hint=shape_hint,
+			figure_hint=images.figure_hint(figures),
 		)
 		if method == "vlm"
 		else clean_markdown(base_md, project_context=project_context, instruction=instruction)
 	)
+	new_md = images.place_figures(new_md, figures, page_no)
 	page_image = store.get_page_image(page["name"]) or ""
 	new_md, diagram_notes = diagrams.remove_unverified_diagrams(new_md, page_image)
 	new_md = remediate.repair_broken_image_tags(new_md, page_image)

@@ -5,9 +5,8 @@ from collections.abc import Callable
 
 import fitz
 
-from wikify.engine import diagrams, llm, pdf_utils, regions, settings, store
+from wikify.engine import diagrams, images, llm, pdf_utils, regions, settings, store
 from wikify.engine.loader.cleanup_llm import clean_markdown
-from wikify.engine.loader.table_stitch import stitch_cross_page_tables
 from wikify.engine.parsers import vlm
 from wikify.engine.sectionize import rebuild_and_classify
 from wikify.engine.verify import deterministic as det
@@ -93,6 +92,7 @@ def remediate_pdf(  # noqa: C901
 
 	with fitz.open(pdf_path) as doc:
 		furniture = det.find_furniture_lines([doc[p["page_no"] - 1].get_text("text") for p in pages])
+		repeated = images.repeated_images(doc)
 
 		doc_cost = 0.0
 		for i, p in enumerate(targets):
@@ -102,6 +102,7 @@ def remediate_pdf(  # noqa: C901
 			page_image = p["image"] or ""
 			data_url = pdf_utils.png_to_data_url(pdf_utils.render_png(page, dpi=dpi))
 			page_regions = regions.find_regions(page)
+			figures = images.page_figures(page, repeated, p["name"], p["page_no"])
 
 			use_judge = judge_all or kind == "visual"
 			img = data_url if use_judge else None
@@ -122,7 +123,9 @@ def remediate_pdf(  # noqa: C901
 					project_context=project_context,
 					instruction=instruction,
 					shape_hint=regions.shape_hint(page_regions),
+					figure_hint=images.figure_hint(figures),
 				)
+				vlm_md = images.place_figures(vlm_md, figures, p["page_no"])
 				vlm_md, diagram_notes = diagrams.remove_unverified_diagrams(vlm_md, page_image)
 				errors.extend(diagram_notes)
 				vlm_ps = score_page(
@@ -134,7 +137,11 @@ def remediate_pdf(  # noqa: C901
 			if kind != "visual":
 				try:
 					clean_md, clean_notes = diagrams.remove_unverified_diagrams(
-						clean_markdown(base_md, project_context=project_context, instruction=instruction),
+						images.place_figures(
+							clean_markdown(base_md, project_context=project_context, instruction=instruction),
+							figures,
+							p["page_no"],
+						),
 						page_image,
 					)
 					errors.extend(clean_notes)
@@ -175,6 +182,7 @@ def remediate_pdf(  # noqa: C901
 				canon_src[p["page_no"]] = method
 			else:
 				canon_md[p["page_no"]] = base_md
+			canon_md[p["page_no"]] = images.place_figures(canon_md[p["page_no"]], figures, p["page_no"])
 			canon_md[p["page_no"]] = repair_broken_image_tags(canon_md[p["page_no"]], page_image)
 			canon_md[p["page_no"]] = with_page_crop(canon_md[p["page_no"]], page_image)
 
@@ -193,11 +201,10 @@ def remediate_pdf(  # noqa: C901
 			if progress_cb:
 				progress_cb(i + 1, total)
 
-	stitched = dict(stitch_cross_page_tables([(p["page_no"], canon_md[p["page_no"]]) for p in pages]))
 	with events.suspended_indexing():
 		for p in pages:
 			pno = p["page_no"]
-			store.set_canonical(p["name"], stitched[pno], canon_comp[pno], canon_src[pno])
+			store.set_canonical(p["name"], canon_md[pno], canon_comp[pno], canon_src[pno])
 
 	comps = [c for c in canon_comp.values() if c is not None]
 	canonical_mean = round(sum(comps) / len(comps), 3) if comps else None

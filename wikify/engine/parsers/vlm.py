@@ -31,6 +31,10 @@ _PROMPT = (
 	'and statutory references (e.g. "u/s 115BAC", "section 44AD", "First Proviso") character '
 	"for character. Never round, re-word, convert or summarise a number, and never invent "
 	"content.\n"
+	"Forms keep their furniture: write every checkbox as ☐ (empty) or ☑ (ticked) in front of its "
+	"option, and keep blank fill-in lines as runs of underscores.\n"
+	"Keep list markers as printed: letters (a. b. c.), roman numerals (i. ii.) and ✓ ticks are "
+	"never renumbered into 1. 2. 3.\n"
 	"Output only the Markdown — no commentary, and no code fences except ```mermaid."
 )
 
@@ -41,6 +45,7 @@ def parse_page_image(
 	project_context: str = "",
 	instruction: str = "",
 	shape_hint: str = "",
+	figure_hint: str = "",
 ) -> str:
 	preamble = context_block(project_context) + instruction_block(instruction) + shape_hint
 	resp = llm.chat_completion(
@@ -49,7 +54,7 @@ def parse_page_image(
 			{
 				"role": "user",
 				"content": [
-					{"type": "text", "text": preamble + _PROMPT},
+					{"type": "text", "text": preamble + _PROMPT + figure_hint},
 					{"type": "image_url", "image_url": {"url": image_data_url}},
 				],
 			}
