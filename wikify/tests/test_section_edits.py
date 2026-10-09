@@ -151,6 +151,24 @@ class TestSectionEdits(FrappeTestCase):
 		self.assertEqual(beta.lft, 1)  # tree renumbered from 1
 		self.assertLess(beta.lft, beta.rgt)
 
+	def test_update_section_markdown_saves_and_relints(self):
+		beta = self._name("2. Beta")
+		api.update_section_markdown(beta, "| a | b |\n| 1 | 2 |")
+
+		markdown, lint_issues = frappe.db.get_value("Source Section", beta, ["markdown", "lint_issues"])
+		self.assertEqual(markdown, "| a | b |\n| 1 | 2 |")
+		self.assertTrue(store.lint_count(lint_issues))
+
+	def test_update_section_markdown_needs_write_permission(self):
+		beta = self._name("2. Beta")
+		frappe.set_user("Guest")
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				api.update_section_markdown(beta, "edited")
+		finally:
+			frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.get_value("Source Section", beta, "markdown"), "body of 2. Beta")
+
 	def test_build_graph_advances_status(self):
 		imp = self._import("Review")
 
@@ -174,6 +192,8 @@ class TestSectionEdits(FrappeTestCase):
 			api.toggle_include(alpha, False)
 		with self.assertRaises(frappe.ValidationError):
 			api.delete_section(alpha)
+		with self.assertRaises(frappe.ValidationError):
+			api.update_section_markdown(alpha, "edited")
 		with self.assertRaises(frappe.ValidationError):
 			api.build_graph(imp.name)
 

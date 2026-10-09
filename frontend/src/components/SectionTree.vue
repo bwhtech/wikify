@@ -467,7 +467,9 @@ async function buildGraph() {
 				<WikiPreview
 					:section="selectedName"
 					:show-back="isNarrow"
+					:editable="!published"
 					@navigate="onSelect"
+					@saved="sections.reload()"
 					@back="showPreview = false"
 				/>
 			</component>

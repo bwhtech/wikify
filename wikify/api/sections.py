@@ -266,6 +266,16 @@ def rename_section(name: str, title: str) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
+def update_section_markdown(name: str, markdown: str) -> None:
+	source_document = frappe.db.get_value("Source Section", name, "source_document")
+	if not source_document:
+		frappe.throw(_("Section {0} not found.").format(name))
+	frappe.has_permission("Source Section", ptype="write", doc=name, throw=True)
+	_assert_editable(source_document)
+	store.set_section_markdown(name, markdown or "")
+
+
+@frappe.whitelist(methods=["POST"])
 def toggle_include(name: str, include: bool | int | str) -> dict:
 	include = 1 if frappe.parse_json(include) else 0
 	source_document, names = _subtree_names(name)
