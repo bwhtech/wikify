@@ -33,6 +33,8 @@ from wikify.engine.refs import smallest_covering
 
 DATA_MAX_LENGTH = 140
 OVERVIEW_TITLE = "Overview"
+CONTENTS_TITLE = "Contents"
+PRINTED_CONTENTS_TITLES = {"contents", "table of contents"}
 
 
 def _upsert_wiki_document(
@@ -97,6 +99,10 @@ def overview_route(prefix: str, section_name: str) -> tuple[str, str]:
 	return bounded_route(prefix, OVERVIEW_TITLE, section_name)
 
 
+def contents_route(prefix: str, source_document: str) -> tuple[str, str]:
+	return bounded_route(prefix, CONTENTS_TITLE, source_document)
+
+
 def has_own_body(section: dict) -> bool:
 	return bool(section["is_group"] and (section["markdown"] or "").strip())
 
@@ -135,6 +141,7 @@ class _WikiGenerator:
 		self._stage("Building wiki pages")
 		self._build_structure()
 		self._rollup_empty_groups()
+		self._add_contents()
 		self._stage("Resolving page references")
 		self._rewrite_links()
 		store.set_document_wiki(self.sd.name, self.space.name, self.root_group.name, status="Wiki-Generated")
@@ -163,6 +170,14 @@ class _WikiGenerator:
 		rest under the root group deepest-first (NestedSet needs leaves gone first).
 		"""
 		kept = {self.root_group.name}
+		if self._needs_contents():
+			kept |= set(
+				frappe.get_all(
+					"Wiki Document",
+					filters={"route": contents_route(self.root_group.route, self.sd.name)[0], "is_group": 0},
+					pluck="name",
+				)
+			)
 		kept |= {s["wiki_document"] for s in self.included if s["wiki_document"]}
 		overview_routes = [
 			overview_route(self.root_group.route, s["name"])[0] for s in self.included if has_own_body(s)
@@ -211,7 +226,7 @@ class _WikiGenerator:
 		return "" if section["is_group"] else f"# {section['title']}\n"
 
 	def _build_structure(self) -> None:
-		sort_counter: dict[str, int] = {}  # parent wiki name → next sort_order
+		sort_counter: dict[str, int] = {self.root_group.name: 1 if self._needs_contents() else 0}
 		total = len(self.included)
 		for i, s in enumerate(self.included):
 			parent_name = self._parent_for(s)
@@ -280,6 +295,42 @@ class _WikiGenerator:
 			frappe.db.set_value(
 				"Wiki Document", self.wiki_name[s["name"]], "content", toc, update_modified=False
 			)
+
+	def _needs_contents(self) -> bool:
+		return bool(self.included) and not any(
+			s["title"].strip().lower() in PRINTED_CONTENTS_TITLES for s in self.included
+		)
+
+	def _add_contents(self) -> None:
+		"""The PDF printed no contents pages, so the space gets one built from the section tree."""
+		if not self._needs_contents():
+			return
+		depth: dict[str, int] = {}
+		lines = []
+		for s in self.included:
+			parent = self.by_name.get(s["parent_source_section"])
+			while parent is not None and parent["name"] not in depth:
+				parent = self.by_name.get(parent["parent_source_section"])
+			depth[s["name"]] = depth[parent["name"]] + 1 if parent else 0
+			pages = (
+				f"p. {s['page_start']}"
+				if s["page_end"] in (None, s["page_start"])
+				else f"pp. {s['page_start']}-{s['page_end']}"
+			)
+			lines.append(
+				f"{'  ' * depth[s['name']]}- [{s['title']}](/{self.wiki_route[s['name']]}) — {pages}\n"
+			)
+		route, slug = contents_route(self.root_group.route, self.sd.name)
+		doc = _upsert_wiki_document(
+			frappe.db.get_value("Wiki Document", {"route": route, "is_group": 0}, "name"),
+			title=CONTENTS_TITLE,
+			content=f"# {CONTENTS_TITLE}\n\n" + "".join(lines),
+			is_group=False,
+			parent=self.root_group.name,
+			route=route,
+			slug=slug,
+		)
+		frappe.db.set_value("Wiki Document", doc.name, "sort_order", 0, update_modified=False)
 
 	def _route_for_page(self, n: int) -> str | None:
 		"""Smallest-span included section whose PDF page range contains n → its route."""

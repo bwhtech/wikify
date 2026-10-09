@@ -238,6 +238,34 @@ class TestWikiGenerate(FrappeTestCase):
 		self.assertNotIn("Overview", docs)
 		self.assertIn("## Contents", docs["1. Intro"].content)
 
+	def test_contents_page_is_built_when_the_pdf_prints_none(self):
+		res = self._generate()
+		docs = self._by_title(res["root_group"])
+		contents = docs["Contents"]
+		self.assertEqual(contents.is_group, 0)
+		self.assertEqual(contents.parent_wiki_document, res["root_group"])
+		self.assertLess(contents.sort_order, docs["1. Intro"].sort_order)
+		self.assertIn(f"- [1. Intro](/{docs['1. Intro'].route}) — pp. 1-3", contents.content)
+		self.assertIn(f"  - [1.2 Scope](/{docs['1.2 Scope'].route}) — p. 2", contents.content)
+		self.assertEqual(get_landing_page_for_route(docs["Gen Test"].route)["route"], contents.route)
+
+		generate_wiki(self.sd.name, wiki_space=res["space"])
+		self.assertEqual(self._by_title(res["root_group"])["Contents"].name, contents.name)
+
+	def test_printed_contents_replaces_the_built_one(self):
+		res = self._generate()
+		store.replace_sections(
+			self.sd.name,
+			[
+				_sec("Contents", 1, ["Contents"], 1, 1, "1. Intro .... 2"),
+				_sec("1. Intro", 1, ["1. Intro"], 2, 5),
+			],
+		)
+		generate_wiki(self.sd.name, wiki_space=res["space"])
+		docs = self._by_title(res["root_group"])
+		self.assertEqual(docs["Contents"].content, "1. Intro .... 2")
+		self.assertEqual(len(docs), 3)
+
 	def test_data_max_length_matches_the_column_width(self):
 		self.assertEqual(DATA_MAX_LENGTH, frappe.db.VARCHAR_LEN)
 
@@ -249,7 +277,7 @@ class TestWikiGenerate(FrappeTestCase):
 		res = self._generate()
 
 		docs = self._docs_under(res["root_group"])
-		self.assertEqual(len(docs), 2 * len(titles))
+		self.assertEqual(len(docs), 2 * len(titles) + 1)
 		self.assertTrue(all(len(doc.route) <= DATA_MAX_LENGTH for doc in docs.values()))
 		self.assertEqual(len({doc.route for doc in docs.values()}), len(docs))
 
