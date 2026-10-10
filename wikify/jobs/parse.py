@@ -52,6 +52,8 @@ def run(import_name: str) -> None:  # noqa: C901
 		# Parse + score only; the tree is built after remediation (below) so it's built once,
 		# over the cleaned canonical markdown rather than the raw baseline.
 		resuming = bool(imp.source_document)
+		if not resuming:
+			delete_partial_documents(import_name)
 		source_document = imp.source_document or parse_pdf(
 			pdf_path,
 			title=imp.import_title,
@@ -141,3 +143,8 @@ def run(import_name: str) -> None:  # noqa: C901
 		frappe.db.commit()
 		log(import_name, "error", "parse", "Parse failed — see error on the import")
 		raise
+
+
+def delete_partial_documents(import_name: str) -> None:
+	for name in frappe.get_all("Source Document", filters={"import": import_name}, pluck="name"):
+		frappe.delete_doc("Source Document", name, ignore_permissions=True, force=True)

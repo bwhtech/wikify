@@ -127,18 +127,18 @@ function confirmReclassify() {
 	});
 }
 
-// A killed worker leaves the import in Parsing/Remediating with no job behind it.
+// A killed or timed-out job leaves the import stopped with no job behind it.
 const canResume = useCall({
 	url: "/api/v2/method/wikify.api.imports.can_resume_import",
 	method: "GET",
 	immediate: false,
 });
-const isRunningStatus = computed(() => ["Parsing", "Remediating"].includes(status.value));
-const isStuck = computed(() => isRunningStatus.value && canResume.data === true);
+const mayBeResumable = computed(() => ["Parsing", "Remediating", "Failed"].includes(status.value));
+const isStuck = computed(() => mayBeResumable.value && canResume.data === true);
 watch(
 	status,
 	() => {
-		if (isRunningStatus.value) canResume.submit({ import_name: props.name });
+		if (mayBeResumable.value) canResume.submit({ import_name: props.name });
 	},
 	{ immediate: true }
 );
@@ -149,8 +149,12 @@ const resume = useCall({
 });
 async function resumeImport() {
 	await resume.submit({ import_name: props.name });
-	if (resume.error) toast.error(resume.error?.messages?.[0] || "Could not resume the import");
-	await canResume.submit({ import_name: props.name });
+	if (resume.error) {
+		toast.error(resume.error?.messages?.[0] || "Could not resume the import");
+		await canResume.submit({ import_name: props.name });
+	} else {
+		imp.reload();
+	}
 }
 
 // Attach the document (with its project) as the agent's default context. Keyed on the

@@ -4,6 +4,7 @@ import frappe
 from frappe.utils import add_to_date, now_datetime
 from frappe.utils.background_jobs import is_job_enqueued
 
+from wikify.engine import store
 from wikify.jobs._util import import_job_id, log, publish_progress
 
 RUNNING_STATUSES = ("Queued", "Parsing", "Remediating")
@@ -21,7 +22,11 @@ def fail_stalled_imports() -> None:
 	for row in imports:
 		if is_job_enqueued(import_job_id(row.name)):
 			continue
-		retry_hint = "Click Remediate to retry." if row.source_document else "Import the PDF again to retry."
+		retry_hint = (
+			"Click Resume import to continue."
+			if store.needs_resume(row.source_document)
+			else "Click Remediate to retry."
+		)
 		error = (
 			"The background job stopped before finishing (it timed out or the worker restarted). "
 			+ retry_hint
