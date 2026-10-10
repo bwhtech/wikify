@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
-import type { Api } from "../helpers/api";
+import { serverMessage, type Api } from "../helpers/api";
+import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor } from "../helpers/wait";
@@ -345,6 +346,126 @@ test.describe("publish", () => {
 				true,
 				"generation makes no AI calls and commits every 50 pages, so even the 98-page fixture is published in seconds, too fast to stop from the UI",
 			);
+		},
+	);
+});
+
+test.describe("PR #19 lock regenerate and hand off to the wiki app editor", () => {
+	test.describe.configure({ mode: "serial" });
+
+	const stamp = Date.now();
+	const name = `${PREFIX} publish W19 ${stamp}`;
+	const spaceRoute = `test-publish-w19-${stamp}`;
+	let importName = "";
+	let space = "";
+	let leaf: SectionRow;
+
+	test.beforeAll(async ({ api, fixture }) => {
+		test.setTimeout(QUEUE_TIMEOUT + 600_000);
+		const project = await createProject(api, name);
+		const cloned = await cloneImport(api, fixture.source.import, { title: name, project });
+		importName = cloned.import;
+		const { rows, children } = await outline(api, cloned.sourceDocument);
+		const leafName = children.find(
+			(child) => !rows.some((row) => row.parent_source_section === child.name),
+		)!.name;
+		await api.call("wikify.api.sections.build_graph", { import_name: importName });
+		await waitForImport(api, importName, "Graphed", 120_000);
+		await api.call("wikify.api.imports.generate_wiki", {
+			import_name: importName,
+			new_space: { space_name: name, route: spaceRoute },
+		});
+		await waitForImport(api, importName, "Completed", QUEUE_TIMEOUT);
+		space = (await api.getList("Wiki Space", { filters: { route: spaceRoute } }))[0].name;
+		leaf = (await sectionRows(api, cloned.sourceDocument)).find((row) => row.name === leafName)!;
+	});
+
+	test(
+		"W19-1 clicking a page after publish opens it in the Wiki app editor",
+		{ tag: ["@functional", "@publish"] },
+		async ({ page }) => {
+			await page.goto(`/wikify/import/${importName}/tree`);
+			await expect(page.getByText("Published", { exact: true })).toBeVisible();
+			const popupPromise = page.waitForEvent("popup");
+			await page
+				.locator(`[data-section-row="${leaf.name}"]`)
+				.getByText(leaf.title, { exact: true })
+				.click();
+			const popup = await popupPromise;
+			expect(new URL(popup.url()).pathname).toBe(
+				`/wiki-app/spaces/${space}/page/${leaf.wiki_document}`,
+			);
+			await popup.close();
+		},
+	);
+
+	test(
+		"W19-2 regenerating a published import is rejected",
+		{ tag: ["@negative", "@publish"] },
+		async ({ api }) => {
+			const before = await wikiDocuments(api, spaceRoute);
+			const response = await api.context.post("/api/method/wikify.api.imports.generate_wiki", {
+				data: { import_name: importName, wiki_space: space },
+			});
+			expect(response.status()).toBe(417);
+			expect(serverMessage(await response.json())).toContain(
+				"This wiki has already been published — edit pages directly in the Wiki app.",
+			);
+			expect(await api.getValue("Wikify Import", importName, "status")).toBe("Completed");
+			expect(await wikiDocuments(api, spaceRoute)).toEqual(before);
+		},
+	);
+});
+
+test.describe("PR #18 collapse tabs to pdf/pages/wiki/logs", () => {
+	test.describe.configure({ mode: "serial" });
+
+	const name = `${PREFIX} publish W18 ${Date.now()}`;
+	let importName = "";
+	let sourceDocument = "";
+
+	test.beforeAll(async ({ api, fixture }) => {
+		test.setTimeout(900_000);
+		const project = await createProject(api, name);
+		const cloned = await cloneImport(api, fixture.source.import, { title: name, project });
+		importName = cloned.import;
+		sourceDocument = cloned.sourceDocument;
+		await api.call("wikify.api.sections.build_graph", { import_name: importName });
+		await waitForImport(api, importName, "Graphed", 120_000);
+	});
+
+	test.afterAll(async ({ api }) => {
+		await deleteTestProjects(api, name);
+	});
+
+	test(
+		"W18-1 the old wiki link lands on the merged Wiki tab with Publish",
+		{ tag: ["@functional", "@publish"] },
+		async ({ page }) => {
+			await page.goto(`/wikify/import/${importName}/wiki`);
+			await expect(page).toHaveURL(new RegExp(`/wikify/import/${importName}/tree$`));
+			for (const label of ["PDF", "Pages", "Wiki", "Logs"])
+				await expect(page.getByRole("tab", { name: label, exact: true })).toBeVisible();
+			await expect(page.getByRole("tab", { name: "Explore", exact: true })).toHaveCount(0);
+			await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
+		},
+	);
+
+	test(
+		"W18-2 the publish dialog refuses to generate when no section is included",
+		{ tag: ["@negative", "@publish"] },
+		async ({ page, api }) => {
+			const rows = await sectionRows(api, sourceDocument);
+			for (const row of rows.filter((r) => r.include_in_wiki && !r.parent_source_section))
+				await api.call("wikify.api.sections.toggle_include", { name: row.name, include: 0 });
+			await waitFor(
+				async () => (await sectionRows(api, sourceDocument)).filter((r) => r.include_in_wiki),
+				(included) => included.length === 0,
+				{ timeout: 60_000, interval: 2_000, label: "all sections excluded" },
+			);
+			const dialog = await openPublishDialog(page, importName);
+			await expect(dialog.getByText(/nothing to publish/)).toBeVisible();
+			await expect(dialog.getByRole("button", { name: "Generate wiki" })).toBeDisabled();
 		},
 	);
 });
