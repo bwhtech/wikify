@@ -978,13 +978,13 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("PO: oral", secs[0].markdown)
 
 	def test_a_numbered_heading_after_bare_step_numbers_is_a_step_not_a_chapter(self):
+		method = (
+			"# The Method\n\nIntro.\n\n### 1\n\n## Build a fresh bench\n\nNever upgrade in place.\n\n"
+			"### 2\n\n## Restore a backup\n\nAlways restore fresh.\n\n## 3 Run bench migrate\n\n"
+			"Expect failures.\n\n4\n\n## Read the whole log\n\nA clean exit is not enough."
+		)
 		pages = [
-			(
-				2,
-				"# The Method\n\nIntro.\n\n### 1\n\n## Build a fresh bench\n\nNever upgrade in place.\n\n"
-				"### 2\n\n## Restore a backup\n\nAlways restore fresh.\n\n## 3 Run bench migrate\n\n"
-				"Expect failures.\n\n4\n\n## Read the whole log\n\nA clean exit is not enough.",
-			),
+			(2, method),
 			(3, "# Preparing the New Bench\n\nSet up the environment.\n\n## The Apps\n\nList the apps."),
 		]
 		secs = sectionize(pages)
