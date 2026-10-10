@@ -6,12 +6,13 @@ from frappe.utils.background_jobs import is_job_enqueued
 
 from wikify.api.sections import assert_not_published
 from wikify.engine import preview_wiki as _preview_wiki
+from wikify.engine import store
 from wikify.jobs import generate as generate_job
 from wikify.jobs._util import IMPORT_JOB_TIMEOUT, import_job_id, log, publish_progress
 from wikify.seed import seed_uncategorized_project
 
 MAX_BATCH = 25
-RESUMABLE_STATUSES = ("Parsing", "Remediating")
+RESUMABLE_STATUSES = ("Parsing", "Remediating", "Failed")
 
 
 def assert_readable_file(file_url: str) -> None:
@@ -44,7 +45,9 @@ def enqueue_parse(import_name: str) -> None:
 
 
 def is_stuck(import_doc) -> bool:
-	return import_doc.status in RESUMABLE_STATUSES and not is_job_enqueued(import_job_id(import_doc.name))
+	if import_doc.status not in RESUMABLE_STATUSES or is_job_enqueued(import_job_id(import_doc.name)):
+		return False
+	return store.needs_resume(import_doc.source_document)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -114,6 +117,7 @@ def resume_import(import_name: str) -> str:
 			)
 		)
 
+	import_doc.db_set({"status": "Queued", "error": None})
 	enqueue_parse(import_name)
 	return import_name
 

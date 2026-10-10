@@ -151,6 +151,14 @@ def set_canonical(page_name: str, markdown: str, composite: float | None, source
 	invalidate_page(page_name)
 
 
+def needs_resume(source_document: str | None) -> bool:
+	return not source_document or bool(
+		frappe.db.exists(
+			"Source Page", {"source_document": source_document, "canonical_source": ("is", "not set")}
+		)
+	)
+
+
 def set_canonical_mean(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "canonical_mean", mean)
 
