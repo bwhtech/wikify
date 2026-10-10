@@ -126,6 +126,16 @@ class TestFallbackPagePlan(FrappeTestCase):
 		for text in ("Memo to all renal staff.", "## Clinic closure", "Call extension 4455."):
 			self.assertIn(text, pages[0].markdown)
 
+	def test_short_unnumbered_sections_each_opening_a_pdf_page_stay_pages(self):
+		topics = ["Five rights", "IV administration", "Covert medication", "Self-administration"]
+		sections = [_sec(["Preamble"], 1, markdown="Repeat Prescribing Protocol")]
+		sections += [
+			_sec([topic], 2 * n + 1, 2 * n + 2, markdown=_words(20)) for n, topic in enumerate(topics)
+		]
+		pages = plan_pages(sections)
+		self.assertEqual(_titles(pages), topics)
+		self.assertIn("Repeat Prescribing Protocol", pages[0].markdown)
+
 	def test_hierarchy_of_the_remaining_pages_is_unchanged(self):
 		pages = plan_pages(_outline())
 		self.assertEqual(pages[-1].hierarchy_path, ["6.1 Protocols", "6.1.2 Lupus nephritis"])

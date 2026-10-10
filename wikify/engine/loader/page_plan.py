@@ -128,6 +128,8 @@ def enforce_invariants(
 				pages.add(index)
 		elif index in chosen and parent in pages:
 			pages.add(index)
+	if not pages:
+		pages = pdf_page_openers(sections, parents)
 	pages = add_numbered_siblings(parents, numbers, pages)
 	pages, parents = split_long_pages(sections, parents, numbers, pages)
 	pages, parents = keep_sibling_order(sections, parents, numbers, pages)
@@ -141,6 +143,15 @@ def enforce_invariants(
 		or (sections[index].markdown.strip() and child_counts[parents[index]] > 1)
 	}
 	return pages or {0}, parents
+
+
+def pdf_page_openers(sections: list[Section], parents: list[int | None]) -> set[int]:
+	openers = {
+		index
+		for index, parent in enumerate(parents)
+		if index and parent is None and (index == 1 or opens_pdf_page(sections, index))
+	}
+	return openers if len(openers) > 1 else set()
 
 
 def add_numbered_siblings(
