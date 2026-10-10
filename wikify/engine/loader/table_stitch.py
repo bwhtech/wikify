@@ -24,6 +24,7 @@ _KEPT_INLINE_TAGS = ("sup", "sub")
 _WRAPPER_TAGS = ("thead", "tbody", "tfoot", "span", "p", "u")
 _LIST_TAGS = ("ul", "ol")
 MIN_NUMBERED_ROWS = 2
+_SUB_STEP = re.compile(r"^\(?(?:[a-z]|[ivx]{1,4})[.)]?$")
 
 
 class _TableReader(HTMLParser):
@@ -194,7 +195,7 @@ def _continues(row: str, after_page_break: bool) -> bool:
 	"""A row that carries on the previous step instead of starting one: no step number and, in the
 	first non-empty cell, a lowercase start (or, right after a page break, any non-capital start)."""
 	cells = [_plain_cell(cell) for cell in _cells(row)]
-	if _STEP.match(cells[0]):
+	if _STEP.match(cells[0]) or _SUB_STEP.match(cells[0]):
 		return False
 	if after_page_break:
 		text = next((cell for cell in cells if cell), "")
@@ -284,27 +285,36 @@ def _with_blank_cell(row: str, column: int) -> str:
 
 def stitch_cross_page_tables(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
 	out = [[pno, md] for pno, md in pages]
-	for k in range(len(out) - 1):
-		a = _trailing_table(out[k][1])
-		b = _leading_table(out[k + 1][1])
-		if not a or not b:
+	target = 0
+	for k in range(1, len(out)):
+		if not out[k][1].strip():
 			continue
-		a_before, a_tbl = a
-		b_tbl, b_after = b
-		if not a_tbl or not b_tbl:
-			continue
-		dropped_column = _empty_column(a_tbl) if _ncols(b_tbl[0]) == _ncols(a_tbl[0]) - 1 else None
-		if _ncols(a_tbl[0]) != _ncols(b_tbl[0]) and dropped_column is None:
-			continue
-		cont = b_tbl
-		if len(b_tbl) >= 2 and _SEP.match(b_tbl[1]):
-			repeated = _header_key(b_tbl[0]) in ("", _header_key(a_tbl[0]))
-			cont = b_tbl[2:] if repeated else [b_tbl[0], *b_tbl[2:]]
-		if dropped_column is not None:
-			cont = [_with_blank_cell(row, dropped_column) for row in cont]
-		if cont and not _SEP.match(a_tbl[-1]) and _is_numbered(a_tbl) and _continues(cont[0], True):
-			a_tbl = [*a_tbl[:-1], _merge_rows(a_tbl[-1], cont[0])]
-			cont = cont[1:]
-		out[k][1] = "\n".join(a_before + a_tbl + cont).strip()
-		out[k + 1][1] = "\n".join(b_after).strip()
+		_stitch_pair(out, target, k)
+		if out[k][1].strip():
+			target = k
 	return [(pno, md) for pno, md in out]
+
+
+def _stitch_pair(out: list[list], previous: int, current: int) -> None:
+	a = _trailing_table(out[previous][1])
+	b = _leading_table(out[current][1])
+	if not a or not b:
+		return
+	a_before, a_tbl = a
+	b_tbl, b_after = b
+	if not a_tbl or not b_tbl:
+		return
+	dropped_column = _empty_column(a_tbl) if _ncols(b_tbl[0]) == _ncols(a_tbl[0]) - 1 else None
+	if _ncols(a_tbl[0]) != _ncols(b_tbl[0]) and dropped_column is None:
+		return
+	cont = b_tbl
+	if len(b_tbl) >= 2 and _SEP.match(b_tbl[1]):
+		repeated = _header_key(b_tbl[0]) in ("", _header_key(a_tbl[0]))
+		cont = b_tbl[2:] if repeated else [b_tbl[0], *b_tbl[2:]]
+	if dropped_column is not None:
+		cont = [_with_blank_cell(row, dropped_column) for row in cont]
+	if cont and not _SEP.match(a_tbl[-1]) and _is_numbered(a_tbl) and _continues(cont[0], True):
+		a_tbl = [*a_tbl[:-1], _merge_rows(a_tbl[-1], cont[0])]
+		cont = cont[1:]
+	out[previous][1] = "\n".join(a_before + a_tbl + cont).strip()
+	out[current][1] = "\n".join(b_after).strip()
