@@ -131,6 +131,27 @@ class TestFigurePlacement(FrappeTestCase):
 			f"## Admissions\n\n{TEXT_BEFORE}\n\n![Figure 2.1](/private/files/chart.png)\n\n{TEXT_AFTER}",
 		)
 
+	def test_an_image_tag_the_vlm_made_up_becomes_the_crop(self):
+		markdown = f"{TEXT_BEFORE}\n\n![Figure 2. Admissions per year](image2.png)\n\n{TEXT_AFTER}"
+
+		placed = images.place_figures(markdown, [chart_figure()], 2)
+
+		self.assertEqual(
+			placed,
+			f"{TEXT_BEFORE}\n\n![Figure 2. Admissions per year](/private/files/chart.png)\n\n{TEXT_AFTER}",
+		)
+
+	def test_a_made_up_image_tag_beside_a_token_is_dropped(self):
+		markdown = (
+			f"{TEXT_BEFORE}\n\n[[FIGURE 1]]\n\n![chart](attachment:chart.png)\n\n![Logo](/files/logo.png)"
+		)
+
+		placed = images.place_figures(markdown, [chart_figure()], 2)
+
+		self.assertNotIn("attachment:chart.png", placed)
+		self.assertIn("![Logo](/files/logo.png)", placed)
+		self.assertEqual(placed.count("/private/files/chart.png"), 1)
+
 	def test_a_figure_already_in_the_markdown_is_not_added_twice(self):
 		markdown = f"{TEXT_BEFORE}\n\n![Admissions per year](/private/files/chart.png)\n\n{TEXT_AFTER}"
 
@@ -171,6 +192,16 @@ class TestTranscribedFigures(FrappeTestCase):
 
 		self.assertEqual(drop_transcribed_figures(markdown), markdown)
 
+	def test_keeps_a_chart_when_the_table_after_it_is_typed_on_the_page(self):
+		markdown = (
+			"![Figure 1](/private/files/chart.png)\n\nFigure 2. eGFR trajectory\n\n"
+			"| Outcome | HR |\n|---|---|\n| eGFR decline | 0.61 |\n| Death | 0.69 |"
+		)
+		page_text = "Results\nOutcome HR\neGFR decline 0.61\nDeath 0.69\nTable 1. Hazard ratios."
+
+		self.assertEqual(drop_transcribed_figures(markdown, page_text), markdown)
+		self.assertNotIn("chart.png", drop_transcribed_figures(markdown, "Results"))
+
 
 class TestFigureEchoes(FrappeTestCase):
 	def test_drops_labels_read_off_the_picture_and_keeps_the_printed_text(self):
@@ -196,7 +227,7 @@ class TestFigureEchoes(FrappeTestCase):
 			"Assemble needle and manometer. Attach the 3-way stopcock to manometer"
 		)
 
-		[(_, cleaned)] = images.drop_figure_echoes([(1, markdown)], str(path))
+		[(_, cleaned)] = images.drop_figure_echoes([(1, markdown)], images.text_layers(str(path)))
 
 		self.assertEqual(
 			cleaned,
