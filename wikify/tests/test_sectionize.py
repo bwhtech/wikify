@@ -337,6 +337,51 @@ class TestSectionizer(FrappeTestCase):
 		self.assertIn("approved by committee", cleaned[1])
 		self.assertIn("|---|---|", cleaned[1])
 
+	def test_clean_pages_keeps_a_section_heading_repeated_under_the_running_header(self):
+		pages = [
+			(number, f"QMS MANUAL\n\n{'## Purpose' if number % 7 == 1 else ''}\n\nbody {number}")
+			for number in range(1, 101)
+		]
+		cleaned = clean_pages(pages)
+		self.assertTrue(all("QMS MANUAL" not in markdown for _, markdown in cleaned))
+		self.assertEqual(sum(markdown.count("## Purpose") for _, markdown in cleaned), 15)
+
+	def test_clean_pages_joins_a_table_that_runs_over_three_pages(self):
+		header = "| Drug | Dose |\n|---|---|"
+		pages = [
+			(1, f"Intro\n\n{header}\n| Amikacin | 1 |\n| Gentamicin | 2 |"),
+			(2, f"{header}\n| Cefazolin | 3 |\n| Vancomycin | 4 |"),
+			(3, f"{header}\n| Meropenem | 5 |\n\nAfter the table."),
+		]
+		joined = "\n\n".join(markdown for _, markdown in clean_pages(pages))
+		self.assertEqual(joined.count("| Drug | Dose |"), 1)
+		self.assertLess(joined.index("Vancomycin"), joined.index("Meropenem"))
+		self.assertIn("After the table.", joined)
+
+	def test_a_section_spans_the_pages_its_stitched_table_came_from(self):
+		header = "| Drug | Dose |\n|---|---|"
+		pages = [
+			(1, f"## 2. Dose table\n\n{header}\n| Amikacin | 1 |"),
+			(2, f"{header}\n| Cefazolin | 3 |"),
+			(3, f"{header}\n| Meropenem | 5 |"),
+			(4, "## 3. After the table\n\nClosing text."),
+		]
+		secs = sectionize(clean_pages(pages))
+		self.assertEqual([(s.page_start, s.page_end) for s in secs], [(1, 3), (4, 4)])
+
+	def test_clean_pages_keeps_lettered_sub_steps_as_rows(self):
+		table = (
+			"| Step | Action |\n|---|---|\n| 1 | Prepare the tray |\n| a | gather gloves |\n"
+			"| b | gather swabs |\n| 2 | Clean the site |\n| 3 | Insert the line |"
+		)
+		self.assertIn("| a | gather gloves |", clean_pages([(1, table)])[0][1])
+
+	def test_a_numbered_data_table_is_not_a_contents_page(self):
+		rows = "\n".join(f"| {n} | Item {n} | {n * 10} |" for n in range(1, 7))
+		page = f"## 5 Supplies\n\nIntro.\n\n## 5.3 Equipment list\n\n| S.No | Item | Qty |\n|---|---|---|\n{rows}"
+		secs = sectionize([(1, page)])
+		self.assertEqual([s.title for s in secs], ["5 Supplies", "5.3 Equipment list"])
+
 	def test_table_of_contents_is_one_section_that_never_opens_chapters(self):
 		table_rows = "\n".join(f"| 1.{n} | Scope of service {n} | {18 + n} |" for n in range(1, 7))
 		procedure_rows = "\n".join(f"| 5.{n} | Policies for topic {n} | {95 + n} |" for n in range(1, 7))

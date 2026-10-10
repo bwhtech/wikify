@@ -12,6 +12,7 @@ the pipeline at sectionize time (Slice 4); shipped here per the Slice 3 cleanup 
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from itertools import groupby
 
@@ -67,6 +68,8 @@ _FENCE_CLOSE = re.compile(r"^\s*```\s*$")
 MAX_TABLE_TITLE_LINES = 2
 MAX_TABLE_TITLE_CHARS = 120
 MIN_TRANSCRIBED_ROWS = 4
+TYPED_TABLE_WORD_SHARE = 0.6
+_TABLE_WORD = re.compile(r"[^\W_]{3,}")
 
 
 def _plain(line: str) -> str:
@@ -141,12 +144,22 @@ def _edge_lines(md: str) -> list[str]:
 def find_boilerplate(pages: list[tuple[int, str]]) -> set[str]:
 	"""Normalized lines that recur at the top or bottom edge of a large fraction of pages."""
 	counts: Counter[str] = Counter()
+	outer_counts: Counter[str] = Counter()
 	for _, md in pages:
-		for nl in {_norm(line) for line in _edge_lines(md)}:
+		edge = _edge_lines(md)
+		for nl in {_norm(line) for line in edge}:
 			counts[nl] += 1
+		outer = [line for line in edge if not _is_page_of(line) and not _PAGE_NUMBER.match(_plain(line))]
+		for nl in {_norm(line) for line in outer[:1] + outer[-1:]}:
+			outer_counts[nl] += 1
+	threshold = max(3, int(0.30 * len(pages)))
 	# Capped so a header that alternates between styles across a long document still counts.
-	threshold = max(3, min(int(0.30 * len(pages)), BOILERPLATE_MAX_PAGES))
-	return {line for line, c in counts.items() if c >= threshold and len(line) <= 90}
+	outer_threshold = min(threshold, BOILERPLATE_MAX_PAGES)
+	return {
+		line
+		for line, c in counts.items()
+		if len(line) <= 90 and (c >= threshold or outer_counts[line] >= outer_threshold)
+	}
 
 
 def _is_page_of(line: str) -> bool:
@@ -402,7 +415,17 @@ def _transcription_after_figure(lines: list[str], figure: int) -> tuple[str, int
 	return None
 
 
-def drop_transcribed_figures(md: str) -> str:
+def _typed_on_page(lines: list[str], start: int, rows: int, page_text: str) -> bool:
+	if not page_text:
+		return False
+	words = _TABLE_WORD.findall(unicodedata.normalize("NFKC", " ".join(lines[start : start + rows])).lower())
+	page_words = set(_TABLE_WORD.findall(unicodedata.normalize("NFKC", page_text).lower()))
+	if not words:
+		return False
+	return sum(word in page_words for word in words) >= TYPED_TABLE_WORD_SHARE * len(words)
+
+
+def drop_transcribed_figures(md: str, page_text: str = "") -> str:
 	"""Keep one copy of a picture the parser also transcribed: the crop for a diagram it redrew as mermaid,
 	the typed table for a table printed as an image, since that copy is exact and searchable."""
 	lines = md.splitlines()
@@ -414,17 +437,20 @@ def drop_transcribed_figures(md: str) -> str:
 		kind, start, end = transcription
 		if kind == "mermaid":
 			drop.update(range(start, end + 1))
-		elif end >= MIN_TRANSCRIBED_ROWS:
+		elif end >= MIN_TRANSCRIBED_ROWS and not _typed_on_page(lines, start, end, page_text):
 			drop.add(index)
 	if not drop:
 		return md
 	return "\n".join(line for index, line in enumerate(lines) if index not in drop)
 
 
-def clean_pages(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+def clean_pages(
+	pages: list[tuple[int, str]], page_texts: dict[int, str] | None = None
+) -> list[tuple[int, str]]:
 	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
+	page_texts = page_texts or {}
 	stripped = [
-		(page_no, contents_lines_to_table(drop_transcribed_figures(md)))
+		(page_no, contents_lines_to_table(drop_transcribed_figures(md, page_texts.get(page_no, ""))))
 		for page_no, md in strip_boilerplate(pages, find_boilerplate(pages))
 	]
 	stitched = stitch_cross_page_tables(stripped)

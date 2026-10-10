@@ -4,6 +4,7 @@ import re
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass
+from itertools import count
 
 import fitz
 
@@ -36,6 +37,7 @@ _CAPTION_RE = re.compile(
 )
 _SKIPPED_MARKUP_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)|<[^<>]*>|&#?\w+;")
 _FENCE_RE = re.compile(r"^[ \t]*```", re.MULTILINE)
+_UNHOSTED_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((?!/files/|/private/files/)[^)]*\)")
 
 
 @dataclass
@@ -279,16 +281,20 @@ def drop_echoes_after_figures(markdown: str, page_text: str) -> str:
 	return re.sub(r"\n{3,}", "\n\n", "\n".join(line for index, line in enumerate(lines) if index not in drop))
 
 
-def drop_figure_echoes(pages: list[tuple[int, str]], pdf_path: str) -> list[tuple[int, str]]:
+def text_layers(pdf_path: str) -> dict[int, str]:
+	with fitz.open(pdf_path) as pdf_document:
+		return {page.number + 1: page.get_text() for page in pdf_document}
+
+
+def drop_figure_echoes(pages: list[tuple[int, str]], page_texts: dict[int, str]) -> list[tuple[int, str]]:
 	"""Drop the labels and captions a parser copied out of a picture into the text after it. Only on pages
 	with a text layer to check against, since on a scanned page every line would look drawn."""
-	with fitz.open(pdf_path) as pdf_document:
-		cleaned = []
-		for page_no, markdown in pages:
-			page_text = pdf_document[page_no - 1].get_text() if 0 < page_no <= pdf_document.page_count else ""
-			if "![" in markdown and len(normalized(layer_text(page_text))) >= MIN_TEXT_LAYER_CHARS:
-				markdown = drop_echoes_after_figures(markdown, page_text)
-			cleaned.append((page_no, markdown))
+	cleaned = []
+	for page_no, markdown in pages:
+		page_text = page_texts.get(page_no, "")
+		if "![" in markdown and len(normalized(layer_text(page_text))) >= MIN_TEXT_LAYER_CHARS:
+			markdown = drop_echoes_after_figures(markdown, page_text)
+		cleaned.append((page_no, markdown))
 	return cleaned
 
 
@@ -341,10 +347,23 @@ def insert_at(markdown: str, position: int, tag: str) -> str:
 	return f"{markdown[:position].rstrip()}\n\n{tag}\n\n{markdown[position:].lstrip()}"
 
 
+def unhosted_images_to_tokens(markdown: str) -> str:
+	if FIGURE_TOKEN_RE.search(markdown):
+		return _UNHOSTED_IMAGE_RE.sub("", markdown)
+	numbers = count(1)
+
+	def to_token(match: re.Match) -> str:
+		title = " ".join(match.group(1).replace("]", ")").split())
+		return f"[[FIGURE {next(numbers)}{': ' + title if title else ''}]]"
+
+	return _UNHOSTED_IMAGE_RE.sub(to_token, markdown)
+
+
 def place_figures(markdown: str, figures: list[Figure], page_no: int) -> str:
 	if not figures:
 		return FIGURE_TOKEN_RE.sub("", markdown or "")
 	placed: set[int] = set()
+	markdown = unhosted_images_to_tokens(markdown or "")
 
 	def swap_token(match: re.Match) -> str:
 		number = int(match.group(1))
