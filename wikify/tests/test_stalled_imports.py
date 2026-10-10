@@ -11,10 +11,19 @@ from wikify.seed import seed_uncategorized_project
 
 
 class TestStalledImports(FrappeTestCase):
-	def make_import(self, status: str, minutes_since_modified: int):
+	def make_import(self, status: str, minutes_since_modified: int, unremediated_page: bool = False):
 		source_document = frappe.get_doc({"doctype": "Source Document", "title": "Stalled Test"}).insert(
 			ignore_permissions=True
 		)
+		if unremediated_page:
+			frappe.get_doc(
+				{
+					"doctype": "Source Page",
+					"source_document": source_document.name,
+					"page_no": 1,
+					"kind": "text",
+				}
+			).insert(ignore_permissions=True)
 		imp = frappe.get_doc(
 			{
 				"doctype": "Wikify Import",
@@ -51,6 +60,15 @@ class TestStalledImports(FrappeTestCase):
 		self.assertEqual(status, "Failed")
 		self.assertIn("Click Remediate to retry", error)
 		self.assertTrue(frappe.db.exists("Import Log Entry", {"import": name, "level": "error"}))
+
+	def test_an_import_with_unremediated_pages_points_to_resume(self):
+		name = self.make_import("Remediating", 30, unremediated_page=True)
+
+		self.fail_stalled_imports(job_is_enqueued=False)
+
+		status, error = frappe.db.get_value("Wikify Import", name, ["status", "error"])
+		self.assertEqual(status, "Failed")
+		self.assertIn("Click Resume import to continue", error)
 
 	def test_an_import_with_a_live_job_is_left_running(self):
 		name = self.make_import("Remediating", 30)

@@ -8,6 +8,8 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from wikify.api import imports as imports_api
+from wikify.engine import store
+from wikify.jobs import parse as parse_job
 from wikify.jobs._util import import_job_id
 from wikify.seed import seed_uncategorized_project
 
@@ -229,8 +231,8 @@ class TestImportsApi(FrappeTestCase):
 
 
 class TestResumeImport(FrappeTestCase):
-	def make_import(self, status: str):
-		return frappe.get_doc(
+	def make_import(self, status: str, canonical_sources: tuple[str, ...] | None = None):
+		imp = frappe.get_doc(
 			{
 				"doctype": "Wikify Import",
 				"import_title": "Resume Test",
@@ -239,6 +241,20 @@ class TestResumeImport(FrappeTestCase):
 				"status": status,
 			}
 		).insert(ignore_permissions=True)
+		if canonical_sources is not None:
+			source_document = store.create_document("Resume Test", import_name=imp.name)
+			for page_no, canonical_source in enumerate(canonical_sources, start=1):
+				frappe.get_doc(
+					{
+						"doctype": "Source Page",
+						"source_document": source_document,
+						"page_no": page_no,
+						"kind": "text",
+						"canonical_source": canonical_source,
+					}
+				).insert(ignore_permissions=True)
+			imp.db_set("source_document", source_document)
+		return imp
 
 	def test_a_stuck_import_requeues_its_parse_job(self):
 		for status in ("Parsing", "Remediating"):
@@ -297,3 +313,44 @@ class TestResumeImport(FrappeTestCase):
 			enqueue.assert_not_called()
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_a_failed_import_with_unremediated_pages_can_resume(self):
+		imp = self.make_import("Failed", canonical_sources=("vlm", "baseline", ""))
+		imp.db_set("error", "The background job stopped before finishing.")
+		with (
+			patch.object(imports_api, "is_job_enqueued", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+		):
+			self.assertTrue(imports_api.can_resume_import(imp.name))
+			imports_api.resume_import(imp.name)
+
+		enqueue.assert_called_once()
+		status, error = frappe.db.get_value("Wikify Import", imp.name, ["status", "error"])
+		self.assertEqual(status, "Queued")
+		self.assertFalse(error)
+
+	def test_an_import_with_every_page_remediated_cannot_resume(self):
+		for status in ("Remediating", "Failed"):
+			imp = self.make_import(status, canonical_sources=("vlm", "baseline", "cleanup"))
+			with (
+				self.subTest(status=status),
+				patch.object(imports_api, "is_job_enqueued", return_value=False),
+				patch.object(frappe, "enqueue") as enqueue,
+			):
+				self.assertFalse(imports_api.can_resume_import(imp.name))
+				with self.assertRaises(frappe.ValidationError):
+					imports_api.resume_import(imp.name)
+				enqueue.assert_not_called()
+
+	def test_a_failed_import_with_no_document_can_resume(self):
+		imp = self.make_import("Failed")
+		with patch.object(imports_api, "is_job_enqueued", return_value=False):
+			self.assertTrue(imports_api.can_resume_import(imp.name))
+
+	def test_reparse_deletes_the_half_parsed_document(self):
+		imp = self.make_import("Parsing")
+		half_parsed = store.create_document("Resume Test", import_name=imp.name)
+
+		parse_job.delete_partial_documents(imp.name)
+
+		self.assertFalse(frappe.db.exists("Source Document", half_parsed))
