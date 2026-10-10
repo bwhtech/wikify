@@ -30,6 +30,7 @@ _TOC_ENTRY = re.compile(
 	r"^(?:[-*+]\s+)?\|?\s*\d+(?:\.\d+)*\.?\s*\|?\s*[A-Za-z(].*?(?:\.{3,}|\s[-\u2013\u2014]\s|\||<br>|\s)\s*(\d{1,4})\s*\|?$"
 )
 _TOC_LEADER = re.compile(r"[A-Za-z].*\.{4,}\s*(\d{1,4})$")
+_TOC_HEADER_WORD = re.compile(r"(?i)\b(?:page|pg|pp|contents|index)\b")
 TOC_MIN_ENTRIES = 5
 TOC_MIN_ENTRY_SHARE = 0.6
 TOC_MIN_ASCENDING_SHARE = 0.75
@@ -313,13 +314,18 @@ def toc_end_line(lines: list[str]) -> int:
 	real headings, so reading them as headings opens phantom sections and advances chapter numbering."""
 	entries: list[tuple[int, int]] = []
 	content_lines = 0
+	in_data_table = False
 	for index, line in enumerate(lines):
 		text = line.strip()
 		if not text or _SEP_ONLY.match(text):
 			continue
 		content_lines += 1
 		entry = _TOC_ENTRY.match(text) or _TOC_LEADER.search(text)
-		if entry:
+		if not text.startswith("|"):
+			in_data_table = False
+		elif index + 1 < len(lines) and _SEP_ONLY.match(lines[index + 1].strip()):
+			in_data_table = not entry and not _TOC_HEADER_WORD.search(text)
+		if entry and not in_data_table:
 			entries.append((index, int(entry.group(1))))
 	if len(entries) < TOC_MIN_ENTRIES or len(entries) < TOC_MIN_ENTRY_SHARE * content_lines:
 		return -1
@@ -386,6 +392,8 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 		# raw HTML, or a lazy continuation of a list item that ended the previous page.
 		if buf and buf[-1].strip():
 			buf.append("")
+		if current is not None and not md.strip():
+			current.page_end = page_no
 		lines = md.splitlines()
 		toc_end = toc_end_line(lines)
 		first_line = next((index for index, line in enumerate(lines) if line.strip()), -1)

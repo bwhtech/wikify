@@ -115,6 +115,17 @@ class TestFallbackPagePlan(FrappeTestCase):
 		self.assertEqual(child.title, "Level 2")
 		self.assertIn("###### Level 7\n\nbody of Level 7\n\n###### Level 8", child.markdown)
 
+	def test_a_short_memo_of_unnumbered_headings_keeps_its_text(self):
+		sections = [
+			_sec(["Preamble"], 1, markdown="Memo to all renal staff."),
+			_sec(["Clinic closure"], 1, markdown="The renal clinic is closed on Friday."),
+			_sec(["Contact"], 1, markdown="Call extension 4455."),
+		]
+		pages = plan_pages(sections)
+		self.assertEqual(_titles(pages), ["Preamble"])
+		for text in ("Memo to all renal staff.", "## Clinic closure", "Call extension 4455."):
+			self.assertIn(text, pages[0].markdown)
+
 	def test_hierarchy_of_the_remaining_pages_is_unchanged(self):
 		pages = plan_pages(_outline())
 		self.assertEqual(pages[-1].hierarchy_path, ["6.1 Protocols", "6.1.2 Lupus nephritis"])
@@ -421,6 +432,18 @@ class TestLlmPagePlan(FrappeTestCase):
 		self.assertIn("## 2.1 The staff", pages[0].markdown)
 		for title in ("2.5 Research staff", "2.6 Office staff", "2.7 Support staff"):
 			self.assertIn(f"## {title}", pages[-1].markdown)
+
+	def test_children_of_an_unpicked_leading_section_fold_with_it(self):
+		sections = [
+			_sec(["Preamble"], 1, markdown=_words(10)),
+			_sec(["Introduction"], 1, markdown=_words(5)),
+			_sec(["Introduction", "Background"], 1, markdown="background " + _words(200)),
+			_sec(["Introduction", "Scope"], 2, markdown="scope " + _words(200)),
+		]
+		pages, _ = self._plan(_llm_reply({"pages": [2, 3]}), sections)
+		self.assertEqual(len(pages), 1)
+		self.assertIn("background", pages[0].markdown)
+		self.assertIn("scope", pages[0].markdown)
 
 	def test_a_long_numbered_section_keeps_its_page_when_it_starts_mid_page(self):
 		sections = [

@@ -140,7 +140,7 @@ def enforce_invariants(
 		or index in child_counts
 		or (sections[index].markdown.strip() and child_counts[parents[index]] > 1)
 	}
-	return pages, parents
+	return pages or {0}, parents
 
 
 def add_numbered_siblings(
@@ -343,6 +343,7 @@ def fold_sections(sections: list[Section], parents: list[int | None], pages: set
 	depth_below_page: dict[int, int] = {}
 	page_parents = {parents[index] for index in pages}
 	leading: list[str] = []
+	leading_sections: set[int] = set()
 	for index, section in enumerate(sections):
 		if index in pages:
 			owner[index], depth_below_page[index] = index, 0
@@ -352,9 +353,10 @@ def fold_sections(sections: list[Section], parents: list[int | None], pages: set
 				leading = []
 			continue
 		parent = parents[index]
-		if parent is None and index - 1 not in owner:
+		if (parent is None and index - 1 not in owner) or parent in leading_sections:
 			title = "" if section.title == PREAMBLE_TITLE else f"**{section.title}**"
 			leading.extend(part for part in (title, section.markdown.strip()) if part)
+			leading_sections.add(index)
 			continue
 		if parent is None:
 			owner[index], depth_below_page[index] = owner[index - 1], 1
