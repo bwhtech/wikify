@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter
-from itertools import groupby
+from itertools import groupby, pairwise
 
 from wikify.engine.loader.table_stitch import (
 	html_tables_to_markdown,
@@ -51,7 +51,7 @@ _SEP_ONLY = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _SIGNOFF = ("prepared by", "issued by", "approved by", "reviewed by", "authorized by")
 _SIGNOFF_LABEL = re.compile(r"(?i)\b(prepared|issued|approved|reviewed|authori[sz]ed) by\s*[:\-\u2013]")
 _SIGNOFF_LINE = re.compile(r"(?i)^[*_\s]*(prepared|issued|approved|reviewed|authori[sz]ed) by\s*[:\-\u2013]")
-_PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
+_PAGE_NUMBER = re.compile(r"(?i)^\s*(?:(?:page|pg\.?)\s*)?\d{1,4}\s*$")
 _SENTENCE_START = re.compile(r"^[a-z]")
 # A sentence cut by a page break ran to the page edge, so its last line is never a short label.
 _MIN_BROKEN_LINE_LENGTH = 40
@@ -70,6 +70,10 @@ MAX_TABLE_TITLE_CHARS = 120
 MIN_TRANSCRIBED_ROWS = 4
 TYPED_TABLE_WORD_SHARE = 0.6
 _TABLE_WORD = re.compile(r"[^\W_]{3,}")
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
+_BREADCRUMB_SPLIT = re.compile(r"\s+>\s+")
+_NOT_BREADCRUMB_START = ("#", "|", ">", "-", "*", "+")
+BREADCRUMB_MIN_PAGES = 2
 
 
 def _plain(line: str) -> str:
@@ -265,6 +269,50 @@ def strip_boilerplate(pages: list[tuple[int, str]], boilerplate: set[str]) -> li
 	return out
 
 
+def markdown_heading(level: int, title: str) -> str:
+	return f"{'#' * min(6, level)} {title}"
+
+
+def page_breadcrumb(lines: list[str]) -> tuple[int, int, str, list[str]] | None:
+	content = [index for index, line in enumerate(lines) if line.strip()]
+	for index, next_index in pairwise(content[:EDGE_LINES]):
+		text = lines[index].strip()
+		if text.startswith(_NOT_BREADCRUMB_START) or _STRUCTURAL_LINE.match(text):
+			continue
+		parts = [part.strip() for part in _BREADCRUMB_SPLIT.split(_plain(text))]
+		heading = _HEADING_RE.match(lines[next_index])
+		if len(parts) > 1 and all(parts) and heading and _norm(heading.group(2)) == _norm(parts[-1]):
+			return index, next_index, heading.group(2), parts
+	return None
+
+
+def breadcrumbs_to_headings(pages: list[tuple[int, str]]) -> list[tuple[int, str]]:
+	page_lines = [md.splitlines() for _, md in pages]
+	crumbs = [page_breadcrumb(lines) for lines in page_lines]
+	if sum(1 for crumb in crumbs if crumb) < BREADCRUMB_MIN_PAGES:
+		return pages
+	previous: list[str] = []
+	for lines, crumb in zip(page_lines, crumbs, strict=True):
+		if not crumb:
+			continue
+		crumb_index, heading_index, title, parts = crumb
+		trail = [_norm(part) for part in parts]
+		opened = 0
+		for old, new in zip(previous, trail[:-1], strict=False):
+			if old != new:
+				break
+			opened += 1
+		lines[heading_index] = markdown_heading(len(parts), title)
+		lines[crumb_index] = "\n\n".join(
+			markdown_heading(depth + 1, parts[depth]) for depth in range(opened, len(parts) - 1)
+		)
+		previous = trail
+	return [
+		(page_no, "\n".join(lines).strip() if crumb else md)
+		for (page_no, md), lines, crumb in zip(pages, page_lines, crumbs, strict=True)
+	]
+
+
 def _ends_mid_sentence(line: str) -> bool:
 	text = line.strip()
 	return (
@@ -449,10 +497,12 @@ def clean_pages(
 ) -> list[tuple[int, str]]:
 	pages = [(page_no, html_tables_to_markdown(md)) for page_no, md in pages]
 	page_texts = page_texts or {}
-	stripped = [
-		(page_no, contents_lines_to_table(drop_transcribed_figures(md, page_texts.get(page_no, ""))))
-		for page_no, md in strip_boilerplate(pages, find_boilerplate(pages))
-	]
+	stripped = breadcrumbs_to_headings(
+		[
+			(page_no, contents_lines_to_table(drop_transcribed_figures(md, page_texts.get(page_no, ""))))
+			for page_no, md in strip_boilerplate(pages, find_boilerplate(pages))
+		]
+	)
 	stitched = stitch_cross_page_tables(stripped)
 	joined = join_page_breaks([(page_no, merge_continuation_rows(md)) for page_no, md in stitched])
 	return reindent_list_continuations(joined)

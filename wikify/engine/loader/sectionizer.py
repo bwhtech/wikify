@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import pairwise
 
-from wikify.engine.loader.cleanup import _SEP_ONLY
+from wikify.engine.loader.cleanup import _HEADING_RE, _SEP_ONLY
 from wikify.engine.loader.toc import correct_level
 
 MAX_TITLE_LENGTH = 140
@@ -15,7 +15,6 @@ PREAMBLE_TITLE = "Preamble"
 RUNNING_HEADER_MIN_PAGES = 3
 TOP_OF_PAGE_LINES = 3
 
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
 _NUM_RE = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+\S")
 _LEADING_NUM = re.compile(r"^(\d+)\b")
 _DOUBLE_NUM = re.compile(r"^\d+\.\s+\d")
@@ -24,6 +23,8 @@ _BOLD_LINE = re.compile(r"^\*\*([^*]+)\*\*$")
 _LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 _HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 _LETTERED_NUM = re.compile(r"^(\d+(?:\.\d+)+)\.[a-z](?![a-z])\s*")
+_CONTINUED = re.compile(r"(?i)^(.*?)\s*\((?:continued|cont'd|cont\.?)\)$")
+_CONTINUED_FROM = re.compile(r"(?i)^continued(?: from (?:the )?previous page)?$")
 _TOC_NUMBERED = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+(.*?)(?:\s*\.{3,})?(?:\s+\d{1,4})?$")
 _CONTENTS_TITLE = re.compile(r"(?i)^(?:table of )?contents$|^index$")
 _TOC_ENTRY = re.compile(
@@ -92,6 +93,16 @@ def _repeats_open_section(title: str, stack: list[tuple[int, str, bool]]) -> boo
 		and _title_words(open_title) == words
 		for _, open_title, numbered in stack
 	)
+
+
+def continues_open_section(title: str, stack: list[tuple[int, str, bool]]) -> bool:
+	if _CONTINUED_FROM.match(title):
+		return bool(stack)
+	continued = _CONTINUED.match(title)
+	if not continued:
+		return False
+	words = _title_words(continued.group(1))
+	return any(words == _title_words(open_title) for _, open_title, _ in stack)
 
 
 def extends_number(number: tuple[int, ...] | None, prefix: tuple[int, ...]) -> bool:
@@ -374,6 +385,7 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 	max_chapter = 0
 	capital_chapters = True
 	last_list_item = (0, 0)
+	last_step_number = (0, 0)
 	last_number: tuple[int, ...] = ()
 	running_headers = running_header_titles(pages)
 	opened_headers: set[str] = set()
@@ -422,10 +434,15 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 				m = None
 			elif m and _is_label(title, level_map):
 				line, m = f"**{title}**", None
+			step = title if m else line.strip()
+			if step.isdigit():
+				last_step_number = (page_no, int(step))
 			if m:
 				title = correct_chapter_typo(title, last_number)
-				if _repeats_open_section(title, stack) or repeats_running_header(
-					title, stack, recurring_titles
+				if (
+					_repeats_open_section(title, stack)
+					or repeats_running_header(title, stack, recurring_titles)
+					or continues_open_section(title, stack)
 				):
 					if current is not None:
 						current.page_end = page_no
@@ -466,7 +483,7 @@ def sectionize(pages: list[tuple[int, str]], level_map: dict[str, int] | None = 
 								and not opens_next_chapter(cnum, last_number, next_dotted, title)
 							)
 							or (max_chapter and capital_chapters and not title.isupper())
-							or (page_no, cnum - 1) == last_list_item
+							or (page_no, cnum - 1) in (last_list_item, last_step_number)
 						):
 							level = 2
 							demoted = True

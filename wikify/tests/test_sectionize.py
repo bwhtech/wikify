@@ -919,6 +919,80 @@ class TestSectionizer(FrappeTestCase):
 		)
 		self.assertEqual(cleaned[3], "")
 
+	def _breadcrumb_pages(self):
+		topics = [
+			("Administering Medicines", "Five rights"),
+			("Administering Medicines", "IV administration"),
+			("Controlled Drugs", "Storage and keys"),
+			("Controlled Drugs", "Register entries"),
+		]
+		pages = []
+		for index, (chapter, topic) in enumerate(topics):
+			opening = 2 * index + 1
+			pages.append(
+				(
+					opening,
+					f"Repeat Prescribing Protocol\n\nPage {opening}\n\n{chapter}  >  {topic}\n\n"
+					f"# {topic}\n\nPractice for {topic.lower()}.",
+				)
+			)
+			pages.append((opening + 1, f"# {topic} (continued)\n\nMore on {topic.lower()}."))
+		return pages
+
+	def test_clean_pages_strips_a_page_label_at_the_page_edge(self):
+		cleaned = dict(clean_pages(self._breadcrumb_pages()))
+		self.assertNotIn("Page 1", cleaned[1])
+		self.assertNotIn("Page 5", cleaned[5])
+
+	def test_a_breadcrumb_running_header_nests_the_section_under_its_chapter(self):
+		secs = sectionize(clean_pages(self._breadcrumb_pages()))
+		paths = {s.title: s.hierarchy_path for s in secs}
+		self.assertEqual(paths["Five rights"], ["Administering Medicines", "Five rights"])
+		self.assertEqual(paths["IV administration"], ["Administering Medicines", "IV administration"])
+		self.assertEqual(paths["Register entries"], ["Controlled Drugs", "Register entries"])
+		self.assertEqual([s.title for s in secs].count("Administering Medicines"), 1)
+
+	def test_a_breadcrumb_needs_a_matching_heading_below_it(self):
+		pages = [
+			(1, "Open Settings  >  Users to add staff.\n\n# Users\n\nbody"),
+			(2, "Open Settings  >  Roles to add roles.\n\n# Roles\n\nbody"),
+		]
+		cleaned = dict(clean_pages(pages))
+		self.assertIn("Open Settings  >  Users to add staff.", cleaned[1])
+
+	def test_a_continued_heading_folds_into_the_open_section(self):
+		secs = sectionize(clean_pages(self._breadcrumb_pages()))
+		titles = [s.title for s in secs]
+		self.assertFalse(any("continued" in title for title in titles))
+		five_rights = next(s for s in secs if s.title == "Five rights")
+		self.assertIn("More on five rights.", five_rights.markdown)
+		self.assertEqual((five_rights.page_start, five_rights.page_end), (1, 2))
+
+	def test_a_continued_from_previous_page_heading_is_not_a_section(self):
+		pages = [
+			(1, "# Abbreviations\n\nIV: intravenous"),
+			(2, "# Continued from the previous page.\n\nPO: oral"),
+		]
+		secs = sectionize(pages)
+		self.assertEqual([s.title for s in secs], ["Abbreviations"])
+		self.assertIn("PO: oral", secs[0].markdown)
+
+	def test_a_numbered_heading_after_bare_step_numbers_is_a_step_not_a_chapter(self):
+		method = (
+			"# The Method\n\nIntro.\n\n### 1\n\n## Build a fresh bench\n\nNever upgrade in place.\n\n"
+			"### 2\n\n## Restore a backup\n\nAlways restore fresh.\n\n## 3 Run bench migrate\n\n"
+			"Expect failures.\n\n4\n\n## Read the whole log\n\nA clean exit is not enough."
+		)
+		pages = [
+			(2, method),
+			(3, "# Preparing the New Bench\n\nSet up the environment.\n\n## The Apps\n\nList the apps."),
+		]
+		secs = sectionize(pages)
+		paths = {s.title: s.hierarchy_path for s in secs}
+		self.assertEqual(paths["3 Run bench migrate"], ["The Method", "3 Run bench migrate"])
+		self.assertEqual(paths["Preparing the New Bench"], ["Preparing the New Bench"])
+		self.assertEqual(paths["The Apps"], ["Preparing the New Bench", "The Apps"])
+
 
 class TestEmptySectionsAreFlagged(FrappeTestCase):
 	def test_section_without_markdown_is_chunked_as_title_only(self):
