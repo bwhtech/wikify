@@ -9,6 +9,11 @@ import {
 
 const routes = [
 	{
+		path: "/dashboard",
+		name: "Dashboard",
+		component: () => import("@/pages/Dashboard.vue"),
+	},
+	{
 		path: "/",
 		name: "Projects",
 		component: () => import("@/pages/ProjectList.vue"),

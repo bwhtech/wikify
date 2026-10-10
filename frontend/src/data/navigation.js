@@ -1,5 +1,11 @@
 export const DESTINATIONS = [
 	{
+		label: "Dashboard",
+		icon: "lucide-layout-dashboard",
+		route: "Dashboard",
+		activeOn: ["Dashboard"],
+	},
+	{
 		label: "Projects",
 		icon: "lucide-folder",
 		route: "Projects",

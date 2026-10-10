@@ -6,6 +6,8 @@ from frappe.query_builder.functions import Count
 from wikify.api.permission import assert_readable, hidden_documents
 
 UNTAGGED = "__untagged__"
+UNTAGGED_LABEL = "Untagged"
+UNTAGGED_COLOR = "#cbd5e1"
 
 
 def _scope(source_document: str | None) -> dict:
@@ -69,8 +71,8 @@ def type_summary(source_document: str | None = None, project: str | None = None)
 		summary.append(
 			{
 				"type_name": UNTAGGED,
-				"label": "Untagged",
-				"color": "#cbd5e1",
+				"label": UNTAGGED_LABEL,
+				"color": UNTAGGED_COLOR,
 				"is_other": 0,
 				"count": counts[UNTAGGED],
 			}
