@@ -16,3 +16,16 @@
 .menu-content {
   z-index: 50;
 }
+
+/* frappe-ui's CodeEditor has no wrap option. CodeMirror reads white-space off
+   .cm-content to decide wrapping, so this is the same as EditorView.lineWrapping. */
+.markdown-wrap .cm-editor .cm-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  flex-shrink: 1;
+}
+.markdown-wrap .cm-editor .cm-foldGutter .cm-gutterElement {
+  align-items: flex-start;
+  padding-top: calc((1lh - 14px) / 2);
+}
