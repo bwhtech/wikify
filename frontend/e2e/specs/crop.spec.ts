@@ -439,3 +439,85 @@ test.describe("crop", () => {
 		},
 	);
 });
+
+test.describe("PR #61 crop on a shared page", () => {
+	let before: Snapshot;
+
+	test.beforeEach(async ({ api, fixture }) => {
+		before = await takeSnapshot(api, fixture.review.sourceDocument);
+	});
+
+	test.afterEach(async ({ api, fixture }) => {
+		test.setTimeout(test.info().timeout + PROPAGATION_TIMEOUT);
+		await restoreCrops(api, fixture.review.sourceDocument, before);
+	});
+
+	test(
+		"W61-1 a crop on a page two sections share changes only the section holding the image",
+		{ tag: ["@functional", "@crop"] },
+		async ({ api, fixture }) => {
+			test.setTimeout(PROPAGATION_TIMEOUT + 120_000);
+			const sourceDocument = fixture.review.sourceDocument;
+			let target:
+				| {
+						pageNo: number;
+						tag: string;
+						caption: string;
+						holder: SectionSnapshot;
+						others: SectionSnapshot[];
+				  }
+				| undefined;
+			for (const row of before.pages) {
+				const owners = owningSections(before.sections, row.page_no);
+				if (owners.length < 2) continue;
+				const figure = imageTags(row.canonical_markdown).find((tag) => !tag.caption.includes('"'));
+				if (!figure) continue;
+				const tag = `![${figure.caption}](${figure.url})`;
+				if (row.canonical_markdown.split(tag).length !== 2) continue;
+				const holders = owners.filter((owner) => owner.markdown.includes(tag));
+				if (holders.length !== 1 || holders[0].markdown.split(tag).length !== 2) continue;
+				target = {
+					pageNo: row.page_no,
+					tag,
+					caption: figure.caption,
+					holder: holders[0],
+					others: owners.filter((owner) => owner.name !== holders[0].name),
+				};
+				break;
+			}
+			test.skip(!target, "no page shared by two sections holds a figure in only one of them");
+			const { pageNo, tag, caption, holder, others } = target!;
+
+			const result = await api.call("wikify.api.pages.crop_page_figure", {
+				source_document: sourceDocument,
+				page_no: pageNo,
+				caption,
+				occurrence: 0,
+				x0: 0.25,
+				y0: 0.25,
+				x1: 0.75,
+				y1: 0.75,
+			});
+
+			const holderMarkdown = await waitFor(
+				() => api.getValue<string>("Source Section", holder.name, "markdown"),
+				(markdown) => markdown.includes(result.image_url),
+				{ timeout: 60_000, interval: 2_000, label: "holder section has the crop" },
+			);
+			expect(holderMarkdown).toBe(
+				holder.markdown.replace(tag, `![${caption}](${result.image_url})`),
+			);
+
+			await waitFor(
+				() => propagationPending(api, sourceDocument),
+				(pending) => !pending,
+				{ timeout: PROPAGATION_TIMEOUT, interval: 3_000, label: "propagation settled" },
+			);
+			for (const other of others) {
+				expect(await api.getValue<string>("Source Section", other.name, "markdown")).toBe(
+					other.markdown,
+				);
+			}
+		},
+	);
+});
