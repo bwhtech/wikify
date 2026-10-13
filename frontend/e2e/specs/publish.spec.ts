@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { serverMessage, type Api } from "../helpers/api";
-import { deleteTestProjects } from "../helpers/cleanup";
 import { PREFIX } from "../helpers/env";
 import { expect, test } from "../helpers/test";
 import { waitFor } from "../helpers/wait";
@@ -432,10 +431,6 @@ test.describe("PR #18 collapse tabs to pdf/pages/wiki/logs", () => {
 		sourceDocument = cloned.sourceDocument;
 		await api.call("wikify.api.sections.build_graph", { import_name: importName });
 		await waitForImport(api, importName, "Graphed", 120_000);
-	});
-
-	test.afterAll(async ({ api }) => {
-		await deleteTestProjects(api, name);
 	});
 
 	test(
