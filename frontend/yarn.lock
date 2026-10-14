@@ -2574,15 +2574,10 @@ lowlight@^3.3.0:
     devlop "^1.0.0"
     highlight.js "~11.11.0"
 
-lucide-static@^0.469.0:
-  version "0.469.0"
-  resolved "https://registry.yarnpkg.com/lucide-static/-/lucide-static-0.469.0.tgz#edf4eb55476fa1b2ae1e1c1922152365dec66854"
-  integrity sha512-ravTgZodIVLO53rJyjIq0iuCRHs+kjd3dAfOcTbA41KCDfdy0Pt6Me8akkhda3jRpbIxjKe1PpYZOg2eQnI/lA==
-
-lucide-static@^1.16.0:
-  version "1.21.0"
-  resolved "https://registry.yarnpkg.com/lucide-static/-/lucide-static-1.21.0.tgz#08812bde7238e206466ba07226e2316f2ab599fe"
-  integrity sha512-6248z2/4sEyKkYAPPUYxOPiB2RCfMmLdMHuoOhsTFnoD40ixAoHmTVhOPux8ADa1NTBmzpEKF7WNePm+Ms503Q==
+lucide-static@^1.16.0, lucide-static@^1.55.0:
+  version "1.55.0"
+  resolved "https://registry.yarnpkg.com/lucide-static/-/lucide-static-1.55.0.tgz#12e5674d15cb258ca10e5ec8ff039ed602886d44"
+  integrity sha512-h18lunTFsIJWnY0FMRPjXeO9KcAtNi7fDqtqgWHOFbssfgUWsctn/pA7bpiyrd4g1DuBOJ24CsRnPfkYblwm/A==
 
 magic-string@^0.30.17, magic-string@^0.30.21:
   version "0.30.21"
