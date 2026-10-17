@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { Api } from "../helpers/api";
 import { PREFIX, WHAT_IS_WIKIFY_PDF } from "../helpers/env";
+import { writePdfs } from "../helpers/pdf";
 import { expect, test } from "../helpers/test";
 import { waitFor, waitForValue } from "../helpers/wait";
 import {
@@ -440,6 +441,85 @@ test.describe("parse", () => {
 				await page.goto(`/wikify/import/${importName}`);
 				await expect(page.getByRole("heading", { name: `${PR_PREFIX} nodoc` })).toBeVisible();
 				await expect(page.getByRole("button", { name: "Actions", exact: true })).toHaveCount(0);
+			},
+		);
+	});
+
+	test.describe("PR #131 short pdfs keep their first section", () => {
+		const PR_PREFIX = `${PREFIX} parse W131 ${Date.now()}`;
+
+		test(
+			"W131-1 a one-page memo of unnumbered headings imports with its text",
+			{ tag: ["@functional", "@parse"] },
+			async ({ api }, testInfo) => {
+				test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT + 60_000);
+				const project = await createProject(api, PR_PREFIX);
+				const [pdf] = writePdfs(
+					testInfo.outputPath("pdfs"),
+					[`${PR_PREFIX} memo`],
+					[
+						"Purpose",
+						"This memo explains the quarterly budget review process for the team.",
+						"Schedule",
+						"The review meets on the first Monday of every quarter at nine.",
+					],
+				);
+				const importName = await startImport(api, { title: `${PR_PREFIX} memo`, project, pdf });
+
+				const done = await waitForImport(
+					api,
+					importName,
+					["Review", "Failed"],
+					QUEUE_WAIT + PARSE_TIMEOUT,
+				);
+				expect(done.error).toBeFalsy();
+				expect(done.status).toBe("Review");
+
+				const sections = await sectionRows(api, done.source_document);
+				expect(sections.length).toBeGreaterThan(0);
+				expect(sections.map((row) => row.markdown).join("\n")).toContain("quarterly budget review");
+			},
+		);
+	});
+
+	test.describe("PR #132 page labels are stripped from imported text", () => {
+		const PR_PREFIX = `${PREFIX} parse W132 ${Date.now()}`;
+
+		test(
+			"W132-1 a Page N label at the page edge does not reach the section text",
+			{ tag: ["@functional", "@parse"] },
+			async ({ api }, testInfo) => {
+				test.setTimeout(QUEUE_WAIT + PARSE_TIMEOUT + 60_000);
+				const project = await createProject(api, PR_PREFIX);
+				const [pdf] = writePdfs(
+					testInfo.outputPath("pdfs"),
+					[`${PR_PREFIX} labelled`],
+					[
+						"Page 7",
+						"Purpose",
+						"This protocol explains how repeat prescriptions are authorised by the practice.",
+					],
+				);
+				const importName = await startImport(api, {
+					title: `${PR_PREFIX} labelled`,
+					project,
+					pdf,
+				});
+
+				const done = await waitForImport(
+					api,
+					importName,
+					["Review", "Failed"],
+					QUEUE_WAIT + PARSE_TIMEOUT,
+				);
+				expect(done.error).toBeFalsy();
+				expect(done.status).toBe("Review");
+
+				const text = (await sectionRows(api, done.source_document))
+					.map((row) => row.markdown)
+					.join("\n");
+				expect(text).toContain("repeat prescriptions are authorised");
+				expect(text).not.toMatch(/^\s*Page 7\s*$/m);
 			},
 		);
 	});
