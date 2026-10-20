@@ -9,26 +9,26 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
-    "cropperjs": "^2.2.0",
+    "cropperjs": "^2.3.1",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
-    "frappe-ui": "1.0.0-beta.24",
+    "frappe-ui": "1.0.2",
     "mermaid": "^11.16.1",
     "pdfjs-dist": "^6.4.299",
     "socket.io-client": "^4.8.4",
     "splitpanes": "^3.1.5",
-    "vue": "^3.5.43",
+    "vue": "^3.5.44",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
-    "@vitejs/plugin-vue": "^6.0.9",
+    "@playwright/test": "^1.64.1",
+    "@vitejs/plugin-vue": "^6.0.10",
     "autoprefixer": "^10.6.1",
     "lucide-static": "^0.469.0",
-    "postcss": "^8.5.28",
+    "postcss": "^8.5.30",
     "tailwindcss": "^3.4.15",
-    "vite": "^8.3.2"
+    "vite": "^8.3.4"
   }
 }
