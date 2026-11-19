@@ -16,6 +16,7 @@ RUNNING_HEADER_MIN_PAGES = 3
 TOP_OF_PAGE_LINES = 3
 
 _NUM_RE = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+\S")
+_SECTION_NUM = re.compile(r"^(\d+(?:\.\d+)*)\.?(?:\s+\S|$)")
 _LEADING_NUM = re.compile(r"^(\d+)\b")
 _DOUBLE_NUM = re.compile(r"^\d+\.\s+\d")
 _GLUED_NUM = re.compile(r"^(\d+(?:\.\d+)+\.?)(?=[A-Z])")
@@ -72,7 +73,7 @@ def _looks_like_list_item(title: str) -> bool:
 
 
 def _section_number(title: str) -> tuple[int, ...] | None:
-	m = _NUM_RE.match(title)
+	m = _SECTION_NUM.match(title)
 	return tuple(int(part) for part in m.group(1).split(".")) if m else None
 
 
