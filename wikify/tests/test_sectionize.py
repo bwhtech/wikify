@@ -723,6 +723,24 @@ class TestSectionizer(FrappeTestCase):
 			],
 		)
 
+	def test_a_never_opened_ancestor_without_a_known_title_groups_under_its_bare_number(self):
+		pages = [
+			(1, "# 5. CONSENTS\n\n## 5.5 Reports\n\nIssue reports."),
+			(2, "### 5.6.1 General consents\n\nSign on admission.\n\n### 5.6.1 General consents\n\nWitness."),
+			(3, "### 5.6.2 Surgical consents\n\nSign before surgery."),
+		]
+		group = ["5. CONSENTS", "5.6"]
+		self.assertEqual(
+			[section.hierarchy_path for section in sectionize(pages)],
+			[
+				["5. CONSENTS"],
+				["5. CONSENTS", "5.5 Reports"],
+				group,
+				[*group, "5.6.1 General consents"],
+				[*group, "5.6.2 Surgical consents"],
+			],
+		)
+
 	def test_a_list_heading_numbered_like_the_next_chapter_stays_in_its_section(self):
 		complications = (
 			"## 6.2.1.4 PROTOCOL FOR VASCULAR ACCESS\n\n# IDENTIFYING AND MANAGING COMPLICATIONS\n\n"
