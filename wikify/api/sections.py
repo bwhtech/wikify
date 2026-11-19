@@ -308,6 +308,7 @@ def create_section(
 		prow = frappe.db.get_value("Source Section", parent, "source_document")
 		if prow != source_document:
 			frappe.throw(_("Parent must belong to the same document."))
+		frappe.db.set_value("Source Section", parent, "is_group", 1, update_modified=False)
 	section_type = (section_type or "").strip() or None
 	if section_type and not frappe.db.exists("Section Type", section_type):
 		frappe.throw(_("Unknown Section Type {0}.").format(section_type))
