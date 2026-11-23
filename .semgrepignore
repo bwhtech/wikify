@@ -8,3 +8,7 @@
 # throws before it routes when the caller may read no wiki.
 wikify/wikify/doctype/wikify_ask_session/wikify_ask_session.json
 wikify/wikify/doctype/wikify_ask_message/wikify_ask_message.json
+
+# Throwaway experiments, already excluded from pre-commit. The RAG eval swaps embedders and
+# rerankers by patching `wikify.rag` at runtime, which `monkey-patching-not-allowed` blocks.
+scratch/
