@@ -1,0 +1,5274 @@
+[
+ {
+  "id": "Q01",
+  "answer": "Based on the excerpts, the staff-patient ratio in the dialysis unit is **1:3 or 1:4**.\n\nSpecifically: \"Each patient is assigned to a particular dialysis therapist or nurse who is responsible for providing total patient care to that particular patient. The staff patient ratio is 1:3 or 1:4.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "staff patient ratio dialysis unit",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.096288,
+  "tokens_in": 15643,
+  "citations": [
+   {
+    "section": "8j9dvjfb2k",
+    "page_start": 155,
+    "page_end": 157
+   },
+   {
+    "section": "8j0q5860co",
+    "page_start": 2,
+    "page_end": 10
+   },
+   {
+    "section": "8jjorb4s7r",
+    "page_start": 380,
+    "page_end": 381
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j3fjvd00a",
+    "page_start": 79,
+    "page_end": 82
+   },
+   {
+    "section": "8j2ahn9del",
+    "page_start": 57,
+    "page_end": 73
+   },
+   {
+    "section": "8jjukoteju",
+    "page_start": 383,
+    "page_end": 384
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   }
+  ],
+  "context_chars": 52826,
+  "t_route": 0.55,
+  "t_retrieve": 1.71,
+  "t_first_token": 4.68,
+  "t_total": 5.85,
+  "grade": "correct",
+  "why": "The system answer exactly matches the gold answer (1:3 or 1:4) with no contradictions."
+ },
+ {
+  "id": "Q02",
+  "answer": "Based on the excerpts, patients should wait **two weeks** before showering or bathing after PD catheter placement.\n\n- \"Patients with a newly placed catheter should not bathe or shower for two weeks after surgery as getting the exit site wet may delay healing.\" [2]\n- This is also reinforced in the post-operative care instructions: \"No bathing for 2 weeks or till sutures removed (sponge bath is allowed).\" [2]\n- \"Showering/bathing may be resumed after the exit site has healed.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How long should someone wait before showering after getting a peritoneal dialysis catheter placed?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.052746,
+  "tokens_in": 8151,
+  "citations": [
+   {
+    "section": "8jdpkchied",
+    "page_start": 263,
+    "page_end": 263
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "8jb768qrt8",
+    "page_start": 204,
+    "page_end": 204
+   },
+   {
+    "section": "8jdt40an56",
+    "page_start": 270,
+    "page_end": 271
+   },
+   {
+    "section": "8jco62h0q7",
+    "page_start": 249,
+    "page_end": 253
+   },
+   {
+    "section": "8jahutp518",
+    "page_start": 165,
+    "page_end": 170
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   },
+   {
+    "section": "8jg1h86udm",
+    "page_start": 351,
+    "page_end": 351
+   }
+  ],
+  "context_chars": 26208,
+  "t_route": 0.26,
+  "t_retrieve": 1.41,
+  "t_first_token": 3.76,
+  "t_total": 5.54,
+  "grade": "correct",
+  "why": "The system answer correctly states that patients should wait two weeks before showering after peritoneal dialysis catheter placement, matching the gold answer without contradictions."
+ },
+ {
+  "id": "Q03",
+  "answer": "The patient should be placed in the **lateral decubitus position**, with the top leg flexed and the lower leg straight.\n\n\"The patient is placed in the lateral decubitus position, with the top leg flexed and the lower leg straight.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What position should a patient be in for bone marrow aspiration from the posterior iliac crest?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.056046,
+  "tokens_in": 9051,
+  "citations": [
+   {
+    "section": "8jg8gjnncs",
+    "page_start": 340,
+    "page_end": 342
+   },
+   {
+    "section": "8jg1h86udm",
+    "page_start": 351,
+    "page_end": 351
+   },
+   {
+    "section": "8jgfbcl83d",
+    "page_start": 342,
+    "page_end": 345
+   },
+   {
+    "section": "8jf4m4d3us",
+    "page_start": 309,
+    "page_end": 311
+   },
+   {
+    "section": "ro3ph9ekfo",
+    "page_start": 117,
+    "page_end": 117
+   },
+   {
+    "section": "8jgcj7tgbq",
+    "page_start": 345,
+    "page_end": 350
+   },
+   {
+    "section": "8jh6i295v5",
+    "page_start": 351,
+    "page_end": 354
+   },
+   {
+    "section": "8jgbdtua43",
+    "page_start": 332,
+    "page_end": 335
+   }
+  ],
+  "context_chars": 29468,
+  "t_route": 0.28,
+  "t_retrieve": 1.39,
+  "t_first_token": 3.02,
+  "t_total": 3.7,
+  "grade": "correct",
+  "why": "The system answer exactly matches the gold answer with all key positional details and no contradictions."
+ },
+ {
+  "id": "Q04",
+  "answer": "## Patient Education: Disease & Prognosis – Nephrology\n\n### Disease\n\n- \"The type of the disease with the normal anatomy and physiology of the concerned problem is explained to the patient\" [2]\n- \"Management options are explained and choice of the treatment given is given to the patient allowing informed choice including the option of refusal after being aware of the possible consequences\" [2]\n- \"Information and consent of patients is taken before any research protocol is initiated\" [2]\n- \"Patient is not denied access to medical records. Usually a medical report or a discharge summary is given.\" [2]\n\n### Prognosis\n\n- \"Information regarding expected outcomes of the treatment, possible risks, complications and the expected length of inpatient stay is explained to all patients\" [2]\n- \"Patients are asked to think over the situation considering its advantages and disadvantages with guidance and asked to conclude the information with their full willingness\" [2]\n\n### Expected Cost Components\n\nThe following cost components are explained to patients [2]:\n\n- Bed charges\n- Nursing care\n- Diet\n- Procedures Performed\n- Nature of the disease which decides the length of stay\n- Professional Charges\n- Oxygen Charges\n- \"The approximate expected cost of the admission depending on the nature of the disease will be explained by the concerned doctor before admission or in outpatient department\" [2]\n- \"If patient has concerns about the bills confirm the details with the concerned unit and billing department\" [2]\n\n### General Education\n\n- \"Patients are educated on the nature of the disease, correct method of using their inhaled dugs, taking their Medications during the stay and at the time of discharge\" [2]\n- \"Possible side effects of systemic medications like Anti tuberculous drugs, Antibiotics are explained\" [2]\n\n### At Time of Admission\n\n- \"Before admitting the patient in to the ward, treating Physician explains the patient and their relatives about the disease, prognosis, treatment plan, possible complications and approximate cost of management of their disease.\" [6]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "patient education disease prognosis nephrology",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.065556,
+  "tokens_in": 8676,
+  "citations": [
+   {
+    "section": "ro1r0nd0s2",
+    "page_start": 73,
+    "page_end": 74
+   },
+   {
+    "section": "8j9hfjjp5h",
+    "page_start": 148,
+    "page_end": 150
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "8j6mauv1sh",
+    "page_start": 117,
+    "page_end": 121
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8j6v636l4s",
+    "page_start": 121,
+    "page_end": 121
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   }
+  ],
+  "context_chars": 32775,
+  "t_route": 0.24,
+  "t_retrieve": 1.53,
+  "t_first_token": 3.41,
+  "t_total": 10.15,
+  "grade": "correct",
+  "why": "System answer includes all key elements of the gold answer—disease explanation with normal anatomy/physiology, management options with informed choice and refusal, and consent before research protocols—without contradiction."
+ },
+ {
+  "id": "Q05",
+  "answer": "The excerpts do not contain specific guidance on how nursing staff should address each other professionally in the nephrology department.\n\nThe only information provided about nurse-to-nurse communication is a brief mention that \"communication from nurses happens in the following ways,\" which includes \"Nurse to nurse\" as one of the listed communication types [3], but no detail is given about professional forms of address or titles to be used between nursing staff.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How should nursing staff address each other professionally in the nephrology department?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05823,
+  "tokens_in": 9255,
+  "citations": [
+   {
+    "section": "8j1qeeh3fm",
+    "page_start": 25,
+    "page_end": 25
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j8qj5nrsm",
+    "page_start": 141,
+    "page_end": 143
+   },
+   {
+    "section": "8j1sqtfqne",
+    "page_start": 24,
+    "page_end": 25
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8jk5e9a4pl",
+    "page_start": 388,
+    "page_end": 388
+   },
+   {
+    "section": "8j0q5860co",
+    "page_start": 2,
+    "page_end": 10
+   },
+   {
+    "section": "8j2mdksnev",
+    "page_start": 38,
+    "page_end": 40
+   }
+  ],
+  "context_chars": 27939,
+  "t_route": 0.28,
+  "t_retrieve": 1.38,
+  "t_first_token": 3.73,
+  "t_total": 5.01,
+  "grade": "wrong",
+  "why": "The system incorrectly claims the documents lack guidance, while the gold answer clearly states nurses should always be addressed as sisters."
+ },
+ {
+  "id": "Q07",
+  "answer": "# Central Venous Catheter Care for Hemodialysis Guidelines\n\n## General Catheter Care Principles (KDOQI)\n\n- \"Hemodialysis catheter dressing changes and catheter manipulations that access the patient's bloodstream should only be performed by trained dialysis staff.\" [3]\n- \"The catheter exit site should be examined at each hemodialysis treatment for signs of infection.\" [1]\n- \"Catheter exit site dressings should be changed at each hemodialysis treatment or once a week and whenever needed.\" [1]\n- \"Use of dry gauze dressing combined with skin disinfection, using either chlorhexidine or povidone iodine solution, followed by povidone iodine ointment or mupirocin ointment at the catheter exit site are recommended after catheter placement and at the end of each dialysis session.\" [3]\n- \"The catheter hub caps or bloodline connectors should be soaked for 3 to 5 minutes in povidone iodine and then allowed to dry prior to separation.\" [3]\n- \"The lumen and tip should never remain open to the air. A cap or syringe should be placed on or within the catheter lumen, while maintaining a clean field under the catheter connectors.\" [3]\n\n## Mask & Glove Protocol\n\n- \"Patients should wear a surgical mask for all catheter procedures that remove the catheter caps and access the patient's bloodstream.\" [3]\n- \"Dialysis staff should wear gloves and a surgical mask or face shield for all procedures that remove catheter caps and access the patient's bloodstream.\" [3]\n\n---\n\n## Procedure: Accessing Catheter for Hemodialysis\n\n1. \"Collect the supplies – sterile supplies, Betadine-10% Chlorhexidine 2% or 70% alcohol, 2 cc syringes-2, 10cc syringes-2, surgical mask.\" [1]\n2. \"Wash hands/ Use hand rub. Open the pack, Pour the antiseptic solution and open the syringes into the pack.\" [3]\n3. \"Cover the hub cap & joint with Antiseptic solution and keep for few minutes before separating it. Place a clean or sterile towel under the CVC.\" [1]\n4. \"Use gauze impregnated with antiseptic solution to wipe one catheter port in circular motion.\" [1]\n5. \"Aspirate 2ml from the cleaned port, clamp the lumen and leave the syringe there.\" [1]\n6. \"Inject some Normal saline into the first port and aspirate blood to check the patency of the lumen.\" [1]\n7. \"The syringes are removed as the dialysis lines are connected to the port\" to minimize exposure of lumen to air. [1]\n\n---\n\n## Procedure: Disconnecting Catheter at End of Dialysis\n\n1. \"After rinse back, Check the patient's vital signs. If stable, clamp the catheter lumens and the dialysis lines.\" [1]\n2. \"Flush the lumen with 10ml of Normal saline. Clamp the lumen and leave the syringe there\" to ensure lumens are patent. [1]\n3. \"Infuse the lock solution to the lumens according to the lumen size and close the clamps.\" [1] — \"Use of Lock solution reduces the risk for clot formation within the lumen and infection.\" [1]\n4. \"Close the ports with sterile bunks\" to prevent contamination. [1]\n5. \"Cover the catheter lumens with sterile gauze or a clean pouch\" to protect from contamination and dislodgement. [1]\n\n---\n\n## Catheter Lock Solutions\n\n- \"Catheter lock solution used are Inj. Heparin (1000 units or concentrated depending on the status of lumen patency) or 4% Sodium citrate of a volume just enough to fill the lumen.\" [3]\n\n---\n\n## Exit Site Care\n\n- \"The exit site should be cleaned with Chlorhexidine 2%. The exit site should be covered with a non occlusive secure dressing to protect the exit site between dialysis sessions.\" [3]\n- \"The use of polysporin ointment reduced the risk of catheter related bacteraemia and reduced catheter related infections related to staphylococcus aureus.\" [3]\n- \"If patient is on CVC, exit site dressing is performed as per protocol\" after each dialysis session. [7]\n\n---\n\n## Infection Prevention (CVC-Specific)\n\n- \"Sterile gloves and masks are indicated while handling CVC.\" [5]\n- \"Hand washing and the use of disinfectant hand rub is mandatory before accessing the catheter.\" [5]\n- \"Apply antibacterial ointment at the catheter exit site during dressing.\" [5]\n- \"Ensure that JVC is removed within 21 days & femoral CVC catheter within 7 days if it is temporary.\" [5]\n- \"Access site is to be cleaned thoroughly with 2% chlorhexidine before starting dialysis and sterile dressing is to be used over the access site at every HD session.\" [5]\n\n---\n\n## Managing CVC Block\n\nIf the catheter lumen is not patent after regular Normal saline flushing:\n1. \"Simple, gentle manipulation of catheter following aseptic technique.\" [3]\n2. \"If lumen is still not patent, flush the lumen with 1.2ml (volume as indicated on the lumen) of concentrated Heparin and wait for 30 minutes.\" [3]\n3. \"Lock the lumens with concentrated Heparin following Hemodialysis.\" [3]\n\n---\n\n## Complications to Monitor\n- \"Bleeding, Infection, Air embolism\" are the noted complications associated with CVC use. [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "central venous catheter care hemodialysis guidelines",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.107508,
+  "tokens_in": 11048,
+  "citations": [
+   {
+    "section": "8jgbdtua43",
+    "page_start": 332,
+    "page_end": 335
+   },
+   {
+    "section": "8jg8o2thv7",
+    "page_start": 323,
+    "page_end": 327
+   },
+   {
+    "section": "8jahutp518",
+    "page_start": 165,
+    "page_end": 170
+   },
+   {
+    "section": "8jes4b09kl",
+    "page_start": 274,
+    "page_end": 275
+   },
+   {
+    "section": "8jb32m6g04",
+    "page_start": 199,
+    "page_end": 204
+   },
+   {
+    "section": "8jgdltm8l4",
+    "page_start": 336,
+    "page_end": 337
+   },
+   {
+    "section": "8ja5h2924f",
+    "page_start": 161,
+    "page_end": 163
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   }
+  ],
+  "context_chars": 36190,
+  "t_route": 0.35,
+  "t_retrieve": 1.3,
+  "t_first_token": 3.04,
+  "t_total": 20.43,
+  "grade": "correct",
+  "why": "The answer includes all key gold facts (clean procedures, performed by trained dialysis staff, exit site exam at each treatment, dressing changes at each treatment or weekly) without contradiction, plus additional consistent detail."
+ },
+ {
+  "id": "Q08",
+  "answer": "Based on the excerpts, the first transplant from a deceased donor at CMC occurred in **1991**.\n\nThe milestone table states: \"1991 — First Transplant from a Deceased Donor (Cadaver)\" [2].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "When did the first kidney transplant from a deceased donor happen at CMC?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.065406,
+  "tokens_in": 10626,
+  "citations": [
+   {
+    "section": "8jebqdfh4p",
+    "page_start": 275,
+    "page_end": 276
+   },
+   {
+    "section": "8j1gsql2d3",
+    "page_start": 19,
+    "page_end": 24
+   },
+   {
+    "section": "8jf3066blc",
+    "page_start": 300,
+    "page_end": 302
+   },
+   {
+    "section": "8j7udiv2eu",
+    "page_start": 131,
+    "page_end": 133
+   },
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "8j3q3t9oce",
+    "page_start": 74,
+    "page_end": 75
+   },
+   {
+    "section": "8jfp031o41",
+    "page_start": 303,
+    "page_end": 306
+   }
+  ],
+  "context_chars": 38662,
+  "t_route": 0.29,
+  "t_retrieve": 0.96,
+  "t_first_token": 3.44,
+  "t_total": 4.05,
+  "grade": "correct",
+  "why": "The system answer correctly identifies 1991 as the year of the first deceased donor kidney transplant at CMC, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q09",
+  "answer": "Based on the excerpts, the nephrology department performs approximately **1,200 biopsies per year** on average.\n\nAs stated in the department profile: \"On an average about 1200 biopsies are performed annually\" [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many renal biopsies are performed annually on average at the nephrology department?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.049464,
+  "tokens_in": 7964,
+  "citations": [
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8jkas7njvb",
+    "page_start": 391,
+    "page_end": 391
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "8jg30o75gn",
+    "page_start": 319,
+    "page_end": 322
+   },
+   {
+    "section": "8jh9fv6bfi",
+    "page_start": 355,
+    "page_end": 356
+   },
+   {
+    "section": "8jhjagecjk",
+    "page_start": 354,
+    "page_end": 354
+   }
+  ],
+  "context_chars": 28860,
+  "t_route": 0.27,
+  "t_retrieve": 1.73,
+  "t_first_token": 4.13,
+  "t_total": 4.72,
+  "grade": "correct",
+  "why": "The system answer correctly states that about 1,200 biopsies are performed annually, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q10",
+  "answer": "Based on the excerpts, the age requirement for lower urinary tract assessment in male recipients is:\n\n**Males over the age of 40 years** must have a lower urinary tract assessment performed.\n\n\"Lower urinary tract assesment to be done for all male recipients over the age of 40years\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "lower urinary tract assessment age requirement male recipients",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.069408,
+  "tokens_in": 11208,
+  "citations": [
+   {
+    "section": "8je68lg2t3",
+    "page_start": 283,
+    "page_end": 287
+   },
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "8jf992jjir",
+    "page_start": 293,
+    "page_end": 297
+   },
+   {
+    "section": "8j43macqhi",
+    "page_start": 98,
+    "page_end": 103
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "ro4inamd8n",
+    "page_start": 148,
+    "page_end": 152
+   },
+   {
+    "section": "ro4kj59nfm",
+    "page_start": 152,
+    "page_end": 155
+   },
+   {
+    "section": "ro27v5dlq9",
+    "page_start": 100,
+    "page_end": 103
+   }
+  ],
+  "context_chars": 38812,
+  "t_route": 0.18,
+  "t_retrieve": 1.38,
+  "t_first_token": 3.77,
+  "t_total": 4.59,
+  "grade": "correct",
+  "why": "The system answer exactly matches the gold answer that lower urinary tract assessment is required for all male recipients over age 40."
+ },
+ {
+  "id": "Q11",
+  "answer": "Based on the excerpts provided, there is no specific blood pressure threshold mentioned for plasmapheresis/plasma exchange that would prompt notification of the dialysis doctor before starting the procedure.\n\nThe plasmapheresis protocol in excerpt [2] only states to \"Monitor vital signs prior to initiating exchange and then every half an hour\" as serving \"as baseline data,\" [2] but does not specify a blood pressure cutoff value that should trigger physician notification before initiating the procedure.\n\nThe only blood pressure threshold for notifying a doctor before starting dialysis that is mentioned in the excerpts applies to **ICU dialysis**, where it states: \"Check the BP. If low inform the dialysis registrar or the concerned nephrology Doctor\" and \"If BP is > 100/60 mm Hg start the therapy with universal precautions.\" [8] However, this applies to critically ill ICU patients undergoing hemodialysis, not plasma exchange.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What blood pressure reading should prompt notification of the dialysis doctor before starting plasma exchange?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.062256,
+  "tokens_in": 9346,
+  "citations": [
+   {
+    "section": "8jabj72ljr",
+    "page_start": 180,
+    "page_end": 183
+   },
+   {
+    "section": "8jgekcv94f",
+    "page_start": 338,
+    "page_end": 340
+   },
+   {
+    "section": "8ja5h2924f",
+    "page_start": 161,
+    "page_end": 163
+   },
+   {
+    "section": "8jbp17hs59",
+    "page_start": 189,
+    "page_end": 190
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   },
+   {
+    "section": "8j9qvoijio",
+    "page_start": 151,
+    "page_end": 155
+   },
+   {
+    "section": "8ja2evd88h",
+    "page_start": 157,
+    "page_end": 160
+   },
+   {
+    "section": "8ja8bmk0ks",
+    "page_start": 172,
+    "page_end": 175
+   }
+  ],
+  "context_chars": 31299,
+  "t_route": 0.24,
+  "t_retrieve": 1.28,
+  "t_first_token": 3.63,
+  "t_total": 6.04,
+  "grade": "wrong",
+  "why": "The system incorrectly claims no threshold is specified, whereas the documents state to inform the dialysis doctor if BP is less than 100/60 mm Hg."
+ },
+ {
+  "id": "Q12",
+  "answer": "Based on the excerpts, the phone number for Clinical Biochemistry results is **23540**.\n\n\"Results which are not ready can be followed through the following phone numbers: ✓ Clinical pathology 23570 ✓ Clinical Biochemistry 23540\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "phone number for clinical biochemistry results",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.040356,
+  "tokens_in": 6401,
+  "citations": [
+   {
+    "section": "8jkst77imq",
+    "page_start": 393,
+    "page_end": 393
+   },
+   {
+    "section": "8j43macqhi",
+    "page_start": 98,
+    "page_end": 103
+   },
+   {
+    "section": "8jhiuftec1",
+    "page_start": 364,
+    "page_end": 365
+   },
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "8jhaa3tm70",
+    "page_start": 368,
+    "page_end": 369
+   },
+   {
+    "section": "8jebrbqas5",
+    "page_start": 277,
+    "page_end": 279
+   },
+   {
+    "section": "8jl0hf26gp",
+    "page_start": 394,
+    "page_end": 396
+   },
+   {
+    "section": "rnvk2djlhe",
+    "page_start": 43,
+    "page_end": 43
+   }
+  ],
+  "context_chars": 23024,
+  "t_route": 0.24,
+  "t_retrieve": 1.42,
+  "t_first_token": 2.91,
+  "t_total": 3.74,
+  "grade": "correct",
+  "why": "The system answer correctly identifies 23540 as the phone number for Clinical Biochemistry results, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q13",
+  "answer": "Based on the excerpts, kinship testing records must be kept for **25 years**.\n\nThis is because \"kinship testing reports could be subpoenaed by a court or the transplant authorization committee, the records (register and reports) will be retained for 25 years\" [2].\n\nThis is in contrast to other records, which are \"maintained for a specific time period (2-5 years)\" [2].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How long must records from kinship testing be kept because they might be requested by courts or transplant committees?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.057042,
+  "tokens_in": 9037,
+  "citations": [
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "8jhe0gastn",
+    "page_start": 356,
+    "page_end": 361
+   },
+   {
+    "section": "8jebrbqas5",
+    "page_start": 277,
+    "page_end": 279
+   },
+   {
+    "section": "8jfp3ibitc",
+    "page_start": 298,
+    "page_end": 299
+   },
+   {
+    "section": "8j7udiv2eu",
+    "page_start": 131,
+    "page_end": 133
+   },
+   {
+    "section": "8jfp031o41",
+    "page_start": 303,
+    "page_end": 306
+   },
+   {
+    "section": "8j3q3t9oce",
+    "page_start": 74,
+    "page_end": 75
+   },
+   {
+    "section": "8jbp17hs59",
+    "page_start": 189,
+    "page_end": 190
+   }
+  ],
+  "context_chars": 33477,
+  "t_route": 0.24,
+  "t_retrieve": 1.27,
+  "t_first_token": 3.07,
+  "t_total": 4.09,
+  "grade": "correct",
+  "why": "The system answer correctly states that kinship testing records must be kept for 25 years, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q14",
+  "answer": "Based on the excerpts, Zone C has **7 stations**.\n\n\"This zone has 7 stations with adequate space.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many dialysis stations are available in Zone C for patients who are positive for HCV, HIV, or HBsAg?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.048402,
+  "tokens_in": 7902,
+  "citations": [
+   {
+    "section": "8j9dvjfb2k",
+    "page_start": 155,
+    "page_end": 157
+   },
+   {
+    "section": "8jjmgv9htb",
+    "page_start": 385,
+    "page_end": 385
+   },
+   {
+    "section": "8jb32m6g04",
+    "page_start": 199,
+    "page_end": 204
+   },
+   {
+    "section": "8jabj72ljr",
+    "page_start": 180,
+    "page_end": 183
+   },
+   {
+    "section": "8jkt9l6nvd",
+    "page_start": 388,
+    "page_end": 388
+   },
+   {
+    "section": "8jbf65p71c",
+    "page_start": 187,
+    "page_end": 188
+   },
+   {
+    "section": "8jee1812nl",
+    "page_start": 280,
+    "page_end": 283
+   },
+   {
+    "section": "8j3ulgbgdd",
+    "page_start": 75,
+    "page_end": 79
+   }
+  ],
+  "context_chars": 26755,
+  "t_route": 0.28,
+  "t_retrieve": 1.57,
+  "t_first_token": 3.5,
+  "t_total": 3.99,
+  "grade": "correct",
+  "why": "The system answer correctly states that Zone C has 7 stations, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q15",
+  "answer": "## Research Staff Responsibilities in the Nephrology Department\n\nThe wiki excerpts do not contain a dedicated section on the specific job responsibilities of research/project staff. However, the following relevant information is available:\n\n- **Project Staff** \"function under the supervision of the research project principal investigator\" [4].\n- The **Nephrology Laboratory** supports research needs, with its \"primary role is to complement the research and diagnostic component of nephrology services\" [5].\n- The **Faculty (Non-Medical) Senior Scientist** (Laboratory Faculty-in-charge) is responsible for research-related duties including: \"Plan & execute research projects addressing lab-based needs of nephrology service\" [5], \"Review laboratory data\" [5], and \"Oversee equipment maintenance ensuring compliance with regulatory safety practices\" [5].\n- The department treats research as a core function: \"The department of nephrology has research and academics as major components of its day-to-day functioning\" [6].\n- Faculty consultants are also expected to \"Carry out research work in areas relevant to the department\" [5].\n\n> **Note:** The table of contents lists a section **3.10 Research staff** (p.93) [7], but the actual content of that section is not included in the provided excerpts, so the specific job description for research staff cannot be detailed further from the available wiki material.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "research staff responsibilities nephrology department",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.060588,
+  "tokens_in": 8603,
+  "citations": [
+   {
+    "section": "8jhjagecjk",
+    "page_start": 354,
+    "page_end": 354
+   },
+   {
+    "section": "8j1qeeh3fm",
+    "page_start": 25,
+    "page_end": 25
+   },
+   {
+    "section": "8j1sqtfqne",
+    "page_start": 24,
+    "page_end": 25
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j2mdksnev",
+    "page_start": 38,
+    "page_end": 40
+   },
+   {
+    "section": "8jk5e9a4pl",
+    "page_start": 388,
+    "page_end": 388
+   },
+   {
+    "section": "8j0q5860co",
+    "page_start": 2,
+    "page_end": 10
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   }
+  ],
+  "context_chars": 25579,
+  "t_route": 0.17,
+  "t_retrieve": 1.39,
+  "t_first_token": 3.69,
+  "t_total": 8.06,
+  "grade": "wrong",
+  "why": "The system answer does not list the concrete responsibilities (patient enrollment, informed consent, specimen handling, record keeping, inventory, biochemical procedures, liaising with pathology) given in the gold answer and instead claims the specifics are not available."
+ },
+ {
+  "id": "Q16",
+  "answer": "Based on the excerpts, the kidney transplant fellowship training program lasts **one year**.\n\nThis is confirmed in two places:\n\n- \"A one year fellowship programme in Renal transplantation for doctors with DM/DNB in Nephrology.\" [2]\n- \"The fellowship course shall run for a period of one year\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How long does the kidney transplant fellowship training program last?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.070044,
+  "tokens_in": 11279,
+  "citations": [
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8jkgb0893d",
+    "page_start": 388,
+    "page_end": 391
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "8jfp031o41",
+    "page_start": 303,
+    "page_end": 306
+   },
+   {
+    "section": "8jebqdfh4p",
+    "page_start": 275,
+    "page_end": 276
+   },
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   }
+  ],
+  "context_chars": 39991,
+  "t_route": 0.32,
+  "t_retrieve": 1.14,
+  "t_first_token": 3.65,
+  "t_total": 4.99,
+  "grade": "correct",
+  "why": "The system answer correctly states that the fellowship lasts one year, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q17",
+  "answer": "Based on the excerpts, internal audits on sales and stocks in the Nephrology pharmacy are conducted **twice a year**.\n\n\"Internal audits done on Sales and stocks twice in a year\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many times per year are internal audits conducted on sales and stocks in the Nephrology pharmacy?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.033264,
+  "tokens_in": 5309,
+  "citations": [
+   {
+    "section": "8j3endalmc",
+    "page_start": 73,
+    "page_end": 73
+   },
+   {
+    "section": "8jicf70lmt",
+    "page_start": 378,
+    "page_end": 379
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "ro58p6ucsa",
+    "page_start": 175,
+    "page_end": 175
+   },
+   {
+    "section": "ro11qidi5e",
+    "page_start": 85,
+    "page_end": 85
+   },
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "ro4hu908fu",
+    "page_start": 169,
+    "page_end": 169
+   },
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   }
+  ],
+  "context_chars": 19415,
+  "t_route": 0.25,
+  "t_retrieve": 1.52,
+  "t_first_token": 3.55,
+  "t_total": 4.05,
+  "grade": "correct",
+  "why": "The system answer correctly states that internal audits are conducted twice a year, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q18",
+  "answer": "Based on the excerpts, there are two different figures given for nursing staff in the AK Lab, which may reflect different points in time or document updates:\n\n- **Excerpt [1]** states the AK Lab has \"29 nursing staff and 25 qualified dialysis therapists, 10 intern dialysis therapists with 21 trainee dialysis therapists, all functioning under the supervision of nephrology faculty.\" [1]\n\n- **Excerpt [2]** states \"There are about 21 registered nurses, 29 dialysis therapists and 8 dialysis therapy interns working around the clock in the unit.\" [2]\n\nThe two sections of the manual give different numbers: **29 nursing staff** according to the Organogram section [1], and **about 21 registered nurses** according to the Hemodialysis unit introduction [2]. The discrepancy is not explained in the excerpts.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many nursing staff work in the AK Lab?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.070338,
+  "tokens_in": 10698,
+  "citations": [
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j9dvjfb2k",
+    "page_start": 155,
+    "page_end": 157
+   },
+   {
+    "section": "8j0q5860co",
+    "page_start": 2,
+    "page_end": 10
+   },
+   {
+    "section": "8j1qeeh3fm",
+    "page_start": 25,
+    "page_end": 25
+   },
+   {
+    "section": "8ja8bmk0ks",
+    "page_start": 172,
+    "page_end": 175
+   },
+   {
+    "section": "8j58hp2msb",
+    "page_start": 114,
+    "page_end": 116
+   },
+   {
+    "section": "8jes4b09kl",
+    "page_start": 274,
+    "page_end": 275
+   },
+   {
+    "section": "8j3v81jr0u",
+    "page_start": 82,
+    "page_end": 85
+   }
+  ],
+  "context_chars": 30397,
+  "t_route": 0.18,
+  "t_retrieve": 1.52,
+  "t_first_token": 3.78,
+  "t_total": 6.56,
+  "grade": "partial",
+  "why": "The answer correctly identifies 29 nursing staff from one excerpt but does not clearly state it as the final answer and introduces alternative figures instead of resolving the question."
+ },
+ {
+  "id": "Q19",
+  "answer": "Based on the excerpts, a hospital attendant posted in the clinical area performs the following tasks to assist patients receiving dialysis treatment:\n\n- **Transport:** \"Transport of inpatients for dialysis from and to the respective wards\" [1]\n- **Lifting/transferring:** \"Lifting and transferring patients to/from trolleys\" [1]\n- **Weight checks:** \"Checking weight pre- and post dialysis session\" [1]\n- **Positioning:** \"Assisting in turning heavy patients\" [1]\n- **Accompanying to other departments:** \"Taking patients to and from X-ray etc.\" [1]\n- **Linen for beds:** \"Bringing linen for bed-making\" and \"Assisting staff in bed-making\" [1]\n- **Soiled linen removal:** \"Taking dirty/soiled linen to linen cage\" [1]\n- **Privacy:** \"Helping placing curtains around the bed, when needed\" [1]\n- **Nutrition support:** \"Assisting patient in feeding & drinking\" [1]\n\nAdditionally, attendants on **Assignment 2** specifically \"Bring patients from the wards to the AK Lab and take them back to the ward\" [1], while those on **Assignment 1** assist with ICU dialysis by \"taking either the dialysate cans or rolling the machines to the ICU etc.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What tasks does a clinical area attendant perform to help with patients receiving dialysis treatment?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.068076,
+  "tokens_in": 9771,
+  "citations": [
+   {
+    "section": "8j3brq0vei",
+    "page_start": 85,
+    "page_end": 90
+   },
+   {
+    "section": "8j3ulgbgdd",
+    "page_start": 75,
+    "page_end": 79
+   },
+   {
+    "section": "8j3v81jr0u",
+    "page_start": 82,
+    "page_end": 85
+   },
+   {
+    "section": "8j58hp2msb",
+    "page_start": 114,
+    "page_end": 116
+   },
+   {
+    "section": "8j6205f2s6",
+    "page_start": 116,
+    "page_end": 117
+   },
+   {
+    "section": "8j3fjvd00a",
+    "page_start": 79,
+    "page_end": 82
+   },
+   {
+    "section": "8j24id7jbg",
+    "page_start": 40,
+    "page_end": 44
+   },
+   {
+    "section": "8jbf65p71c",
+    "page_start": 187,
+    "page_end": 188
+   }
+  ],
+  "context_chars": 35649,
+  "t_route": 0.27,
+  "t_retrieve": 1.39,
+  "t_first_token": 3.92,
+  "t_total": 13.78,
+  "grade": "correct",
+  "why": "The system answer lists all the specific tasks from the gold answer with no contradictions, adding only extra consistent details."
+ },
+ {
+  "id": "Q20",
+  "answer": "Based on the excerpts, from day 7 onwards, the inflow solution volume is increased to 2 liters with a dwell time of **6–8 hours**.\n\nSpecifically, the protocol states: \"Increase the inflow solution volume to 2 liters\" and \"Increase dwell time to 6-8 hours\" [4].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the recommended dwell time for CAPD exchanges from day 7 onwards?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.044124,
+  "tokens_in": 6939,
+  "citations": [
+   {
+    "section": "8jdhfhs732",
+    "page_start": 254,
+    "page_end": 257
+   },
+   {
+    "section": "8jb768qrt8",
+    "page_start": 204,
+    "page_end": 204
+   },
+   {
+    "section": "8jc68b2u1h",
+    "page_start": 204,
+    "page_end": 205
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "8jco62h0q7",
+    "page_start": 249,
+    "page_end": 253
+   },
+   {
+    "section": "8jcaih8d98",
+    "page_start": 247,
+    "page_end": 248
+   },
+   {
+    "section": "8jdut4unom",
+    "page_start": 271,
+    "page_end": 273
+   },
+   {
+    "section": "8jd87hmo1p",
+    "page_start": 269,
+    "page_end": 270
+   }
+  ],
+  "context_chars": 20959,
+  "t_route": 0.35,
+  "t_retrieve": 1.5,
+  "t_first_token": 3.3,
+  "t_total": 3.91,
+  "grade": "correct",
+  "why": "The system answer correctly identifies the recommended dwell time as 6–8 hours and matches the gold answer with no contradictions."
+ },
+ {
+  "id": "Q21",
+  "answer": "Based on the excerpts, the Nephrology department offers the following types of dialysis catheter insertions:\n\n- **Tunnelled Dialysis Catheter Insertions** [1]\n- **Non-Tunnelled Dialysis Catheter Insertions** [1]\n- **Peritoneal Dialysis Catheter Insertions** [1]\n\nThese are listed under the Procedures section of the department's scope of services, specifically as \"Dialysis Catheter Insertions – Tunelled and NonTunelled\" and \"Peritoneal Dialysis Catheter Insertions.\" [1]\n\nAdditionally, regarding specific venous access sites, Central Venous Catheters can be inserted \"through any of the main veins as jugular vein, subclavian vein or femoral vein into the right atrium of the heart\" for hemodialysis access. [4] CAPD and Jugular Dialysis Catheters are specifically \"inserted in the B101 dialysis unit operating room under aseptic precautions.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "types of dialysis catheter insertions offered by nephrology",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05829,
+  "tokens_in": 8480,
+  "citations": [
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8jk2ns2sns",
+    "page_start": 386,
+    "page_end": 387
+   },
+   {
+    "section": "8ja2evd88h",
+    "page_start": 157,
+    "page_end": 160
+   },
+   {
+    "section": "8jgbdtua43",
+    "page_start": 332,
+    "page_end": 335
+   },
+   {
+    "section": "8jh9fv6bfi",
+    "page_start": 355,
+    "page_end": 356
+   },
+   {
+    "section": "8jdut4unom",
+    "page_start": 271,
+    "page_end": 273
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   }
+  ],
+  "context_chars": 30147,
+  "t_route": 0.34,
+  "t_retrieve": 1.56,
+  "t_first_token": 3.89,
+  "t_total": 6.45,
+  "grade": "partial",
+  "why": "It correctly identifies tunnelled and non-tunnelled dialysis catheter insertions but adds peritoneal dialysis catheter insertions, which are not part of the gold answer."
+ },
+ {
+  "id": "Q22",
+  "answer": "Based on the excerpts, staff have the following responsibilities when training nursing learners in a clinical setting:\n\n## Assignment & Orientation\n- \"Assign the patients according to the level of students and their learning objectives and requirements\" [1]\n- \"Orient the students to the physical set up and patients\" [1]\n- \"Ensure the availability of teaching and clinical resources for students\" [1]\n\n## Teaching & Demonstration\n- \"Demonstrate specific procedures relating to students requirements\" [1]\n- \"Plan and Conduct regular clinical teaching sessions (Planned and Incidental) using effective audiovisual aids\" [1]\n- \"Participate in planning and implementing weekly clinical teaching program\" [1]\n- \"Enhances clinical learning of staff and students through classes, skill training and role modelling\" [2]\n\n## Supervision & Guidance\n- \"Supervise and guide students in completing their requirements\" [1]\n- \"Guide students in planning, implementing and evaluation of holistic patient care\" [1]\n- \"Assist students in applying their theoretical knowledge in the clinical setting\" [1]\n- \"Teaches guides and supervises nursing care\" [2]\n\n## Support & Mentorship\n- \"Mentor students and counsel as required\" [1]\n- \"Offer additional support to students as required\" [1]\n- \"Has an awareness of student needs\" [2]\n\n## Assessment & Documentation\n- \"Appraise students' performance at the end of each clinical posting\" [1]\n- \"Maintain upto date documents and reports related to clinical teaching and supervision\" [1]\n- \"Inform the Head of Department on issues pertaining to students as relevant\" [1]\n\n## Research Guidance\n- \"Guide students of different levels in completing research projects\" [1]\n- \"Guide and supervise students during their ward administration posting\" [1]\n\n## Environment\n- \"Maintain a conducive environment for student teaching and learning\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What responsibilities do staff have when training nursing learners in a clinical setting?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.079902,
+  "tokens_in": 11147,
+  "citations": [
+   {
+    "section": "8j2ju0hgef",
+    "page_start": 55,
+    "page_end": 56
+   },
+   {
+    "section": "8j2ahn9del",
+    "page_start": 57,
+    "page_end": 73
+   },
+   {
+    "section": "rnv3h1eqid",
+    "page_start": 21,
+    "page_end": 22
+   },
+   {
+    "section": "8j2mdksnev",
+    "page_start": 38,
+    "page_end": 40
+   },
+   {
+    "section": "8j3brq0vei",
+    "page_start": 85,
+    "page_end": 90
+   },
+   {
+    "section": "8j2o4m991m",
+    "page_start": 56,
+    "page_end": 57
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "rnvjbf1hc9",
+    "page_start": 28,
+    "page_end": 31
+   }
+  ],
+  "context_chars": 44554,
+  "t_route": 0.23,
+  "t_retrieve": 1.29,
+  "t_first_token": 2.9,
+  "t_total": 8.49,
+  "grade": "correct",
+  "why": "The system answer includes all key responsibilities from the gold answer, with no contradictions and only additional consistent details."
+ },
+ {
+  "id": "Q23",
+  "answer": "Based on the excerpts, dialysate samples are tested **once a week** for these parameters.\n\n\"The following tests are done once a week on dialysate samples: Sodium, Potassium, Bicarbonate, Calcium, Chloride, Magnesium and pH.\" [5]\n\nIf any abnormality is found, \"this is to be informed to the chief dialysis therapist and testing repeated after the required adjustment to done.\" [5]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How often are dialysate samples tested for sodium, potassium, bicarbonate, calcium, chloride, magnesium and pH?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.053652,
+  "tokens_in": 8417,
+  "citations": [
+   {
+    "section": "8jabj72ljr",
+    "page_start": 180,
+    "page_end": 183
+   },
+   {
+    "section": "8japgc0bf4",
+    "page_start": 160,
+    "page_end": 161
+   },
+   {
+    "section": "8jccu9abql",
+    "page_start": 242,
+    "page_end": 246
+   },
+   {
+    "section": "8jbbcsn9vm",
+    "page_start": 196,
+    "page_end": 196
+   },
+   {
+    "section": "8jbp0ucsdk",
+    "page_start": 197,
+    "page_end": 199
+   },
+   {
+    "section": "ro2mim307v",
+    "page_start": 98,
+    "page_end": 99
+   },
+   {
+    "section": "8jcaih8d98",
+    "page_start": 247,
+    "page_end": 248
+   },
+   {
+    "section": "8j2g8c858o",
+    "page_start": 44,
+    "page_end": 48
+   }
+  ],
+  "context_chars": 27184,
+  "t_route": 0.2,
+  "t_retrieve": 1.45,
+  "t_first_token": 3.74,
+  "t_total": 5.13,
+  "grade": "correct",
+  "why": "The system answer correctly states that the dialysate samples are tested once a week and matches the gold answer without contradiction."
+ },
+ {
+  "id": "Q24",
+  "answer": "The wiki excerpts do not contain specific information about how often to order CAPD bags (i.e., ordering frequency or supply scheduling).\n\nWhat the excerpts do mention is the exchange frequency and related logistics:\n\n- Dialysis exchanges are carried out \"3 - 4 times a day for 6-8 hours each\" [1], which implies a daily consumption of 3–4 bags per day.\n- \"The Transfer set of PD catheter is changed once in 4 months\" [7], but this refers to the transfer set, not the dialysis bags themselves.\n- \"The mini-cap of catheter is changed during each PD exchange\" [7].\n\nFor specific guidance on ordering intervals or supply quantities of CAPD bags, the wiki does not provide that information.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "how often to order CAPD bags",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.053838,
+  "tokens_in": 8093,
+  "citations": [
+   {
+    "section": "8jb768qrt8",
+    "page_start": 204,
+    "page_end": 204
+   },
+   {
+    "section": "8jcaih8d98",
+    "page_start": 247,
+    "page_end": 248
+   },
+   {
+    "section": "8jc68b2u1h",
+    "page_start": 204,
+    "page_end": 205
+   },
+   {
+    "section": "8jcckjf3ad",
+    "page_start": 232,
+    "page_end": 235
+   },
+   {
+    "section": "8jdhfhs732",
+    "page_start": 254,
+    "page_end": 257
+   },
+   {
+    "section": "8jces2rldu",
+    "page_start": 205,
+    "page_end": 210
+   },
+   {
+    "section": "8jdt40an56",
+    "page_start": 270,
+    "page_end": 271
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   }
+  ],
+  "context_chars": 24820,
+  "t_route": 0.26,
+  "t_retrieve": 1.34,
+  "t_first_token": 3.74,
+  "t_total": 6.28,
+  "grade": "wrong",
+  "why": "The system answer incorrectly claims the wiki lacks information on ordering frequency, while the gold answer specifies ordering CAPD bags once every 1–2 weeks."
+ },
+ {
+  "id": "Q25",
+  "answer": "## Risks When Caring for a Dialysis Catheter\n\n### Infection Risks\n- **Catheter-related bloodstream infections (CRBSI)** are a major concern: \"Catheter-related blood stream infections are of great concern\" [8]\n- **Exit site infection** is a persistent risk: \"For venous catheters, the exit site remains a potential source of infection\" [5]\n- **Staphylococcus aureus** is a leading pathogen: \"Staphylococcus aureus is the leading cause of catheter exit site infection and bacteremia in hemodialysis patients\" [5]\n- **Aerosolized or hand-borne bacteria** can contaminate the catheter: \"Catheter infection can occur following transmission of hand or aerosolized bacterial contaminants\" [5]\n- **MRSA transmission** is a specific risk requiring contact isolation: \"If MRSA has been isolated from the patient, contact isolation precautions are followed\" [8]\n\n### Mechanical/Physical Risks\n- **Air embolism** can occur if the lumen is exposed to air: \"The lumen and tip should never remain open to the air\" [5]\n- **Catheter block or loss of patency** is a recognized complication requiring intervention with heparin flushing [5]\n- **Bleeding** at the catheter site is listed as a complication [6]\n\n### General Complications\n- The documented complications of central venous catheter care include: \"Bleeding Infection Air embolism\" [6]\n- Catheter manipulations that access the bloodstream carry inherent risks, which is why \"hemodialysis catheter dressing changes and catheter manipulations that access the patient's bloodstream should only be performed by trained dialysis staff\" [5]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What risks can occur when caring for a dialysis catheter?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.07152,
+  "tokens_in": 9850,
+  "citations": [
+   {
+    "section": "8jb768qrt8",
+    "page_start": 204,
+    "page_end": 204
+   },
+   {
+    "section": "8ja5h2924f",
+    "page_start": 161,
+    "page_end": 163
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   },
+   {
+    "section": "8jk2ns2sns",
+    "page_start": 386,
+    "page_end": 387
+   },
+   {
+    "section": "8jahutp518",
+    "page_start": 165,
+    "page_end": 170
+   },
+   {
+    "section": "8jgbdtua43",
+    "page_start": 332,
+    "page_end": 335
+   },
+   {
+    "section": "8ja2evd88h",
+    "page_start": 157,
+    "page_end": 160
+   },
+   {
+    "section": "8jb32m6g04",
+    "page_start": 199,
+    "page_end": 204
+   }
+  ],
+  "context_chars": 33012,
+  "t_route": 0.22,
+  "t_retrieve": 1.52,
+  "t_first_token": 3.88,
+  "t_total": 8.46,
+  "grade": "correct",
+  "why": "Answer explicitly lists bleeding, infection, and air embolism as complications, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q26",
+  "answer": "Based on the excerpts, the minimum distance required between the outer cuff and the proposed exit site is **2.5 cm**.\n\nThis is specified in the catheter placement procedure: \"ensure at least 2.5 cm distance between the outer cuff and the proposed exit site to avoid cuff extrusion\" [4].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the minimum distance required between the outer cuff and the proposed exit site during PD catheter placement?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.062442,
+  "tokens_in": 10037,
+  "citations": [
+   {
+    "section": "8jdpkchied",
+    "page_start": 263,
+    "page_end": 263
+   },
+   {
+    "section": "8jdt40an56",
+    "page_start": 270,
+    "page_end": 271
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8jgbdtua43",
+    "page_start": 332,
+    "page_end": 335
+   },
+   {
+    "section": "8jdpt6j0l1",
+    "page_start": 264,
+    "page_end": 267
+   },
+   {
+    "section": "8jgdltm8l4",
+    "page_start": 336,
+    "page_end": 337
+   },
+   {
+    "section": "8jg1h86udm",
+    "page_start": 351,
+    "page_end": 351
+   }
+  ],
+  "context_chars": 33039,
+  "t_route": 0.26,
+  "t_retrieve": 1.3,
+  "t_first_token": 3.68,
+  "t_total": 4.3,
+  "grade": "correct",
+  "why": "The system answer gives the exact required minimum distance of 2.5 cm, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q27",
+  "answer": "## When to Start Flushing After PD Catheter Insertion\n\nThere are two references to flushing timing in the protocols, which give slightly different days:\n\n- **Post-operative care instructions** state: \"First flushing on Day 5 (unless emergency start of PD is required)\" [1]\n\n- However, the **Flush Protocol** states: \"Flushing to be started following strict aseptic technique, on Day 3 post surgery using 500 ml PD fluid to which 500 U/L of heparin has been added.\" [1]\n\n- After the first flush, \"flushing to be continued alternate days till the date of starting regular low volume exchanges.\" [1]\n\nAdditionally, flushing is also performed **intraoperatively**: the surgeon connects PD fluid to the transfer set and performs \"rapid flushing 2-3 times\" with 500 ml of PD fluid (with Heparin 500 U/L added), leaving the last 500 ml in the peritoneal cavity. [3]\n\n> **Summary:** The flush protocol specifies Day 3 as the start date, while the post-operative care section states Day 5. Both agree that flushing continues on alternate days thereafter. Emergency PD start may require earlier initiation.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "when to start flushing after PD catheter insertion",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.063876,
+  "tokens_in": 9171,
+  "citations": [
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "8jdut4unom",
+    "page_start": 271,
+    "page_end": 273
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8jdpkchied",
+    "page_start": 263,
+    "page_end": 263
+   },
+   {
+    "section": "8jdt40an56",
+    "page_start": 270,
+    "page_end": 271
+   },
+   {
+    "section": "8jdhfhs732",
+    "page_start": 254,
+    "page_end": 257
+   },
+   {
+    "section": "8jdo5cr7cv",
+    "page_start": 273,
+    "page_end": 273
+   },
+   {
+    "section": "8jdpt6j0l1",
+    "page_start": 264,
+    "page_end": 267
+   }
+  ],
+  "context_chars": 29257,
+  "t_route": 0.29,
+  "t_retrieve": 1.33,
+  "t_first_token": 2.98,
+  "t_total": 7.54,
+  "grade": "partial",
+  "why": "The answer includes the correct Day 5 timing and emergency exception but also highlights a contradictory Day 3 start from another part of the protocol instead of clearly giving Day 5 as the answer."
+ },
+ {
+  "id": "Q28",
+  "answer": "Based on the Nephrology procedures, patients can collect their Medical Reports at the following times:\n\n- **Weekdays:** Between **4:00 to 4:30 pm**, \"collect the Medical Report from the Nephrology, Secretary at A102- Counter No 74 – first floor OPD building in the evening between 4 to 4:30 during week days\" [1]\n- **Saturdays:** Between **11:00 to 11:30 am**, \"11-11:30 during Saturdays (if the chart/written Medical report is available)\" [1]\n\nIn both cases, collection is subject to the chart/written medical report being available, and \"the secretary will inform the patient as to when the report will be available\" if it is not ready. [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "When can patients pick up their medical certificates on weekdays versus Saturdays?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.050454,
+  "tokens_in": 7504,
+  "citations": [
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "8j8qj5nrsm",
+    "page_start": 141,
+    "page_end": 143
+   },
+   {
+    "section": "8jl3t2la6l",
+    "page_start": 396,
+    "page_end": 396
+   },
+   {
+    "section": "8j2cank05f",
+    "page_start": 52,
+    "page_end": 54
+   },
+   {
+    "section": "ro06gl4mfb",
+    "page_start": 61,
+    "page_end": 62
+   },
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   },
+   {
+    "section": "8j44etmejd",
+    "page_start": 103,
+    "page_end": 105
+   },
+   {
+    "section": "8j2g8c858o",
+    "page_start": 44,
+    "page_end": 48
+   }
+  ],
+  "context_chars": 27411,
+  "t_route": 0.22,
+  "t_retrieve": 1.47,
+  "t_first_token": 3.02,
+  "t_total": 6.96,
+  "grade": "partial",
+  "why": "The answer gives the correct Saturday time but incorrectly states weekday collection as 4–4:30 pm instead of 3–4:30 pm."
+ },
+ {
+  "id": "Q29",
+  "answer": "Based on the excerpts, vital signs should be monitored **every 10 minutes** during surgery.\n\nSpecifically, one of the roles of the PD nurse is \"Monitoring vital signs every 10 minutes during surgery\" [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How often should vital signs be monitored during PD catheter insertion surgery?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.064956,
+  "tokens_in": 10551,
+  "citations": [
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8j80gkms3f",
+    "page_start": 133,
+    "page_end": 134
+   },
+   {
+    "section": "8jahutp518",
+    "page_start": 165,
+    "page_end": 170
+   },
+   {
+    "section": "8jdpt6j0l1",
+    "page_start": 264,
+    "page_end": 267
+   },
+   {
+    "section": "8jdut4unom",
+    "page_start": 271,
+    "page_end": 273
+   },
+   {
+    "section": "8jces2rldu",
+    "page_start": 205,
+    "page_end": 210
+   },
+   {
+    "section": "8jdo5cr7cv",
+    "page_start": 273,
+    "page_end": 273
+   },
+   {
+    "section": "8jdt40an56",
+    "page_start": 270,
+    "page_end": 271
+   }
+  ],
+  "context_chars": 34806,
+  "t_route": 0.69,
+  "t_retrieve": 1.36,
+  "t_first_token": 4.29,
+  "t_total": 4.92,
+  "grade": "correct",
+  "why": "The system answer clearly states that vital signs should be monitored every 10 minutes during surgery, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q30",
+  "answer": "## Turn-Around-Time for Kinship Testing\n\nThe turn-around-time for kinship testing is **21 days**.\n\nKey details:\n\n- \"The turn-around-time for this assay is 21 days. The assay-per-se takes only about 4-5 days.\" [2]\n- The longer window exists because if a result needs to be repeated, it takes more time — \"if in case we have to repeat it twice it takes more time.\" [2]\n- Even in related pairs, delays can occur due to technical reasons: \"sequencing not satisfactory, the batch run not validated etc.\" [2]\n- The wider time-period is given because \"the patient and family will get highly anxious if the results are delayed.\" [2]\n- However, early reporting is practiced: \"as soon as the report is ready (even within 5 days), the transplant registrar is informed and he/she proceeds further with the evaluation protocol.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "turn-around-time kinship testing nephrology",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.055266,
+  "tokens_in": 8116,
+  "citations": [
+   {
+    "section": "8jh9fv6bfi",
+    "page_start": 355,
+    "page_end": 356
+   },
+   {
+    "section": "8jhe0gastn",
+    "page_start": 356,
+    "page_end": 361
+   },
+   {
+    "section": "8jiqa77t5f",
+    "page_start": 370,
+    "page_end": 370
+   },
+   {
+    "section": "8jfp3ibitc",
+    "page_start": 298,
+    "page_end": 299
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "8jhjagecjk",
+    "page_start": 354,
+    "page_end": 354
+   },
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "8jhaa3tm70",
+    "page_start": 368,
+    "page_end": 369
+   }
+  ],
+  "context_chars": 29546,
+  "t_route": 0.15,
+  "t_retrieve": 1.36,
+  "t_first_token": 2.91,
+  "t_total": 6.36,
+  "grade": "correct",
+  "why": "The system answer correctly identifies the turn-around-time as 21 days and does not contradict the gold answer."
+ },
+ {
+  "id": "Q31",
+  "answer": "Based on the excerpts, preventive medication (chemoprophylaxis) should be started **within 1–2 hours** following exposure.\n\n- \"Chemoprophylaxis is started within 1-2 hours following exposure. (Cut off period is 72 hours)\" [1]\n- The drug regimen prescribed is a **Triple Drug Regimen**: \"Tenofovir/Lamivudine and Dolutegravir (As per Institution Protocol)\" for a \"Total duration 4 weeks\" [1]\n- For the Indian setting, all HIV-positive index cases are treated as highly infectious: \"For Indian setting all HIV positive indexes to be considered highly infectious\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How soon after a needlestick exposure to HIV-positive blood should preventive medication be started?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.069684,
+  "tokens_in": 10824,
+  "citations": [
+   {
+    "section": "8j8bldnp04",
+    "page_start": 134,
+    "page_end": 136
+   },
+   {
+    "section": "ro5m869bbp",
+    "page_start": 170,
+    "page_end": 173
+   },
+   {
+    "section": "ro18d2c4tg",
+    "page_start": 84,
+    "page_end": 84
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "ro27v5dlq9",
+    "page_start": 100,
+    "page_end": 103
+   },
+   {
+    "section": "8jb32m6g04",
+    "page_start": 199,
+    "page_end": 204
+   },
+   {
+    "section": "8jabj72ljr",
+    "page_start": 180,
+    "page_end": 183
+   },
+   {
+    "section": "8jcaih8d98",
+    "page_start": 247,
+    "page_end": 248
+   }
+  ],
+  "context_chars": 35728,
+  "t_route": 0.15,
+  "t_retrieve": 1.45,
+  "t_first_token": 3.06,
+  "t_total": 5.44,
+  "grade": "partial",
+  "why": "Mentions starting chemoprophylaxis within 1–2 hours but omits the 72-hour cutoff period that is specified in the gold answer."
+ },
+ {
+  "id": "Q32",
+  "answer": "Based on the excerpts, during the initial outpatient assessment the nephrology doctor collects the following types of history:\n\n- **Presenting complaints in detail** — \"The presenting complaints in detail\" [4]\n- **Relevant positive and negative associated history** — \"Relevant positive and negative history of associated and related symptoms\" [4]\n- **Past history** — \"Past history\" [4]\n- **Personal history** — \"Personal history\" [4]\n- **Details of treatment already taken** — \"Details of treatment already taken\" [4]\n- **Other important co-morbid conditions** — \"Other important co-morbid conditions\" [4]\n- **Family history** — \"A family history\" [4]\n- **Socio-economic history** — \"A socio-economic history\" [4]\n\nIn total, **8 categories of history** are collected. As noted in the excerpt, \"the doctor enquires the detailed history of the patient\" covering all of the above, after which \"the patient is examined in detail with particular importance to the general examination and examination of the genitourinary system.\" [4]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What types of history does the nephrology doctor collect during the initial outpatient assessment?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.060564,
+  "tokens_in": 8824,
+  "citations": [
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "ro0agichl7",
+    "page_start": 48,
+    "page_end": 50
+   },
+   {
+    "section": "8j8qj5nrsm",
+    "page_start": 141,
+    "page_end": 143
+   },
+   {
+    "section": "8j43macqhi",
+    "page_start": 98,
+    "page_end": 103
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "8j80gkms3f",
+    "page_start": 133,
+    "page_end": 134
+   },
+   {
+    "section": "8j5jg88467",
+    "page_start": 112,
+    "page_end": 114
+   }
+  ],
+  "context_chars": 33306,
+  "t_route": 0.21,
+  "t_retrieve": 1.54,
+  "t_first_token": 3.9,
+  "t_total": 6.63,
+  "grade": "correct",
+  "why": "The system answer lists all the same history types as the gold answer with no contradictions or omissions."
+ },
+ {
+  "id": "Q33",
+  "answer": "The excerpts do not contain any information about an After Life Support team intercom number specific to Nephrology.\n\nHowever, excerpt [7] (from Obstetrics and Gynaecology) does mention the After Life Support team's contact: \"They are available at the enquiry through intercom no. 2040\" [7]. This is documented under the Obstetrics and Gynaecology section, not Nephrology.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "After Life Support team intercom number nephrology",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.043716,
+  "tokens_in": 6796,
+  "citations": [
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   },
+   {
+    "section": "8j8qj5nrsm",
+    "page_start": 141,
+    "page_end": 143
+   },
+   {
+    "section": "8j76pf1926",
+    "page_start": 129,
+    "page_end": 131
+   },
+   {
+    "section": "8j1qeeh3fm",
+    "page_start": 25,
+    "page_end": 25
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8jjukoteju",
+    "page_start": 383,
+    "page_end": 384
+   },
+   {
+    "section": "ro0s33ntn5",
+    "page_start": 53,
+    "page_end": 54
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   }
+  ],
+  "context_chars": 25061,
+  "t_route": 0.15,
+  "t_retrieve": 1.72,
+  "t_first_token": 4.22,
+  "t_total": 5.11,
+  "grade": "wrong",
+  "why": "The system claims the intercom number is 2040 and says nephrology info is not present, contradicting the gold answer 09498747035."
+ },
+ {
+  "id": "Q34",
+  "answer": "## Autoimmune Tests Offered by the Nephrology Laboratory\n\nThe nephrology laboratory offers **three** tests specifically for autoimmune conditions:\n\n### 1. Anti-PLA2R Antibody Quantitation Test\n- \"Autoantibodies of class IgG against phospholipase A2 receptors are highly specific for the diagnosis of primary membranous glomerulonephritis and can be detected in the serum of up to 70%-80% of patients.\" [1]\n- \"The test is performed with the ELISA, EUROIMMUN kit based.\" [1]\n\n### 2. Anti-GBM Antibody Quantitation Test\n- \"The detection of circulating autoantibodies against glomerular basement membrane (GBM) is an important contribution to the diagnosis of anti-GBM, a progressive glomerulonephritis that often involves the lungs (then called Goodpasture syndrome).\" [1]\n- \"The test is performed with the ELISA, EUROIMMUN kit based.\" [1]\n\n### 3. Anti-Factor H Antibody Quantitation Test\n- \"Anti-factor H is used for the quantitative determination of IgG antibodies to the complement factor H in human serum for the diagnosis of atypical haemolytic-uraemic syndrome (HUS).\" [1]\n- \"The test is based on ELISA, Generic assay kit (GA).\" [1]\n\nAll three tests are performed on serum samples, with \"2ml - 4ml of blood...collected from the patient in Plain serum clotted blood tube.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What laboratory tests does the kidney disease department offer for autoimmune conditions?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.04089,
+  "tokens_in": 4950,
+  "citations": [
+   {
+    "section": "8jh9fv6bfi",
+    "page_start": 355,
+    "page_end": 356
+   },
+   {
+    "section": "8jhgt68t0k",
+    "page_start": 363,
+    "page_end": 363
+   },
+   {
+    "section": "8jhgu1l0um",
+    "page_start": 365,
+    "page_end": 367
+   },
+   {
+    "section": "8j9dvjfb2k",
+    "page_start": 155,
+    "page_end": 157
+   },
+   {
+    "section": "8jhjagecjk",
+    "page_start": 354,
+    "page_end": 354
+   },
+   {
+    "section": "8jiqa77t5f",
+    "page_start": 370,
+    "page_end": 370
+   },
+   {
+    "section": "8j1sqtfqne",
+    "page_start": 24,
+    "page_end": 25
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   }
+  ],
+  "context_chars": 16893,
+  "t_route": 0.56,
+  "t_retrieve": 1.47,
+  "t_first_token": 3.84,
+  "t_total": 8.03,
+  "grade": "correct",
+  "why": "The answer correctly lists the three autoimmune-related tests (Anti GBM, Anti PLA2R, Anti Factor H) with no contradictions, matching the gold answer’s key facts."
+ },
+ {
+  "id": "Q35",
+  "answer": "Based on the excerpts, there are two different weekly meetings where dialysis information is presented:\n\n1. **Wednesday meeting:** A \"dialysis/transplant review meeting is conducted in our department every Wednesday,\" where \"the dialysis statistics are presented at this meeting\" — no specific time is mentioned for this meeting. [2]\n\n2. **Saturday meeting:** The department meets \"on Saturdays at 9AM,\" where new patient details (including dialysis-related information) are presented. [1]\n\nThe specific time for the Wednesday dialysis meeting is **not provided in the wiki excerpts**.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What time is the weekly dialysis report presented to the nephrology department?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.040962,
+  "tokens_in": 6182,
+  "citations": [
+   {
+    "section": "8jl3t2la6l",
+    "page_start": 396,
+    "page_end": 396
+   },
+   {
+    "section": "8jicf70lmt",
+    "page_start": 378,
+    "page_end": 379
+   },
+   {
+    "section": "8j9dvjfb2k",
+    "page_start": 155,
+    "page_end": 157
+   },
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "8j2cank05f",
+    "page_start": 52,
+    "page_end": 54
+   },
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   },
+   {
+    "section": "8ji4ha5ptc",
+    "page_start": 373,
+    "page_end": 373
+   },
+   {
+    "section": "8jkgb0893d",
+    "page_start": 388,
+    "page_end": 391
+   }
+  ],
+  "context_chars": 21230,
+  "t_route": 0.15,
+  "t_retrieve": 1.6,
+  "t_first_token": 3.03,
+  "t_total": 4.82,
+  "grade": "wrong",
+  "why": "The system claims the Wednesday meeting time is not provided, contradicting the gold evidence that it is every Wednesday from 2-3pm."
+ },
+ {
+  "id": "Q36",
+  "answer": "Based on the excerpts, the Nephrology department uses the following drugs from the WHO pain ladder for non-nephrotoxic pain relief:\n\n- **Paracetamol** — as the first-line analgesic\n- **NSAIDs** — second step\n- **Weak Opioids** — specifically **propoxyphene**\n- **Strong Opioids** — specifically **Morphine**\n\nThese are described as \"non-nephrotoxic drugs as per the WHO pain ladder (Paracetamol. NSAID, weak Opioids like propoxyphene and strong opioid like Morphine)\" [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "WHO pain ladder drugs used in nephrology for non-nephrotoxic pain relief",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.046512,
+  "tokens_in": 6997,
+  "citations": [
+   {
+    "section": "8j7389coki",
+    "page_start": 122,
+    "page_end": 123
+   },
+   {
+    "section": "ro1abtn890",
+    "page_start": 81,
+    "page_end": 83
+   },
+   {
+    "section": "8j3endalmc",
+    "page_start": 73,
+    "page_end": 73
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "8j0jf5s54s",
+    "page_start": 14,
+    "page_end": 19
+   },
+   {
+    "section": "8j8adt1li1",
+    "page_start": 137,
+    "page_end": 138
+   },
+   {
+    "section": "8jh9fv6bfi",
+    "page_start": 355,
+    "page_end": 356
+   },
+   {
+    "section": "8j76pf1926",
+    "page_start": 129,
+    "page_end": 131
+   }
+  ],
+  "context_chars": 25841,
+  "t_route": 0.13,
+  "t_retrieve": 1.74,
+  "t_first_token": 3.19,
+  "t_total": 4.62,
+  "grade": "correct",
+  "why": "The system answer lists paracetamol, NSAIDs, weak opioids like propoxyphene, and strong opioids like morphine exactly as in the gold answer without contradiction."
+ },
+ {
+  "id": "Q37",
+  "answer": "Based on the excerpts, there are **two sets of BP targets** depending on donor age and clinical context:\n\n---\n\n### For Donors ≥ 50 Years (on antihypertensives, < 2 agents)\n\nUsing ABPM: \"24 hour average systolic BP < 130 mm Hg and average diastolic BP < 80 mm Hg\" must be achieved, along with no end organ damage, for the donor to be cleared. [1]\n\n---\n\n### For Donors ≥ 50 Years (general policy)\n\nThe donor evaluation policy states the donor \"can be accepted if the above are normal and if the hypertension is controlled (130/85 mm Hg) with one anti hypertensive agent in maximum dose.\" [2]\n\n---\n\n### Key Rejection Thresholds\n\n- Donors **< 50 years** who are hypertensive should be **rejected** — \"Donors < 50 years who are hypertensive\" are listed among those who should be rejected. [1]\n- Donors ≥ 50 years are also rejected if \"blood pressure is not controlled on maximal dose of a single antihypertensive (Generally we use Amlodipine to a maximum dose of 10 mg OD).\" [1]\n- Hypertensive donors ≥ 50 years **with end organ damage** must also be rejected. [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What blood pressure target should be achieved for a hypertensive kidney donor to be considered acceptable?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.059286,
+  "tokens_in": 8231,
+  "citations": [
+   {
+    "section": "8jf992jjir",
+    "page_start": 293,
+    "page_end": 297
+   },
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "8jev38f79j",
+    "page_start": 276,
+    "page_end": 277
+   },
+   {
+    "section": "8jfuemjbs7",
+    "page_start": 306,
+    "page_end": 309
+   },
+   {
+    "section": "8jccu9abql",
+    "page_start": 242,
+    "page_end": 246
+   },
+   {
+    "section": "8jf4m4d3us",
+    "page_start": 309,
+    "page_end": 311
+   },
+   {
+    "section": "8j7qulstcq",
+    "page_start": 127,
+    "page_end": 129
+   },
+   {
+    "section": "8jbp17hs59",
+    "page_start": 189,
+    "page_end": 190
+   }
+  ],
+  "context_chars": 27457,
+  "t_route": 0.15,
+  "t_retrieve": 1.31,
+  "t_first_token": 2.76,
+  "t_total": 8.83,
+  "grade": "partial",
+  "why": "It mentions the correct 130/85 mm Hg target but also introduces a different ABPM target (130/80) as an additional requirement, making the answer more complex and not directly aligned with the single target asked for."
+ },
+ {
+  "id": "Q38",
+  "answer": "Based on the protocol for initiating CAPD, on Day 3 the dwell time is **3–4 hours**.\n\nSpecifically: \"Infuse 800-1000ml of PD fluid, allow for 3-4 hours dwell\" [2].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the dwell time for PD fluid infusion on day 3 of the CAPD procedure?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.043482,
+  "tokens_in": 6927,
+  "citations": [
+   {
+    "section": "8jcaih8d98",
+    "page_start": 247,
+    "page_end": 248
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "8jb768qrt8",
+    "page_start": 204,
+    "page_end": 204
+   },
+   {
+    "section": "8jdhfhs732",
+    "page_start": 254,
+    "page_end": 257
+   },
+   {
+    "section": "8jc68b2u1h",
+    "page_start": 204,
+    "page_end": 205
+   },
+   {
+    "section": "8jco62h0q7",
+    "page_start": 249,
+    "page_end": 253
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   },
+   {
+    "section": "8jdt40an56",
+    "page_start": 270,
+    "page_end": 271
+   }
+  ],
+  "context_chars": 21140,
+  "t_route": 0.27,
+  "t_retrieve": 1.21,
+  "t_first_token": 3.13,
+  "t_total": 3.66,
+  "grade": "correct",
+  "why": "The system answer correctly states the dwell time as 3–4 hours, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q39",
+  "answer": "Based on the excerpts, investigations for patients waiting for deceased donor transplant must be performed **monthly**.\n\n- \"each patient should have a deceased donor kidney transplant workup sheet filled and updated on a monthly basis\" [2]\n- \"The patients on the list must have their relevant investigations done monthly failing which they cannot be considered as suitable candidates in the event of a cadaveric transplantation.\" [2]\n- \"Patients who are planned for transplantation surgery (both live-related and deceased donor transplant) must have the complete monthly investigations done every month.\" [4]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "how often are investigations performed for patients waiting for deceased donor transplant",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.055686,
+  "tokens_in": 8646,
+  "citations": [
+   {
+    "section": "8j2bsivrrb",
+    "page_start": 48,
+    "page_end": 52
+   },
+   {
+    "section": "8jbp17hs59",
+    "page_start": 189,
+    "page_end": 190
+   },
+   {
+    "section": "8jebrbqas5",
+    "page_start": 277,
+    "page_end": 279
+   },
+   {
+    "section": "8jabj72ljr",
+    "page_start": 180,
+    "page_end": 183
+   },
+   {
+    "section": "8j3q3t9oce",
+    "page_start": 74,
+    "page_end": 75
+   },
+   {
+    "section": "8jebqdfh4p",
+    "page_start": 275,
+    "page_end": 276
+   },
+   {
+    "section": "8j7udiv2eu",
+    "page_start": 131,
+    "page_end": 133
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   }
+  ],
+  "context_chars": 30630,
+  "t_route": 0.16,
+  "t_retrieve": 1.14,
+  "t_first_token": 3.46,
+  "t_total": 5.48,
+  "grade": "wrong",
+  "why": "The system answer says investigations are done monthly, while the gold answer specifies every 3 months, so it directly contradicts the key fact."
+ },
+ {
+  "id": "Q40",
+  "answer": "Based on the excerpts, the total duration of immunosuppressive therapy for vasculitis is **2 years**.\n\nSpecifically: \"Cyclophosphamides continues at starting dose for 3 to 6 months till disease free and then switch to azathioprine 2 mg/ Kg per day – therapy should continue for a total of 2 years.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How long should immunosuppressive treatment be continued after switching from cyclophosphamide to azathioprine for vasculitis?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.052302,
+  "tokens_in": 8277,
+  "citations": [
+   {
+    "section": "8j8q97k3a8",
+    "page_start": 140,
+    "page_end": 141
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "8jf4m4d3us",
+    "page_start": 309,
+    "page_end": 311
+   },
+   {
+    "section": "8j8msv1r7m",
+    "page_start": 138,
+    "page_end": 140
+   },
+   {
+    "section": "8je68lg2t3",
+    "page_start": 283,
+    "page_end": 287
+   },
+   {
+    "section": "8j8adt1li1",
+    "page_start": 137,
+    "page_end": 138
+   },
+   {
+    "section": "8jco62h0q7",
+    "page_start": 249,
+    "page_end": 253
+   },
+   {
+    "section": "8jfpi0nk4d",
+    "page_start": 316,
+    "page_end": 319
+   }
+  ],
+  "context_chars": 24683,
+  "t_route": 0.26,
+  "t_retrieve": 1.46,
+  "t_first_token": 3.88,
+  "t_total": 4.93,
+  "grade": "correct",
+  "why": "The system answer correctly states that immunosuppressive therapy should continue for a total of 2 years after switching to azathioprine."
+ },
+ {
+  "id": "Q41",
+  "answer": "Based on the excerpts, patient privacy during labor and delivery is maintained through the following measures:\n\n- **Screened cubicles** are provided in the labour ward for labouring patients, and \"the delivery is conducted ensuring full privacy, in the presence of one female relative\" [3].\n\n- **Single rooms** are available in the labour ward \"where the husband/ 2 female relatives can be with the patient during her labour and delivery\" [3].\n\n- Patients have the right to **request a female doctor**: \"Patients can request to be seen only by a female doctor in the outpatient or delivery suite. If the patient developed any complications requiring expert care, this request becomes invalid\" [3].\n\n- Patients also have the right to **refuse examination** in the presence of students or male doctors: \"Patients have the right to refuse examination by or in the presence of students or male doctors\" [3].\n\n- **Confidentiality of sensitive information** is protected, as \"sensitive information like diagnosis of cancer, or sero-positivity are not divulged without patient consent\" [3].\n\n- Nursing staff are required to \"maintain confidentiality in all matters related to the patient, patient's family and other staff\" [8].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How is patient privacy maintained during labor and delivery at the hospital?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.044034,
+  "tokens_in": 5979,
+  "citations": [
+   {
+    "section": "8jik1cgug8",
+    "page_start": 371,
+    "page_end": 371
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "ro4ld05rvm",
+    "page_start": 161,
+    "page_end": 164
+   },
+   {
+    "section": "8jl0hf26gp",
+    "page_start": 394,
+    "page_end": 396
+   },
+   {
+    "section": "8jkp0anj1u",
+    "page_start": 392,
+    "page_end": 392
+   },
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "ro4v13vchd",
+    "page_start": 140,
+    "page_end": 143
+   },
+   {
+    "section": "rnvje6421b",
+    "page_start": 26,
+    "page_end": 28
+   }
+  ],
+  "context_chars": 21185,
+  "t_route": 0.23,
+  "t_retrieve": 1.52,
+  "t_first_token": 3.07,
+  "t_total": 6.71,
+  "grade": "partial",
+  "why": "The answer correctly mentions screened cubicles, full privacy with one female relative, and single rooms where husband or two female relatives can be present, but adds several extra privacy-related points (female doctor requests, refusal of students, confidentiality of diagnoses) that go beyond the specific scope of labor and delivery in the gold answer."
+ },
+ {
+  "id": "Q42",
+  "answer": "The Ida Sophia Scudder Centenary Endowment Fund covers **up to Rs. 1,00,000 per patient**.\n\nThis is confirmed by both departments' policy documents:\n\n- In Nephrology: \"The fund covers up to Rs.1, 00,000/- for a patient and is meant for those as per institutional policy.\" [1]\n- In Obstetrics and Gynaecology: \"The fund covers up to Rs.1, 00,000/- for a patient and is meant for those residing in Vellore District.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the maximum amount covered per patient by the Ida Sophia Scudder Centenary Endowment Fund?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.06582,
+  "tokens_in": 10295,
+  "citations": [
+   {
+    "section": "8j6mauv1sh",
+    "page_start": 117,
+    "page_end": 121
+   },
+   {
+    "section": "ro1cc2lp5p",
+    "page_start": 75,
+    "page_end": 80
+   },
+   {
+    "section": "8j0qud4e5s",
+    "page_start": 11,
+    "page_end": 13
+   },
+   {
+    "section": "rnunki7k19",
+    "page_start": 7,
+    "page_end": 11
+   },
+   {
+    "section": "8j1sqtfqne",
+    "page_start": 24,
+    "page_end": 25
+   },
+   {
+    "section": "rnvbbgm6bb",
+    "page_start": 16,
+    "page_end": 19
+   },
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8j7qulstcq",
+    "page_start": 127,
+    "page_end": 129
+   }
+  ],
+  "context_chars": 38644,
+  "t_route": 0.17,
+  "t_retrieve": 1.36,
+  "t_first_token": 3.72,
+  "t_total": 5.1,
+  "grade": "correct",
+  "why": "The system answer gives the exact maximum coverage amount of Rs.1,00,000 per patient, matching the gold answer with no contradictions."
+ },
+ {
+  "id": "Q43",
+  "answer": "Based on the excerpts, the required post anaesthetic score before transferring a patient from the recovery room to the ward is **10**.\n\n\"Before transferring the patient to the ward consultant has to ensure that the post anaesthetic score is 10.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "post anaesthetic score required before transferring patient from recovery room to ward",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05841,
+  "tokens_in": 9445,
+  "citations": [
+   {
+    "section": "ro0ubc0ccd",
+    "page_start": 64,
+    "page_end": 67
+   },
+   {
+    "section": "ro055tkkbf",
+    "page_start": 62,
+    "page_end": 63
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "8j58hp2msb",
+    "page_start": 114,
+    "page_end": 116
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8j6205f2s6",
+    "page_start": 116,
+    "page_end": 117
+   },
+   {
+    "section": "ro0s33ntn5",
+    "page_start": 53,
+    "page_end": 54
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   }
+  ],
+  "context_chars": 33557,
+  "t_route": 0.67,
+  "t_retrieve": 1.49,
+  "t_first_token": 3.51,
+  "t_total": 4.12,
+  "grade": "correct",
+  "why": "The system answer correctly identifies that a post anaesthetic score of 10 is required before transferring the patient from recovery to the ward."
+ },
+ {
+  "id": "Q44",
+  "answer": "Based on the excerpts, the staff technician (who handles ultrasound scanning) is responsible for ordering the following supplies:\n\n**Consumables/Disposables:**\n- Tissue rolls and registers — \"Responsible for indenting items such as Tissue rolls, registers\" [5]\n- Jelly bottles — \"Jelly bottles\" [5]\n- Glove boxes — \"Glove boxes\" [5]\n\n**Equipment/Procedure Supplies (via purchase orders):**\n- Fetal chart papers — \"Responsible for placing purchase orders for Fetal chart papers\" [5]\n- Spiral electrodes — \"Spiral electrodes\" [5]\n- Condoms for use with transvaginal probes — \"Condoms for use with trans vaginal probes\" [5]\n- Form G books (to be supplied to labour room, wards and scan room) — \"Form G books and the same to supplied to labour room, wards and scan room\" [5]\n\nThe staff technician is also responsible for coordinating these orders: \"To co-ordinate with purchase department, central receiving stores and suppliers for the same.\" [5]\n\nThat is a total of **7 categories of supplies** listed in the excerpts for this role.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What supplies does the ultrasound technician need to order for the department?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.065982,
+  "tokens_in": 9582,
+  "citations": [
+   {
+    "section": "rnvfq78dtc",
+    "page_start": 22,
+    "page_end": 26
+   },
+   {
+    "section": "8jdpt6j0l1",
+    "page_start": 264,
+    "page_end": 267
+   },
+   {
+    "section": "rnvjbf1hc9",
+    "page_start": 28,
+    "page_end": 31
+   },
+   {
+    "section": "8j3brq0vei",
+    "page_start": 85,
+    "page_end": 90
+   },
+   {
+    "section": "rnvcl1vnvv",
+    "page_start": 32,
+    "page_end": 36
+   },
+   {
+    "section": "8jhaa3tm70",
+    "page_start": 368,
+    "page_end": 369
+   },
+   {
+    "section": "ro00rtbc33",
+    "page_start": 59,
+    "page_end": 60
+   },
+   {
+    "section": "8ja2evd88h",
+    "page_start": 157,
+    "page_end": 160
+   }
+  ],
+  "context_chars": 34141,
+  "t_route": 0.31,
+  "t_retrieve": 1.44,
+  "t_first_token": 3.12,
+  "t_total": 6.83,
+  "grade": "correct",
+  "why": "Lists all the required supplies exactly as in the gold answer, with no contradictions."
+ },
+ {
+  "id": "Q45",
+  "answer": "The excerpts do not contain information specifying how many weeks after delivery obstetrics continues to monitor the mother. The postnatal care sections in the excerpts only address immediate postpartum monitoring (such as vital signs until transfer to the postnatal ward) and short-term inpatient care, but no specific duration of postpartum follow-up in weeks is mentioned.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many weeks after delivery does obstetrics continue to monitor the mother?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.049188,
+  "tokens_in": 7788,
+  "citations": [
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "ro27v5dlq9",
+    "page_start": 100,
+    "page_end": 103
+   },
+   {
+    "section": "ro4inamd8n",
+    "page_start": 148,
+    "page_end": 152
+   },
+   {
+    "section": "ro4v13vchd",
+    "page_start": 140,
+    "page_end": 143
+   },
+   {
+    "section": "ro21e6bo2n",
+    "page_start": 91,
+    "page_end": 91
+   },
+   {
+    "section": "ro2th5kgcq",
+    "page_start": 96,
+    "page_end": 98
+   },
+   {
+    "section": "ro2jsnonjq",
+    "page_start": 104,
+    "page_end": 104
+   }
+  ],
+  "context_chars": 23762,
+  "t_route": 0.29,
+  "t_retrieve": 1.33,
+  "t_first_token": 3.38,
+  "t_total": 4.43,
+  "grade": "wrong",
+  "why": "The system refused to answer despite the gold specifying a clear fact that obstetrics monitors the mother for the first 6 weeks after delivery."
+ },
+ {
+  "id": "Q46",
+  "answer": "Based on the excerpts, the protocol for steroid administration in placenta previa with mild to moderate bleeding (or resolving bleeding) is straightforward:\n\n> \"Steroids 2 doses are given if the gestation is < 36 weeks\" [1]\n\nThis is part of the **Expectant Management (Macafee Johnson regime)** for mild to moderate or resolving bleeding in placenta previa. [1]\n\nNo further details about the specific steroid drug, dose, or route are provided in the excerpts.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "steroids doses placenta previa less than 36 weeks",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05592,
+  "tokens_in": 8720,
+  "citations": [
+   {
+    "section": "ro4v13vchd",
+    "page_start": 140,
+    "page_end": 143
+   },
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "ro23kgls3r",
+    "page_start": 106,
+    "page_end": 109
+   },
+   {
+    "section": "8j8adt1li1",
+    "page_start": 137,
+    "page_end": 138
+   },
+   {
+    "section": "ro4inamd8n",
+    "page_start": 148,
+    "page_end": 152
+   },
+   {
+    "section": "rnu710gfg5",
+    "page_start": 5,
+    "page_end": 6
+   },
+   {
+    "section": "ro22u3naqi",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "8j8q97k3a8",
+    "page_start": 140,
+    "page_end": 141
+   }
+  ],
+  "context_chars": 24927,
+  "t_route": 0.23,
+  "t_retrieve": 1.43,
+  "t_first_token": 3.12,
+  "t_total": 4.72,
+  "grade": "correct",
+  "why": "The system answer clearly states that 2 doses of steroids are given if gestation is less than 36 weeks, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q47",
+  "answer": "Based on the excerpts, in the Obstetrics and Gynaecology department's outpatient setting:\n\n- **Doctors** perform the physical examinations. \"A physical examination of the patient is followed\" as part of the doctor's assessment, and \"The initial assessment is done by the Doctor.\" [1]\n\n- **Clinical Assistants are explicitly excluded** from performing examinations: \"Clinical Assistants are facilitators and are not permitted to examine the patients.\" [1]\n\n- Clinical Assistants may only take history: \"Detail history is taken and documented by clinical assistants.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "Who is allowed to perform physical examinations on outpatients in the obstetrics department?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05487,
+  "tokens_in": 8475,
+  "citations": [
+   {
+    "section": "ro0agichl7",
+    "page_start": 48,
+    "page_end": 50
+   },
+   {
+    "section": "8j6vu8u8ii",
+    "page_start": 122,
+    "page_end": 122
+   },
+   {
+    "section": "ro560ttn60",
+    "page_start": 176,
+    "page_end": 176
+   },
+   {
+    "section": "rnunki7k19",
+    "page_start": 7,
+    "page_end": 11
+   },
+   {
+    "section": "ro4ld05rvm",
+    "page_start": 161,
+    "page_end": 164
+   },
+   {
+    "section": "rnvfq78dtc",
+    "page_start": 22,
+    "page_end": 26
+   },
+   {
+    "section": "8j24id7jbg",
+    "page_start": 40,
+    "page_end": 44
+   },
+   {
+    "section": "rnvcl1vnvv",
+    "page_start": 32,
+    "page_end": 36
+   }
+  ],
+  "context_chars": 30688,
+  "t_route": 0.25,
+  "t_retrieve": 1.67,
+  "t_first_token": 4.4,
+  "t_total": 6.21,
+  "grade": "correct",
+  "why": "It correctly states that only doctors perform physical examinations and that clinical assistants are not permitted to examine patients."
+ },
+ {
+  "id": "Q48",
+  "answer": "Based on the excerpts, nurses and doctors must retrain in CPR techniques **once every two years**.\n\nThis is stated in two places:\n\n- In Obstetrics and Gynaecology: \"Nurses and doctors are trained in CPR techniques and retrain once in two years by attending the CPR classes conducted by the institution\" [1]\n- In the Cardiac Arrest policy: \"Staff are sent once every two years for resuscitation training\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How often must nurses and doctors retrain in CPR techniques at the institution?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.096792,
+  "tokens_in": 15602,
+  "citations": [
+   {
+    "section": "ro0kaq08bk",
+    "page_start": 50,
+    "page_end": 51
+   },
+   {
+    "section": "8jcabe3jae",
+    "page_start": 227,
+    "page_end": 232
+   },
+   {
+    "section": "8jkgb0893d",
+    "page_start": 388,
+    "page_end": 391
+   },
+   {
+    "section": "8j70phnt42",
+    "page_start": 126,
+    "page_end": 127
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8j76pf1926",
+    "page_start": 129,
+    "page_end": 131
+   },
+   {
+    "section": "8j2ahn9del",
+    "page_start": 57,
+    "page_end": 73
+   },
+   {
+    "section": "8j9qvoijio",
+    "page_start": 151,
+    "page_end": 155
+   }
+  ],
+  "context_chars": 57495,
+  "t_route": 0.25,
+  "t_retrieve": 1.45,
+  "t_first_token": 3.34,
+  "t_total": 4.76,
+  "grade": "correct",
+  "why": "The system answer matches the gold answer exactly, stating that nurses and doctors retrain in CPR techniques once every two years with no contradictions."
+ },
+ {
+  "id": "Q49",
+  "answer": "## Magnesium Sulphate Loading Dose for Pre-eclampsia/Eclampsia\n\n### Continuous IV Infusion\n- \"Give loading dose of 4 g of 20% magnesium sulphate solution IV slowly over 5 - 10 min.\" [2]\n- If convulsions recur after more than 15 minutes: \"give 2 g magnesium sulphate (20%) IV slowly over 5 min.\" [2]\n- This is followed by: \"Give maintenance dose IV Mag Sulph 1 gm / hour if infusion pump is available.\" [2]\n\n### Intermittent IM Route (alternative)\n- \"Follow loading dose promptly with 8 g of 50% magnesium sulphate solution IM: 4 g in each buttock as deep IM injections with 1 mL of 2% lignocaine in the same syringe.\" [2]\n\n### Eclampsia Drill Preparation (Loading Dose)\n- Loading dose preparation: \"50% MgSO4 2 amps (4ml)+16ml NS or in 100ml NS.\" [4]\n\n### Prophylaxis in Severe Pre-eclampsia\n- \"Use magnesium sulphate for prophylaxis in all cases of severe preeclampsia, severe gestational hypertension and chronic hypertensives with superimposed severe preeclampsia, irrespective of symptoms.\" [2]\n- \"Use the same dosage as for eclampsia.\" [2]\n\n### Monitoring — Withhold if Any of the Following:\n- \"Respiratory rate falls below 16/min\" [2]\n- \"Patellar reflexes are absent\" [2]\n- \"Urinary output falls below 30 mL/hr over preceding 4 hr.\" [2]\n\n### Overdose/Toxicity Treatment\n- \"Give calcium gluconate 1 g (10 ml of 10% solution) IV slowly until respiration begins.\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "magnesium sulphate loading dose preeclampsia",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.077142,
+  "tokens_in": 10497,
+  "citations": [
+   {
+    "section": "ro3cpof264",
+    "page_start": 120,
+    "page_end": 124
+   },
+   {
+    "section": "ro27v5dlq9",
+    "page_start": 100,
+    "page_end": 103
+   },
+   {
+    "section": "rnu710gfg5",
+    "page_start": 5,
+    "page_end": 6
+   },
+   {
+    "section": "ro3p7be0fi",
+    "page_start": 125,
+    "page_end": 129
+   },
+   {
+    "section": "ro3jljfp96",
+    "page_start": 116,
+    "page_end": 116
+   },
+   {
+    "section": "8j8msv1r7m",
+    "page_start": 138,
+    "page_end": 140
+   },
+   {
+    "section": "8j8q97k3a8",
+    "page_start": 140,
+    "page_end": 141
+   },
+   {
+    "section": "8ja9licf3p",
+    "page_start": 175,
+    "page_end": 180
+   }
+  ],
+  "context_chars": 30050,
+  "t_route": 0.41,
+  "t_retrieve": 1.43,
+  "t_first_token": 3.93,
+  "t_total": 9.67,
+  "grade": "wrong",
+  "why": "The system answer gives a different loading dose schedule (4 g over 5–10 minutes and various alternatives) and does not state the specific regimen of 4 g in 100 ml normal saline over 20 minutes."
+ },
+ {
+  "id": "Q50",
+  "answer": "Based on the excerpts, both the Nephrology and Obstetrics & Gynaecology HOD job descriptions address staff welfare activities the department head should oversee and approve:\n\n- **Training programmes** – the HOD should \"Approve and oversee the activities promoting staff welfare – Training programmes, Picnics, retreat etc.\" [2][4]\n- **Picnics** – included in the same staff welfare activities requiring HOD approval [2][4]\n- **Retreats** – also listed among the welfare activities to be approved and overseen [2][4]\n- **Departmental social functions** – the HOD should \"Organise functions in the department- Christmas, farewells etc.\" [2][4]\n- **Personal development plans** – the HOD should \"Go through the personal development plans of the team members and help them achieve goals.\" [2][4]\n- **Stress and grievance provisions** – at the unit management level, the job description calls for providing \"avenues to address staff grievances and create opportunities for stress debrief.\" [1]\n- **Positive working environment** – management responsibilities include the need to \"Promote and ensure a positive working environment.\" [1]\n- **Staff counselling** – the management role includes the responsibility to \"Counsel nursing staff as required.\" [1]\n\nIn summary, the HOD is expected to approve and oversee training programmes, recreational activities (picnics, retreats), social functions, and personal development, while also ensuring grievance channels, stress debriefs, and a positive work environment are maintained.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What types of staff welfare activities should a department head oversee and approve?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.080784,
+  "tokens_in": 11709,
+  "citations": [
+   {
+    "section": "8j2o4m991m",
+    "page_start": 56,
+    "page_end": 57
+   },
+   {
+    "section": "8j1brk1e5n",
+    "page_start": 33,
+    "page_end": 38
+   },
+   {
+    "section": "rnvfcn9gk6",
+    "page_start": 19,
+    "page_end": 21
+   },
+   {
+    "section": "rnvbbgm6bb",
+    "page_start": 16,
+    "page_end": 19
+   },
+   {
+    "section": "8j3v81jr0u",
+    "page_start": 82,
+    "page_end": 85
+   },
+   {
+    "section": "8j2ahn9del",
+    "page_start": 57,
+    "page_end": 73
+   },
+   {
+    "section": "8j2mdksnev",
+    "page_start": 38,
+    "page_end": 40
+   },
+   {
+    "section": "8j1jc7ftcg",
+    "page_start": 26,
+    "page_end": 28
+   }
+  ],
+  "context_chars": 47519,
+  "t_route": 0.34,
+  "t_retrieve": 1.22,
+  "t_first_token": 3.74,
+  "t_total": 7.98,
+  "grade": "partial",
+  "why": "The answer correctly includes training programmes, picnics, and retreats but adds several extra welfare-related responsibilities that are not asked for and go beyond the specific types of activities in the gold answer."
+ },
+ {
+  "id": "Q51",
+  "answer": "The provided excerpts do not contain a dedicated protocol or list specifically addressing \"danger signs of labour\" that pregnant women should watch for as patient education material.\n\nThe excerpts do, however, touch on a few related monitoring points in clinical contexts:\n\n- Women with placenta previa are educated \"regarding the importance of bleeding per vagina, avoidance of intercourse, and to report to labour room at the earliest if bleeding per vagina\" [5].\n- In the labour room, \"if the patient is in labour, she is monitored for maternal and fetal conditions every 15 minutes\" and \"the progress is assessed\" [3].\n- Regarding fetal heart rate, \"vaginal examination may be done earlier if there are significant fetal heart rate abnormalities\" [4].\n\nHowever, a comprehensive list of danger signs of labour for patient education is **not covered in the available excerpts**.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What are the danger signs of labour that pregnant women should watch for?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.056364,
+  "tokens_in": 8419,
+  "citations": [
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "ro22u3naqi",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "ro380vpbd8",
+    "page_start": 115,
+    "page_end": 115
+   },
+   {
+    "section": "ro4v13vchd",
+    "page_start": 140,
+    "page_end": 143
+   },
+   {
+    "section": "ro3cpof264",
+    "page_start": 120,
+    "page_end": 124
+   },
+   {
+    "section": "ro2u0c2tou",
+    "page_start": 109,
+    "page_end": 111
+   },
+   {
+    "section": "ro2th5kgcq",
+    "page_start": 96,
+    "page_end": 98
+   }
+  ],
+  "context_chars": 26118,
+  "t_route": 0.32,
+  "t_retrieve": 1.42,
+  "t_first_token": 3.02,
+  "t_total": 6.24,
+  "grade": "wrong",
+  "why": "The system incorrectly claimed the information was not covered, missing the specific danger signs: vaginal bleeding, foul smelling discharge, and fluid from vagina."
+ },
+ {
+  "id": "Q52",
+  "answer": "## Circulatory Nurse Pre-Surgical Duties\n\nBased on the excerpts, the circulating nurse has two pre-surgical duties:\n\n1. **Equipment preparation** – \"Before a procedure, the circulating nurse ensures that all the necessary equipments, instruments and supplies are readily available.\" [1]\n\n2. **Assisting with sterile attire** – \"They also assist the surgical team in scrubbing and donning sterile gowns and gloves.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "circulatory nurse pre surgical duties",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.058128,
+  "tokens_in": 9143,
+  "citations": [
+   {
+    "section": "rnvjbf1hc9",
+    "page_start": 28,
+    "page_end": 31
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8jces2rldu",
+    "page_start": 205,
+    "page_end": 210
+   },
+   {
+    "section": "ro0q1gg5ng",
+    "page_start": 51,
+    "page_end": 52
+   },
+   {
+    "section": "ro055tkkbf",
+    "page_start": 62,
+    "page_end": 63
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "8j58hp2msb",
+    "page_start": 114,
+    "page_end": 116
+   }
+  ],
+  "context_chars": 31376,
+  "t_route": 0.26,
+  "t_retrieve": 1.52,
+  "t_first_token": 3.16,
+  "t_total": 4.48,
+  "grade": "correct",
+  "why": "The system answer includes both key facts from the gold answer: ensuring equipment/supplies are available and assisting the team with scrubbing and donning sterile gowns and gloves, without contradiction."
+ },
+ {
+  "id": "Q53",
+  "answer": "Based on the excerpts, the answer differs by department:\n\n- **Obstetrics and Gynaecology:** \"the patient can get their medical report within 7 days of request\" [1]\n- **Nephrology:** \"This report will be issued for patients on the same OP day or the next day\" [2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How long does it take to receive a medical report after requesting one?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.042606,
+  "tokens_in": 6716,
+  "citations": [
+   {
+    "section": "ro06gl4mfb",
+    "page_start": 61,
+    "page_end": 62
+   },
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "8jco62h0q7",
+    "page_start": 249,
+    "page_end": 253
+   },
+   {
+    "section": "ro0n22q4f3",
+    "page_start": 53,
+    "page_end": 53
+   },
+   {
+    "section": "8j44etmejd",
+    "page_start": 103,
+    "page_end": 105
+   },
+   {
+    "section": "ro0q1gg5ng",
+    "page_start": 51,
+    "page_end": 52
+   },
+   {
+    "section": "ro0s33ntn5",
+    "page_start": 53,
+    "page_end": 54
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   }
+  ],
+  "context_chars": 22702,
+  "t_route": 0.31,
+  "t_retrieve": 1.69,
+  "t_first_token": 3.29,
+  "t_total": 4.44,
+  "grade": "partial",
+  "why": "Mentions the 7-day timeframe but adds another conflicting timeframe instead of giving the single gold answer of within 7 days of request."
+ },
+ {
+  "id": "Q54",
+  "answer": "Based on the excerpts, there are **differing fees** depending on the department:\n\n- **Obstetrics and Gynaecology**: \"The fee for repeat registration i.e. Rs.100 for general patients and Rs.600 for the private patients is paid at the MCTT counters.\" [1]\n\n- **Nephrology (within 90 days / repeat consultation)**: \"The appointment can be sought by paying Rs. 350 (private) or Rs 140 (general) at the MCTT counter.\" [3]\n\n- **Nephrology (beyond 90 days / follow-up consultation)**: \"the tariff is Rs. 800/- for private consultation whereas for general consultation it is the same Rs. 140/-.\" [3]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the repeat registration fee for private patients at the MCTT counter?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.042324,
+  "tokens_in": 6179,
+  "citations": [
+   {
+    "section": "rnvk2djlhe",
+    "page_start": 43,
+    "page_end": 43
+   },
+   {
+    "section": "rnvnpsk9sj",
+    "page_start": 41,
+    "page_end": 41
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "rnv664b6lo",
+    "page_start": 41,
+    "page_end": 42
+   },
+   {
+    "section": "8jl0hf26gp",
+    "page_start": 394,
+    "page_end": 396
+   },
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8j51p1no0u",
+    "page_start": 111,
+    "page_end": 112
+   },
+   {
+    "section": "8j4letm454",
+    "page_start": 97,
+    "page_end": 98
+   }
+  ],
+  "context_chars": 22126,
+  "t_route": 0.31,
+  "t_retrieve": 1.47,
+  "t_first_token": 3.62,
+  "t_total": 5.82,
+  "grade": "correct",
+  "why": "It explicitly states that the repeat registration fee for private patients at the MCTT counter is Rs.600, matching the gold answer."
+ },
+ {
+  "id": "Q55",
+  "answer": "Based on the excerpts, the admission registrar sees the patient **within 5–15 minutes**.\n\nSpecifically, \"the admission registrar sees the patient in 5-15minutes and informs the senior registrar posted in the labour room\" [1].\n\nThis refers to the labour ward (IP) setting. The excerpts do not provide a specific timeframe for the admission registrar seeing patients in other ward settings.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "how long does the admission registrar take to see a patient",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.044628,
+  "tokens_in": 6973,
+  "citations": [
+   {
+    "section": "ro0agichl7",
+    "page_start": 48,
+    "page_end": 50
+   },
+   {
+    "section": "ro0q1gg5ng",
+    "page_start": 51,
+    "page_end": 52
+   },
+   {
+    "section": "8j8qj5nrsm",
+    "page_start": 141,
+    "page_end": 143
+   },
+   {
+    "section": "8j4t34fu2o",
+    "page_start": 107,
+    "page_end": 108
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "8j24id7jbg",
+    "page_start": 40,
+    "page_end": 44
+   },
+   {
+    "section": "8jebrbqas5",
+    "page_start": 277,
+    "page_end": 279
+   },
+   {
+    "section": "8j5jg88467",
+    "page_start": 112,
+    "page_end": 114
+   }
+  ],
+  "context_chars": 25764,
+  "t_route": 0.31,
+  "t_retrieve": 1.48,
+  "t_first_token": 3.12,
+  "t_total": 4.48,
+  "grade": "correct",
+  "why": "The system answer gives the correct timeframe of 5–15 minutes with no contradictions."
+ },
+ {
+  "id": "Q56",
+  "answer": "## Immediate Action for Eye Exposure to Blood/Body Fluids at Work\n\nThe eyes should be properly flooded or irrigated with water immediately after exposure.\n\nSpecifically, according to the OR safety precautions:\n\n- **Irrigate the eyes**: \"If splashed in the eyes mouth or nose have them properly flooded or irrigated with water.\" [1]\n\n- **Report promptly**: \"Notify supervisor as soon as possible.\" [1]\n\n- **Seek medical attention**: \"Report to staff student health services especially in case of needle stick injury.\" [1]\n\nFor **mucosal exposure** more broadly, the needle stick injury procedure specifies: \"For mucosal exposure, irrigate copiously by running normal saline.\" [2]\n\nAfter the immediate first aid, during working hours (8:00–4:30), \"Report to the Staff Student Health Services (SSHS) immediately during work hours.\" [2] Outside those hours, \"After work hours report in person to the casualty to be seen by the duty SSHS doctor.\" [3]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What should be done immediately after getting blood or body fluids in the eyes at work?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.059094,
+  "tokens_in": 8669,
+  "citations": [
+   {
+    "section": "ro5m869bbp",
+    "page_start": 170,
+    "page_end": 173
+   },
+   {
+    "section": "ro18d2c4tg",
+    "page_start": 84,
+    "page_end": 84
+   },
+   {
+    "section": "8j8bldnp04",
+    "page_start": 134,
+    "page_end": 136
+   },
+   {
+    "section": "8jbf65p71c",
+    "page_start": 187,
+    "page_end": 188
+   },
+   {
+    "section": "8j9qvoijio",
+    "page_start": 151,
+    "page_end": 155
+   },
+   {
+    "section": "8j76pf1926",
+    "page_start": 129,
+    "page_end": 131
+   },
+   {
+    "section": "ro2mim307v",
+    "page_start": 98,
+    "page_end": 99
+   },
+   {
+    "section": "8jebrbqas5",
+    "page_start": 277,
+    "page_end": 279
+   }
+  ],
+  "context_chars": 31812,
+  "t_route": 0.24,
+  "t_retrieve": 1.58,
+  "t_first_token": 3.55,
+  "t_total": 6.74,
+  "grade": "correct",
+  "why": "The system answer clearly states that the eyes should be properly flooded or irrigated with water immediately after exposure, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q57",
+  "answer": "Based on the excerpts, for magnesium sulphate overdose treatment:\n\n**Calcium gluconate 1 gram (10 ml of 10% solution) should be given slowly via the IV route over 10 minutes.** [1]\n\nThis is noted with an important caveat: \"Signs and symptoms of toxicity can recur after administration of calcium gluconate.\" [1]\n\nThis same dose is also referenced in the obstetric protocol for eclampsia, where in case of respiratory arrest, the guidance is to \"Give calcium gluconate 1 g (10 ml of 10% solution) IV slowly until respiration begins.\" [3]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What dose of calcium gluconate should be given for magnesium sulfate overdose treatment?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.071298,
+  "tokens_in": 11153,
+  "citations": [
+   {
+    "section": "ro3cpof264",
+    "page_start": 120,
+    "page_end": 124
+   },
+   {
+    "section": "8jf4m4d3us",
+    "page_start": 309,
+    "page_end": 311
+   },
+   {
+    "section": "ro27v5dlq9",
+    "page_start": 100,
+    "page_end": 103
+   },
+   {
+    "section": "8j8msv1r7m",
+    "page_start": 138,
+    "page_end": 140
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "ro3qjvc4ln",
+    "page_start": 135,
+    "page_end": 136
+   },
+   {
+    "section": "8j8q97k3a8",
+    "page_start": 140,
+    "page_end": 141
+   },
+   {
+    "section": "8ja9licf3p",
+    "page_start": 175,
+    "page_end": 180
+   }
+  ],
+  "context_chars": 33963,
+  "t_route": 0.33,
+  "t_retrieve": 1.14,
+  "t_first_token": 2.76,
+  "t_total": 4.64,
+  "grade": "correct",
+  "why": "The system answer exactly matches the gold answer dose, route, concentration, and duration with no contradictions."
+ },
+ {
+  "id": "Q58",
+  "answer": "Based on the excerpts, here is the protocol for vaginal examination intervals in active labour:\n\n- **Active labour is defined** as \"the stage of labour when the cervix is fully effaced and at least 4 cm dilated.\" [1]\n\n- **Repeat interval in active labour:** \"Vaginal examination should be repeated after 4 hours if the woman is in active labour at the initial assessment.\" [1]\n\n- **If induced:** \"after 6 hours if the patient is being induced.\" [1]\n\n- **Earlier examination may be warranted** if \"there are significant fetal heart rate abnormalities.\" [1]\n\n- For comparison, in the **latent phase or false labour**, \"Repeat vaginal examination after 6 hours if woman is in latent phase of labour or in false labour is not warranted.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "vaginal examination interval active labour",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.046164,
+  "tokens_in": 6744,
+  "citations": [
+   {
+    "section": "ro380vpbd8",
+    "page_start": 115,
+    "page_end": 115
+   },
+   {
+    "section": "ro4v13vchd",
+    "page_start": 140,
+    "page_end": 143
+   },
+   {
+    "section": "ro197m28nq",
+    "page_start": 89,
+    "page_end": 90
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "rnuf1mfugt",
+    "page_start": 12,
+    "page_end": 16
+   },
+   {
+    "section": "rnu710gfg5",
+    "page_start": 5,
+    "page_end": 6
+   },
+   {
+    "section": "ro3jljfp96",
+    "page_start": 116,
+    "page_end": 116
+   }
+  ],
+  "context_chars": 18377,
+  "t_route": 0.57,
+  "t_retrieve": 1.55,
+  "t_first_token": 4.13,
+  "t_total": 6.23,
+  "grade": "correct",
+  "why": "The system answer correctly identifies that vaginal examination in active labour should be repeated after 4 hours, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q59",
+  "answer": "Based on the excerpts, patients who have been given a date for surgery after many weeks \"should be contacted 1 week before surgery to confirm operation.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How far in advance should patients be contacted to confirm their scheduled gynecological surgery?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05958,
+  "tokens_in": 9740,
+  "citations": [
+   {
+    "section": "ro4kj59nfm",
+    "page_start": 152,
+    "page_end": 155
+   },
+   {
+    "section": "rnvfq78dtc",
+    "page_start": 22,
+    "page_end": 26
+   },
+   {
+    "section": "8jebrbqas5",
+    "page_start": 277,
+    "page_end": 279
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "ro0q1gg5ng",
+    "page_start": 51,
+    "page_end": 52
+   },
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "ro0n22q4f3",
+    "page_start": 53,
+    "page_end": 53
+   }
+  ],
+  "context_chars": 34227,
+  "t_route": 0.33,
+  "t_retrieve": 1.55,
+  "t_first_token": 3.13,
+  "t_total": 3.81,
+  "grade": "correct",
+  "why": "The system answer correctly states that patients should be contacted 1 week before surgery to confirm the operation."
+ },
+ {
+  "id": "Q60",
+  "answer": "20 minutes of contact time is required.\n\nAs stated in the OR precautions: \"The disinfectant has a 20 minute contact time and the area cleaned with Lysol.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many minutes of contact time is required for the bactericidal disinfectant when cleaning blood spills in the operating room?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.070578,
+  "tokens_in": 11518,
+  "citations": [
+   {
+    "section": "ro5m869bbp",
+    "page_start": 170,
+    "page_end": 173
+   },
+   {
+    "section": "8jb2ge03lk",
+    "page_start": 192,
+    "page_end": 195
+   },
+   {
+    "section": "8jcdckd0f4",
+    "page_start": 217,
+    "page_end": 222
+   },
+   {
+    "section": "8jcaih8d98",
+    "page_start": 247,
+    "page_end": 248
+   },
+   {
+    "section": "8jcckjf3ad",
+    "page_start": 232,
+    "page_end": 235
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "8jbf65p71c",
+    "page_start": 187,
+    "page_end": 188
+   },
+   {
+    "section": "8jbgm8sj66",
+    "page_start": 190,
+    "page_end": 192
+   }
+  ],
+  "context_chars": 39259,
+  "t_route": 0.23,
+  "t_retrieve": 1.3,
+  "t_first_token": 3.18,
+  "t_total": 3.58,
+  "grade": "correct",
+  "why": "The system answer correctly states the required 20 minutes of contact time with no contradictions."
+ },
+ {
+  "id": "Q61",
+  "answer": "Based on the excerpts, here is the admission orientation information explained to patients about the physical set up of the ward:\n\n## Admission Orientation – Ward Setup\n\nThe following are explained to the patient (as listed in both Obstetrics & Gynaecology [1] and Nephrology [2]):\n\n1. **Bed** – \"Availability of the bed\" [1][2]\n2. **Bedside cupboard** – \"to place the necessary things like water and medicines\" [1][2]\n3. **Cupboard** – \"for placing the extra things-Clothing, Extra luggages\" [1] / \"Clothing, luggage\" [2]\n4. **Toilets** – \"Toilets\" [1][2]\n5. **Pantry** – \"Pantry\" [1][2]\n6. **Diet facility** – \"Diet facility like hospital diet or patients own\" [1][2]\n7. **Bank** – \"Bank- for the financial need\" [1][2]\n8. **Billing section** – \"Billing section- to settle the bill\" [1][2]\n9. **Pharmacy** – \"Pharmacy- to purchase the daily medicines\" [1][2]\n10. **Canteen** – \"Canteen\" [1][2]\n11. **Visitor pass** – \"Visitor pass\" [1][2]\n12. **Visiting Time** – \"Visiting Time\" [1][2]\n13. **Valuables** – \"Not to keep valuable in the hospital\" [1][2]\n14. **Responsibility disclaimer** – \"The administration will not be responsible for the loss\" [1][2]\n15. **Female relative** – \"One female relative to be staying with the patient\" [1][2]\n16. **Name tag** – \"Name tag to be put on patient\" [1][2]\n\nThere are **16 items** covered in the admission orientation, and this list is identical across both the Obstetrics & Gynaecology and Nephrology department policies. [1][2]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "admission orientation patient ward",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.050334,
+  "tokens_in": 6004,
+  "citations": [
+   {
+    "section": "ro1s5hfpnv",
+    "page_start": 71,
+    "page_end": 72
+   },
+   {
+    "section": "8j9u3mgi3i",
+    "page_start": 147,
+    "page_end": 148
+   },
+   {
+    "section": "8j4letm454",
+    "page_start": 97,
+    "page_end": 98
+   },
+   {
+    "section": "rnvc1jggk8",
+    "page_start": 47,
+    "page_end": 47
+   },
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8jces2rldu",
+    "page_start": 205,
+    "page_end": 210
+   },
+   {
+    "section": "ro0agichl7",
+    "page_start": 48,
+    "page_end": 50
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   }
+  ],
+  "context_chars": 19334,
+  "t_route": 0.22,
+  "t_retrieve": 1.47,
+  "t_first_token": 2.99,
+  "t_total": 7.86,
+  "grade": "partial",
+  "why": "Includes all required physical setup items and the female relative requirement, but adds extra details (responsibility disclaimer, name tag, item count) not in the gold answer."
+ },
+ {
+  "id": "Q62",
+  "answer": "Based on the abbreviations table provided, BSO stands for **Bilateral Salpingo-Oophorectomy**.\n\n\"BSO - Bilateral salphingo oophorectomy\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What does the medical shorthand BSO stand for in gynecological procedures?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.058242,
+  "tokens_in": 9462,
+  "citations": [
+   {
+    "section": "rnuf1mfugt",
+    "page_start": 12,
+    "page_end": 16
+   },
+   {
+    "section": "rnunki7k19",
+    "page_start": 7,
+    "page_end": 11
+   },
+   {
+    "section": "ro3unm0g1n",
+    "page_start": 136,
+    "page_end": 140
+   },
+   {
+    "section": "8jg8gjnncs",
+    "page_start": 340,
+    "page_end": 342
+   },
+   {
+    "section": "rnvfq78dtc",
+    "page_start": 22,
+    "page_end": 26
+   },
+   {
+    "section": "8jg30o75gn",
+    "page_start": 319,
+    "page_end": 322
+   },
+   {
+    "section": "8jgfbcl83d",
+    "page_start": 342,
+    "page_end": 345
+   },
+   {
+    "section": "8j77j80cen",
+    "page_start": 133,
+    "page_end": 133
+   }
+  ],
+  "context_chars": 29657,
+  "t_route": 0.27,
+  "t_retrieve": 1.78,
+  "t_first_token": 3.33,
+  "t_total": 3.87,
+  "grade": "correct",
+  "why": "The system answer gives the exact expansion of BSO that matches the gold answer with no contradictions."
+ },
+ {
+  "id": "Q63",
+  "answer": "Based on the excerpts, the maximum warfarin dose that poses a risk to the fetus is **greater than 5 mg per day**.\n\nThe protocol notes that \"Warfarin >5 mg /day\" is listed under \"ASSESS RISKS TO FETUS DUE TO MEDICATIONS\" [1], and separately specifies that \"Warfarin especially if dosage is less than 5 mg /day to be continued through 1st trimester upto 36 weeks\" [1], implying that doses at or below 5 mg/day are considered safer for continuation.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the maximum warfarin dose per day that poses a risk to the fetus during pregnancy?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.064758,
+  "tokens_in": 10123,
+  "citations": [
+   {
+    "section": "ro22u3naqi",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "ro2u0c2tou",
+    "page_start": 109,
+    "page_end": 111
+   },
+   {
+    "section": "ro2jsnonjq",
+    "page_start": 104,
+    "page_end": 104
+   },
+   {
+    "section": "ro3cpof264",
+    "page_start": 120,
+    "page_end": 124
+   },
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "8j8msv1r7m",
+    "page_start": 138,
+    "page_end": 140
+   },
+   {
+    "section": "ro27v5dlq9",
+    "page_start": 100,
+    "page_end": 103
+   },
+   {
+    "section": "ro23kgls3r",
+    "page_start": 106,
+    "page_end": 109
+   }
+  ],
+  "context_chars": 30465,
+  "t_route": 0.22,
+  "t_retrieve": 1.28,
+  "t_first_token": 2.81,
+  "t_total": 4.42,
+  "grade": "correct",
+  "why": "The system answer correctly identifies greater than 5 mg/day as the maximum daily warfarin dose that poses a risk to the fetus, matching the gold answer."
+ },
+ {
+  "id": "Q64",
+  "answer": "Based on the excerpts, the new patient registration fee for the **General OPD** in Obstetrics & Gynaecology is:\n\n- **Rs. 270** for a first-time new patient — \"for general appointment first time is Rs.270 for new patient\" [1]\n- **Rs. 150** for a repeat general patient — \"Rs.150 for repeat general patient\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "new patient registration fee general OPD obstetrics gynaecology",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.050784,
+  "tokens_in": 7984,
+  "citations": [
+   {
+    "section": "rnvnpsk9sj",
+    "page_start": 41,
+    "page_end": 41
+   },
+   {
+    "section": "rnvk2djlhe",
+    "page_start": 43,
+    "page_end": 43
+   },
+   {
+    "section": "rnv664b6lo",
+    "page_start": 41,
+    "page_end": 42
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "rnunki7k19",
+    "page_start": 7,
+    "page_end": 11
+   },
+   {
+    "section": "rnvkkgr2dp",
+    "page_start": 37,
+    "page_end": 38
+   },
+   {
+    "section": "rnvfq78dtc",
+    "page_start": 22,
+    "page_end": 26
+   }
+  ],
+  "context_chars": 27424,
+  "t_route": 0.27,
+  "t_retrieve": 1.46,
+  "t_first_token": 2.98,
+  "t_total": 4.28,
+  "grade": "correct",
+  "why": "The system answer exactly matches the gold answer amounts for new and repeat general patients with no contradictions."
+ },
+ {
+  "id": "Q65",
+  "answer": "Based on the excerpts, there are two consistent policy statements on this:\n\n- \"The doctor in charge of the bed or the duty doctor sees the patient within **6 hours**.\" [3]\n- \"Within 6 hours of admission the patients are seen, examined and order and history sheets are written up by the junior doctor in charge or the duty doctor.\" [1]\n\nThe doctor in charge or duty doctor must see a newly admitted patient **within 6 hours** of admission.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "Within how many hours must the doctor in charge or duty doctor see a newly admitted patient?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.047412,
+  "tokens_in": 7367,
+  "citations": [
+   {
+    "section": "ro0q1gg5ng",
+    "page_start": 51,
+    "page_end": 52
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "ro0kaq08bk",
+    "page_start": 50,
+    "page_end": 51
+   },
+   {
+    "section": "8j2g8c858o",
+    "page_start": 44,
+    "page_end": 48
+   },
+   {
+    "section": "ro12tse6vh",
+    "page_start": 68,
+    "page_end": 68
+   },
+   {
+    "section": "8j24id7jbg",
+    "page_start": 40,
+    "page_end": 44
+   },
+   {
+    "section": "ro0n22q4f3",
+    "page_start": 53,
+    "page_end": 53
+   },
+   {
+    "section": "ro0agichl7",
+    "page_start": 48,
+    "page_end": 50
+   }
+  ],
+  "context_chars": 26226,
+  "t_route": 0.2,
+  "t_retrieve": 1.34,
+  "t_first_token": 2.77,
+  "t_total": 4.2,
+  "grade": "correct",
+  "why": "The system answer correctly states that the doctor in charge or duty doctor must see the patient within 6 hours, matching the gold answer exactly."
+ },
+ {
+  "id": "Q66",
+  "answer": "## Knitting as Representation for Aunt Jennifer\n\nBased on the excerpts, knitting functions on two levels for Aunt Jennifer — as both an outlet and an ironic symbol of her oppression:\n\n**As a Creative Outlet / Expression of Repressed Desires**\n- The tigers Aunt Jennifer creates through her knitting are described as \"proud and unafraid,\" representing her repressed desires for freedom and power. [1]\n- The poem is said to show \"an alternative for women to express their repressed desires through art,\" with knitting being Aunt Jennifer's chosen medium. [1]\n- Her tigers \"will go on prancing, proud and unafraid\" even after her death, suggesting knitting gives her a form of immortality and lasting expression. [1]\n\n**As a Symbol of Oppression**\n- Even while knitting, \"Aunt Jennifer's fingers fluttering through her wool / Find even the ivory needle hard to pull,\" indicating that the weight of her subjugation physically burdens even this creative act. [1]\n- Her hands are described as \"terrified,\" and even in death they will remain \"ringed with ordeals she was mastered by,\" showing she cannot escape patriarchal subjugation even through her art. [1]\n\n**The Broader Parallel**\n- The excerpt draws the connection: \"What knitting was to Aunt Jennifer; poetry was for Adrienne Rich,\" suggesting knitting served as Rich's own poetic voice made manifest — \"a medium to express what could not otherwise be said.\" [1]",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What does knitting represent for Aunt Jennifer in the poem?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.087714,
+  "tokens_in": 12904,
+  "citations": [
+   {
+    "section": "lnegga0982",
+    "page_start": 61,
+    "page_end": 64
+   },
+   {
+    "section": "lnekqq2ca7",
+    "page_start": 48,
+    "page_end": 51
+   },
+   {
+    "section": "lnf45dtub2",
+    "page_start": 81,
+    "page_end": 82
+   },
+   {
+    "section": "lne0kc09pa",
+    "page_start": 52,
+    "page_end": 55
+   },
+   {
+    "section": "lnflslj37h",
+    "page_start": 87,
+    "page_end": 91
+   },
+   {
+    "section": "lne674cj60",
+    "page_start": 39,
+    "page_end": 42
+   },
+   {
+    "section": "lneblohpvs",
+    "page_start": 34,
+    "page_end": 36
+   },
+   {
+    "section": "lnf6t938ko",
+    "page_start": 97,
+    "page_end": 101
+   }
+  ],
+  "context_chars": 43133,
+  "t_route": 1.0,
+  "t_retrieve": 0.84,
+  "t_first_token": 3.31,
+  "t_total": 8.64,
+  "grade": "partial",
+  "why": "It correctly explains knitting as Aunt Jennifer’s artistic outlet for repressed desires and notes the explicit parallel to poetry for Adrienne Rich, but adds an emphasis on knitting as a symbol of oppression that is not part of the gold answer."
+ },
+ {
+  "id": "Q67",
+  "answer": "I couldn't find this in the wiki. Nothing in the indexed documents is close enough to your question for me to answer it without guessing.",
+  "refused": true,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What qualities should someone look for when assessing how well a journalist conducted a conversation with a famous author?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.0,
+  "tokens_in": null,
+  "citations": [],
+  "context_chars": 0,
+  "t_route": 0.36,
+  "t_retrieve": 0.91,
+  "t_first_token": 1.27,
+  "t_total": 1.27,
+  "grade": "correct",
+  "why": "The system explicitly states it cannot find the answer in the documents, which is appropriate because the gold answer is unanswerable from the wiki."
+ },
+ {
+  "id": "Q68",
+  "answer": "Based on the excerpt, the letter-writing question about the mother responding to the poet's fears falls under the long-answer section, which specifies a word count.\n\n\"Answer in 120-150 words\" is the requirement for Q12, under which the letter-writing prompt appears: \"Imagine the mother gets to know of the poet persona's fears. Write a letter, as the mother, telling the daughter why she must not dwell on these fears.\" [1]\n\nThe answer should be **120-150 words**.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many words should the answer be for the letter-writing question about the mother responding to the poet's fears in My Mother at Sixty-Six?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.074028,
+  "tokens_in": 11763,
+  "citations": [
+   {
+    "section": "lne674cj60",
+    "page_start": 39,
+    "page_end": 42
+   },
+   {
+    "section": "lnf6t938ko",
+    "page_start": 97,
+    "page_end": 101
+   },
+   {
+    "section": "lnedvd75fb",
+    "page_start": 15,
+    "page_end": 15
+   },
+   {
+    "section": "lneblohpvs",
+    "page_start": 34,
+    "page_end": 36
+   },
+   {
+    "section": "lnekqq2ca7",
+    "page_start": 48,
+    "page_end": 51
+   },
+   {
+    "section": "lnf45dtub2",
+    "page_start": 81,
+    "page_end": 82
+   },
+   {
+    "section": "lne118jht1",
+    "page_start": 56,
+    "page_end": 60
+   },
+   {
+    "section": "lne8aqs9en",
+    "page_start": 43,
+    "page_end": 47
+   }
+  ],
+  "context_chars": 38343,
+  "t_route": 0.25,
+  "t_retrieve": 0.95,
+  "t_first_token": 2.54,
+  "t_total": 4.2,
+  "grade": "correct",
+  "why": "The system answer correctly identifies that the letter-writing response should be 120-150 words, matching the gold answer."
+ },
+ {
+  "id": "Q69",
+  "answer": "Based on the excerpt, the question asks to pick the options that best match the phrase **'break o break open'**.\n\nThe answer choices given are:\n\n1. break free\n2. break silence\n3. break out\n4. break even\n5. break through\n6. break ground\n\nThe correct answer provided is **a) 1, 3 and 5** — meaning \"break free,\" \"break out,\" and \"break through\" [1].\n\nThese three options align with the poet's urgent plea in the extract: \"Break O break open till they break the town And show the children to green fields\" — suggesting a forceful breaking away from confinement and oppression [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "break o break open phrase meaning options",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.094854,
+  "tokens_in": 15049,
+  "citations": [
+   {
+    "section": "lne8aqs9en",
+    "page_start": 43,
+    "page_end": 47
+   },
+   {
+    "section": "lne0kc09pa",
+    "page_start": 52,
+    "page_end": 55
+   },
+   {
+    "section": "lne8p277ia",
+    "page_start": 16,
+    "page_end": 20
+   },
+   {
+    "section": "lnfaurrqq2",
+    "page_start": 73,
+    "page_end": 78
+   },
+   {
+    "section": "lneukphvu9",
+    "page_start": 29,
+    "page_end": 33
+   },
+   {
+    "section": "lneblohpvs",
+    "page_start": 34,
+    "page_end": 36
+   },
+   {
+    "section": "lnekc5dkdu",
+    "page_start": 36,
+    "page_end": 38
+   },
+   {
+    "section": "lne118jht1",
+    "page_start": 56,
+    "page_end": 60
+   }
+  ],
+  "context_chars": 50932,
+  "t_route": 0.34,
+  "t_retrieve": 0.98,
+  "t_first_token": 3.14,
+  "t_total": 5.23,
+  "grade": "correct",
+  "why": "The system answer correctly identifies options 1, 3, and 5 as matching the phrase and explains them consistently with the gold answer."
+ },
+ {
+  "id": "Q70",
+  "answer": "Based on the excerpts, the story explores **\"waking-dream wish fulfilment\"** — specifically, the desire to escape the anxieties and pressures of modern life by retreating into an idealized, peaceful past.\n\nKey details:\n\n- Charley imagines Grand Central as a living, growing thing: \"Sometimes I think Grand Central is growing like a tree, pushing out new corridors and staircases like roots,\" suggesting the station itself becomes a vehicle for psychological escape. [1]\n\n- The destination of his wish fulfilment is Galesburg, Illinois in 1894, described as a world of comfort and peace: \"in 1894, summer evenings were twice as long, and people sat out on their lawns, the men smoking cigars and talking quietly, the women waving palm-leaf fans, with the fire-flies all around, in a peaceful world.\" [1]\n\n- The appeal is explicitly tied to escaping modern conflict: \"To be back there with the First World War still twenty years off, and World War II over forty years in the future... I wanted two tickets for that.\" [1]\n\n- The stand-alone MCQ answer key confirms the best description of Charley's vision is **\"idealized sentimentality\"** — \"i – b\" [1] — and that the most fitting conclusion is **\"Imagination might be the only great escape\"** — \"iv – d.\" [1]\n\nIn short, the third level represents a fantasized refuge from modern life's stress, accessed through imagination and longing for a simpler, war-free past.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What kind of wish fulfillment does the story about the Grand Central Station third level explore?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.103824,
+  "tokens_in": 15564,
+  "citations": [
+   {
+    "section": "lneh7hdjgg",
+    "page_start": 65,
+    "page_end": 68
+   },
+   {
+    "section": "lnf45dtub2",
+    "page_start": 81,
+    "page_end": 82
+   },
+   {
+    "section": "lnfaurrqq2",
+    "page_start": 73,
+    "page_end": 78
+   },
+   {
+    "section": "lnfohfqkh7",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "lnepglg146",
+    "page_start": 8,
+    "page_end": 15
+   },
+   {
+    "section": "lnftrfi54s",
+    "page_start": 83,
+    "page_end": 86
+   },
+   {
+    "section": "lne0kc09pa",
+    "page_start": 52,
+    "page_end": 55
+   },
+   {
+    "section": "lne6kuovn1",
+    "page_start": 25,
+    "page_end": 28
+   }
+  ],
+  "context_chars": 53377,
+  "t_route": 0.27,
+  "t_retrieve": 0.8,
+  "t_first_token": 2.46,
+  "t_total": 8.28,
+  "grade": "correct",
+  "why": "It correctly identifies the wish fulfillment as waking-dream escape through imagination from modern life's worries and does not contradict the gold answer."
+ },
+ {
+  "id": "Q71",
+  "answer": "I couldn't find this in the wiki. Nothing in the indexed documents is close enough to your question for me to answer it without guessing.",
+  "refused": true,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many times did the author practice paddling with water wings before the misadventure occurred?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.0,
+  "tokens_in": null,
+  "citations": [],
+  "context_chars": 0,
+  "t_route": 0.31,
+  "t_retrieve": 0.93,
+  "t_first_token": 1.24,
+  "t_total": 1.24,
+  "grade": "wrong",
+  "why": "The gold answer is explicitly given, but the system incorrectly claims the information is not in the documents and refuses to answer."
+ },
+ {
+  "id": "Q72",
+  "answer": "Based on the excerpt, Jack creates the wizard's voice by **scrunching up his face and whining through his eyes**.\n\nSpecifically: \"he did it by scrunching up his face and somehow whining through his eyes, which felt for the interval rheumy\" [1].\n\nThe excerpt also notes that \"He felt being an old man suited him\" [1], suggesting the overall effect was that of a tiny, grumpy old man.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "what sound effects does Jack use for the wizard's voice",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.101922,
+  "tokens_in": 16492,
+  "citations": [
+   {
+    "section": "lnftrfi54s",
+    "page_start": 83,
+    "page_end": 86
+   },
+   {
+    "section": "lnfohfqkh7",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "lnepglg146",
+    "page_start": 8,
+    "page_end": 15
+   },
+   {
+    "section": "lnflslj37h",
+    "page_start": 87,
+    "page_end": 91
+   },
+   {
+    "section": "lne8p277ia",
+    "page_start": 16,
+    "page_end": 20
+   },
+   {
+    "section": "lne8aqs9en",
+    "page_start": 43,
+    "page_end": 47
+   },
+   {
+    "section": "lnfq5btcbd",
+    "page_start": 69,
+    "page_end": 72
+   },
+   {
+    "section": "lnf45dtub2",
+    "page_start": 81,
+    "page_end": 82
+   }
+  ],
+  "context_chars": 55370,
+  "t_route": 0.23,
+  "t_retrieve": 0.71,
+  "t_first_token": 2.46,
+  "t_total": 4.07,
+  "grade": "correct",
+  "why": "The system answer accurately repeats the key description of Jack’s sound effects with no contradictions."
+ },
+ {
+  "id": "Q73",
+  "answer": "Based on the excerpts, according to Keats' poem, **some shape of beauty** removes the pall (sadness/darkness) from our spirits.\n\nThe poem states: \"some shape of beauty moves away the pall / From our dark spirits\" [1].\n\nThis happens despite various challenges, including \"despondence,\" \"the inhuman dearth / Of noble natures,\" \"gloomy days,\" and \"all the unhealthy and o'er darkened ways\" [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What removes sadness from our spirits according to Keats' poem about beauty?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.085206,
+  "tokens_in": 13646,
+  "citations": [
+   {
+    "section": "lne0kc09pa",
+    "page_start": 52,
+    "page_end": 55
+   },
+   {
+    "section": "lnf6t938ko",
+    "page_start": 97,
+    "page_end": 101
+   },
+   {
+    "section": "lne118jht1",
+    "page_start": 56,
+    "page_end": 60
+   },
+   {
+    "section": "lnekqq2ca7",
+    "page_start": 48,
+    "page_end": 51
+   },
+   {
+    "section": "lnf45dtub2",
+    "page_start": 81,
+    "page_end": 82
+   },
+   {
+    "section": "lnf96b9sgd",
+    "page_start": 79,
+    "page_end": 81
+   },
+   {
+    "section": "lne6kuovn1",
+    "page_start": 25,
+    "page_end": 28
+   },
+   {
+    "section": "lne8aqs9en",
+    "page_start": 43,
+    "page_end": 47
+   }
+  ],
+  "context_chars": 44692,
+  "t_route": 0.26,
+  "t_retrieve": 0.79,
+  "t_first_token": 3.28,
+  "t_total": 4.95,
+  "grade": "correct",
+  "why": "The system answer accurately identifies 'some shape of beauty' as what removes the pall from our dark spirits, matching the gold answer without contradiction."
+ },
+ {
+  "id": "Q74",
+  "answer": "Based on the excerpt, the MCQ question ii in Section A of Q4 asks:\n\n\"Pick the option that mentions elements justifying monetary aspect as the 'requisite lift of spirit'.\"\n\nThe elements listed are **5 in total**:\n\n1. confidence\n2. ego\n3. self-esteem\n4. status\n5. fame\n\n\"Pick the option that mentions elements justifying monetary aspect as the 'requisite lift of spirit'. 1. confidence 2. ego 3. self-esteem 4. status 5. fame\" [1]\n\nThe correct answer given in the answer key is option **(d) 1, 3, 5** — i.e., confidence, self-esteem, and fame — \"A. i. (c) ii. (d)\" [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many elements are listed in the MCQ about monetary aspects as the 'requisite lift of spirit' in the Roadside Stand questions?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.068772,
+  "tokens_in": 10542,
+  "citations": [
+   {
+    "section": "lne118jht1",
+    "page_start": 56,
+    "page_end": 60
+   },
+   {
+    "section": "lnf6t938ko",
+    "page_start": 97,
+    "page_end": 101
+   },
+   {
+    "section": "lnes0uupne",
+    "page_start": 7,
+    "page_end": 7
+   },
+   {
+    "section": "lneui3bu5n",
+    "page_start": 20,
+    "page_end": 20
+   },
+   {
+    "section": "lneblohpvs",
+    "page_start": 34,
+    "page_end": 36
+   },
+   {
+    "section": "lnfaurrqq2",
+    "page_start": 73,
+    "page_end": 78
+   },
+   {
+    "section": "lne8p277ia",
+    "page_start": 16,
+    "page_end": 20
+   },
+   {
+    "section": "lnd7039kv2",
+    "page_start": 1,
+    "page_end": 2
+   }
+  ],
+  "context_chars": 35699,
+  "t_route": 0.21,
+  "t_retrieve": 0.98,
+  "t_first_token": 2.62,
+  "t_total": 4.84,
+  "grade": "correct",
+  "why": "The system correctly identifies that there are 5 elements listed in the MCQ, matching the gold answer."
+ },
+ {
+  "id": "Q75",
+  "answer": "Based on the excerpts, there are **multiple answer keys** for Q3 and Q5 MCQs across different lessons. Here is a complete breakdown:\n\n---\n\n## Answer Keys for MCQs – Q3 & Q5\n\n### L-1 The Last Lesson *(p.3-7)*\nNo Q3 answer key is provided in the excerpts for this lesson. The wiki does not contain it.\n\n---\n\n### L-2 Lost Spring *(p.15)*\n**Q3:**\n- A: i.(c), ii.(d), iii.(b), iv.(d)\n- B: i.(a), ii.(d), iii.(b), iv.(b)\n\n**Q5:** i.(c), ii.(b), iii.(b), iv.(c), v.(c)\n\n\"Q3 A i. (c) ii. (d) iii. (b) iv. (d) B i. (a) ii. (d) iii. (b) iv. (b)\" [1]\n\"Q5 i.(c) ii. (b) iii. (b) iv. (c) v. (c)\" [1]\n\n---\n\n### Page 7 Answer Key\n**Q3:** A: i–c, ii–b, iii–c, iv–d; B: i–d, ii–b, iii–d, iv–a\n**Q5:** i–c, ii–b, iii–b, iv–d\n\n\"Q3 A i – c ; ii – b ; iii – c ; iv – d B i – d ; ii – b ; iii – d ; iv – a Q5 i – c ; ii – b ; iii – b ; iv – d\" [2]\n\n---\n\n### Page 20 Answer Key\n**Q3:**\n- A: i–c, ii–a, iii–d, iv–c\n- B: i–b, ii–c, iii–a, iv–b\n\n**Q5:** i–b, ii–c, iii–a, iv–d\n\n\"Q3 A i – c ii – a iii – d iv – c B i – b ii – c iii – a iv – b Q5 i – b ii – c iii – a iv – d\" [3]\n\n---\n\n### L-8 Memories of Childhood *(p.97-101)*\n**Q3:**\n- A: i.(c), ii.(d), iii.(c), iv.(d)\n- B: i.(c), ii.(d), iii.(b), iv.(b)\n\n**Q5:** i.(c), ii.(a), iii.(b), iv.(c)\n\n\"Q3 A. i. (c) ii. (d) iii. (c) iv. (d) B. i.(c) ii. (d) iii. (b) iv. (b) Q5 i.(c) ii. (a) iii. (b) iv. (c)\" [5]\n\n---\n\n> **Note:** The answer keys on pages 7 [2], 15 [1], and 20 [3] are not explicitly labelled by lesson name in the excerpts, so their exact lesson attribution beyond what is stated cannot be confirmed.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "answer key MCQs Q3 Q5 English Core",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.073758,
+  "tokens_in": 8508,
+  "citations": [
+   {
+    "section": "lnedvd75fb",
+    "page_start": 15,
+    "page_end": 15
+   },
+   {
+    "section": "lnes0uupne",
+    "page_start": 7,
+    "page_end": 7
+   },
+   {
+    "section": "lneui3bu5n",
+    "page_start": 20,
+    "page_end": 20
+   },
+   {
+    "section": "lnd7039kv2",
+    "page_start": 1,
+    "page_end": 2
+   },
+   {
+    "section": "lnf6t938ko",
+    "page_start": 97,
+    "page_end": 101
+   },
+   {
+    "section": "lnd7trrin0",
+    "page_start": 3,
+    "page_end": 7
+   },
+   {
+    "section": "lnegga0982",
+    "page_start": 61,
+    "page_end": 64
+   },
+   {
+    "section": "lne674cj60",
+    "page_start": 39,
+    "page_end": 42
+   }
+  ],
+  "context_chars": 28171,
+  "t_route": 0.27,
+  "t_retrieve": 1.13,
+  "t_first_token": 2.77,
+  "t_total": 8.66,
+  "grade": "wrong",
+  "why": "The system answer gives multiple conflicting answer keys for Q3 and Q5 instead of the specific gold keys (Q3 A: i.(a) ii.(d) iii.(b) iv.(c); Q3 B: i.(b) ii.(d) iii.(c) iv.(c); Q5: i.(d) ii.(c) iii.(b) iv.(b))."
+ },
+ {
+  "id": "Q76",
+  "answer": "I couldn't find this in the wiki. Nothing in the indexed documents is close enough to your question for me to answer it without guessing.",
+  "refused": true,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What does the expression 'old familiar ache' describe in terms of emotional experience?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.0,
+  "tokens_in": null,
+  "citations": [],
+  "context_chars": 0,
+  "t_route": 0.24,
+  "t_retrieve": 0.97,
+  "t_first_token": 1.2,
+  "t_total": 1.2,
+  "grade": "wrong",
+  "why": "The question is answerable from the documents but the system refused, so it did not provide the required fact about a familiar longing."
+ },
+ {
+  "id": "Q77",
+  "answer": "Based on the excerpts, here is the count of multiple choice questions in the **Evans Tries an O-Level** extract exercise:\n\nThe exercise contains **two extracts (A and B), each with four MCQs**, plus **four Stand-alone MCQs** in Q5.\n\n- Extract A: \"i, ii, iii, iv\" — 4 questions [5]\n- Extract B: \"i, ii, iii, iv\" — 4 questions [5]\n- Q5 Stand-alone MCQs: \"i, ii, iii\" — 3 questions [5]\n\nThat gives a total of **11 multiple choice questions** in the Evans Tries an O-Level extract exercise, \"Q3 A i – b ; ii – b ; iii – c ; iv – d / B i – b ; ii – c ; iii – a ; iv – d / Q5 i – b ; ii – c ; iii – b\" confirming answers for all of them [5].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many multiple choice questions are included in the Evans Tries an O-Level extract exercise?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.098544,
+  "tokens_in": 15274,
+  "citations": [
+   {
+    "section": "lnf6t938ko",
+    "page_start": 97,
+    "page_end": 101
+   },
+   {
+    "section": "lne674cj60",
+    "page_start": 39,
+    "page_end": 42
+   },
+   {
+    "section": "lnd7trrin0",
+    "page_start": 3,
+    "page_end": 7
+   },
+   {
+    "section": "lnegga0982",
+    "page_start": 61,
+    "page_end": 64
+   },
+   {
+    "section": "lnfohfqkh7",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "lneukphvu9",
+    "page_start": 29,
+    "page_end": 33
+   },
+   {
+    "section": "lneblohpvs",
+    "page_start": 34,
+    "page_end": 36
+   },
+   {
+    "section": "lnflslj37h",
+    "page_start": 87,
+    "page_end": 91
+   }
+  ],
+  "context_chars": 52418,
+  "t_route": 0.22,
+  "t_retrieve": 0.89,
+  "t_first_token": 2.77,
+  "t_total": 4.99,
+  "grade": "wrong",
+  "why": "The system answer claims there are 11 multiple choice questions, contradicting the gold answer that specifies 4."
+ },
+ {
+  "id": "Q78",
+  "answer": "I couldn't find this in the wiki. Nothing in the indexed documents is close enough to your question for me to answer it without guessing.",
+  "refused": true,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "poet opinion children freedom nature slums",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.0,
+  "tokens_in": null,
+  "citations": [],
+  "context_chars": 0,
+  "t_route": 0.2,
+  "t_retrieve": 0.79,
+  "t_first_token": 0.99,
+  "t_total": 0.99,
+  "grade": "wrong",
+  "why": "The question is answerable from the document, but the system incorrectly claimed the information was not available."
+ },
+ {
+  "id": "Q79",
+  "answer": "Based on the excerpts, Mr. Lamb's aim with this statement is clearly identified in the answer key.\n\n**Mr. Lamb aims to empower Derry to take charge.**\n\nThe answer key for Q5 Stand-alone MCQs confirms: \"ii – a\" [1], which corresponds to option **(a) Empower Derry to take charge** [1].\n\nThe statement is part of Mr. Lamb's broader effort to challenge Derry's self-limiting beliefs and push him toward agency over his own life, rather than allowing the opinions and reactions of others to define him — consistent with the play's message that \"People's attitude should not stop one from experiencing life\" [1].",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is Mr. Lamb trying to accomplish when he says 'Ah, but do you care if you never kiss them' to Derry?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.109446,
+  "tokens_in": 17461,
+  "citations": [
+   {
+    "section": "lnflslj37h",
+    "page_start": 87,
+    "page_end": 91
+   },
+   {
+    "section": "lnfohfqkh7",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "lnf96b9sgd",
+    "page_start": 79,
+    "page_end": 81
+   },
+   {
+    "section": "lnftrfi54s",
+    "page_start": 83,
+    "page_end": 86
+   },
+   {
+    "section": "lnekqq2ca7",
+    "page_start": 48,
+    "page_end": 51
+   },
+   {
+    "section": "lnepglg146",
+    "page_start": 8,
+    "page_end": 15
+   },
+   {
+    "section": "lnd7trrin0",
+    "page_start": 3,
+    "page_end": 7
+   },
+   {
+    "section": "lne8p277ia",
+    "page_start": 16,
+    "page_end": 20
+   }
+  ],
+  "context_chars": 59042,
+  "t_route": 0.21,
+  "t_retrieve": 0.75,
+  "t_first_token": 2.39,
+  "t_total": 4.74,
+  "grade": "correct",
+  "why": "The system answer explicitly matches the gold answer, stating that Mr. Lamb aims to empower Derry to take charge, with no contradictions."
+ },
+ {
+  "id": "Q80",
+  "answer": "Based on the excerpts, here is what happens to the peddler after he steals from the crofter and enters the forest:\n\nAfter stealing the money, the peddler enters a forest and becomes hopelessly lost. \"He tried, to be sure, to walk in a definite direction, but the paths twisted back and forth so strangely!\" [1]. He wanders endlessly without finding a way out: \"He walked and walked without coming to the end of the wood, and finally he realised that he had only been walking around in the same part of the forest.\" [1].\n\nAt this point, the peddler has a moment of grim self-awareness — he connects his situation to his own philosophy about the world. \"He recalled his thoughts about the world and the rattrap. Now his own turn had come. He had let himself be fooled by a bait and had been caught.\" [1]. The stolen money was the \"bait\" that had lured him into this trap.\n\nThe forest itself closes in on him menacingly: \"The whole forest, with its trunks and branches, its thickets and fallen logs, closed in upon him like an impenetrable prison from which he could never escape.\" [1]. This experience serves as a direct parallel to his rattrap philosophy — just as the rattrap lures creatures with bait, the world had lured him with the crofter's money, and now he was trapped.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What happens to the peddler after he steals from the crofter and enters the forest?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.113304,
+  "tokens_in": 17299,
+  "citations": [
+   {
+    "section": "lne8p277ia",
+    "page_start": 16,
+    "page_end": 20
+   },
+   {
+    "section": "lnfq5btcbd",
+    "page_start": 69,
+    "page_end": 72
+   },
+   {
+    "section": "lnf96b9sgd",
+    "page_start": 79,
+    "page_end": 81
+   },
+   {
+    "section": "lnfohfqkh7",
+    "page_start": 92,
+    "page_end": 96
+   },
+   {
+    "section": "lnepglg146",
+    "page_start": 8,
+    "page_end": 15
+   },
+   {
+    "section": "lnftrfi54s",
+    "page_start": 83,
+    "page_end": 86
+   },
+   {
+    "section": "lneda1jj9h",
+    "page_start": 21,
+    "page_end": 24
+   },
+   {
+    "section": "lnflslj37h",
+    "page_start": 87,
+    "page_end": 91
+   }
+  ],
+  "context_chars": 58391,
+  "t_route": 0.31,
+  "t_retrieve": 0.89,
+  "t_first_token": 3.51,
+  "t_total": 7.85,
+  "grade": "correct",
+  "why": "The system answer accurately describes that he gets lost walking in circles in the forest, feels trapped, and realizes he has been caught like in his own rattrap analogy, matching the gold answer without contradiction."
+ },
+ {
+  "id": "N01",
+  "answer": "The provided excerpts do not contain any information about tenecteplase dosing for acute ischaemic stroke thrombolysis. This topic is not covered in any of the wiki excerpts provided.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the tenecteplase dose for acute ischaemic stroke thrombolysis?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.062988,
+  "tokens_in": 10273,
+  "citations": [
+   {
+    "section": "8jfpi0nk4d",
+    "page_start": 316,
+    "page_end": 319
+   },
+   {
+    "section": "8jat8an0b9",
+    "page_start": 170,
+    "page_end": 171
+   },
+   {
+    "section": "8j8msv1r7m",
+    "page_start": 138,
+    "page_end": 140
+   },
+   {
+    "section": "ro3unm0g1n",
+    "page_start": 136,
+    "page_end": 140
+   },
+   {
+    "section": "8j8q97k3a8",
+    "page_start": 140,
+    "page_end": 141
+   },
+   {
+    "section": "8jg8o2thv7",
+    "page_start": 323,
+    "page_end": 327
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "ro197m28nq",
+    "page_start": 89,
+    "page_end": 90
+   }
+  ],
+  "context_chars": 30270,
+  "t_route": 0.3,
+  "t_retrieve": 1.61,
+  "t_first_token": 3.2,
+  "t_total": 3.53,
+  "grade": "correct",
+  "why": "The system correctly stated that the information is not in the provided documents and did not attempt to give a dosing answer."
+ },
+ {
+  "id": "N02",
+  "answer": "The excerpts provided do not contain any information about visiting hours in the cardiac ICU. This information is not covered in the available wiki excerpts.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What are the visiting hours in the cardiac ICU?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.04419,
+  "tokens_in": 7200,
+  "citations": [
+   {
+    "section": "8j2cank05f",
+    "page_start": 52,
+    "page_end": 54
+   },
+   {
+    "section": "ro1s5hfpnv",
+    "page_start": 71,
+    "page_end": 72
+   },
+   {
+    "section": "8j7udiv2eu",
+    "page_start": 131,
+    "page_end": 133
+   },
+   {
+    "section": "8jf3066blc",
+    "page_start": 300,
+    "page_end": 302
+   },
+   {
+    "section": "8j6205f2s6",
+    "page_start": 116,
+    "page_end": 117
+   },
+   {
+    "section": "ro0ubc0ccd",
+    "page_start": 64,
+    "page_end": 67
+   },
+   {
+    "section": "ro2u0c2tou",
+    "page_start": 109,
+    "page_end": 111
+   },
+   {
+    "section": "8j9dvjfb2k",
+    "page_start": 155,
+    "page_end": 157
+   }
+  ],
+  "context_chars": 26477,
+  "t_route": 0.25,
+  "t_retrieve": 1.52,
+  "t_first_token": 3.09,
+  "t_total": 3.39,
+  "grade": "correct",
+  "why": "The system correctly identifies that visiting hours are not covered in the documents and declines to provide an answer."
+ },
+ {
+  "id": "N03",
+  "answer": "The provided excerpts do not contain any information about parking costs for visitors at the hospital. This topic is not covered in any of the excerpts available.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How much does parking cost for visitors at the hospital?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.055074,
+  "tokens_in": 9009,
+  "citations": [
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "ro1cc2lp5p",
+    "page_start": 75,
+    "page_end": 80
+   },
+   {
+    "section": "ro1s5hfpnv",
+    "page_start": 71,
+    "page_end": 72
+   },
+   {
+    "section": "8j6mauv1sh",
+    "page_start": 117,
+    "page_end": 121
+   },
+   {
+    "section": "8jjorb4s7r",
+    "page_start": 380,
+    "page_end": 381
+   },
+   {
+    "section": "ro0q1gg5ng",
+    "page_start": 51,
+    "page_end": 52
+   },
+   {
+    "section": "8j9u3mgi3i",
+    "page_start": 147,
+    "page_end": 148
+   }
+  ],
+  "context_chars": 33553,
+  "t_route": 0.32,
+  "t_retrieve": 1.26,
+  "t_first_token": 2.92,
+  "t_total": 3.27,
+  "grade": "correct",
+  "why": "The system correctly stated that the parking cost information is not in the provided documents and did not invent an answer."
+ },
+ {
+  "id": "N04",
+  "answer": "The provided excerpts do not contain any information about snake bite treatment protocols or emergency department management of snake bites. This topic is not covered in any of the wiki excerpts provided.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the protocol for treating a snake bite in the emergency department?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.04599,
+  "tokens_in": 7465,
+  "citations": [
+   {
+    "section": "ro00rtbc33",
+    "page_start": 59,
+    "page_end": 60
+   },
+   {
+    "section": "8j8qj5nrsm",
+    "page_start": 141,
+    "page_end": 143
+   },
+   {
+    "section": "ro0kaq08bk",
+    "page_start": 50,
+    "page_end": 51
+   },
+   {
+    "section": "8jcmpbvqho",
+    "page_start": 222,
+    "page_end": 227
+   },
+   {
+    "section": "rnv3h1eqid",
+    "page_start": 21,
+    "page_end": 22
+   },
+   {
+    "section": "8jjqv9jjm1",
+    "page_start": 379,
+    "page_end": 379
+   },
+   {
+    "section": "8jbf65p71c",
+    "page_start": 187,
+    "page_end": 188
+   },
+   {
+    "section": "ro5m869bbp",
+    "page_start": 170,
+    "page_end": 173
+   }
+  ],
+  "context_chars": 25710,
+  "t_route": 0.29,
+  "t_retrieve": 1.45,
+  "t_first_token": 2.95,
+  "t_total": 3.27,
+  "grade": "correct",
+  "why": "The system explicitly states that the information is not in the provided documents, appropriately declining to answer an unanswerable question."
+ },
+ {
+  "id": "N05",
+  "answer": "I couldn't find this in the wiki. Nothing in the indexed documents is close enough to your question for me to answer it without guessing.",
+  "refused": true,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "Who wrote the novel Pride and Prejudice and what year was it published?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.0,
+  "tokens_in": null,
+  "citations": [],
+  "context_chars": 0,
+  "t_route": 0.31,
+  "t_retrieve": 1.61,
+  "t_first_token": 1.92,
+  "t_total": 1.92,
+  "grade": "correct",
+  "why": "The system appropriately stated it could not find the information in the documents, matching the unanswerable gold."
+ },
+ {
+  "id": "N06",
+  "answer": "The provided excerpts do not contain any information about HPV vaccination schedules for boys aged 9 to 14. The excerpts only cover Hepatitis B vaccination protocols for ESRD/CKD patients and dialysis unit staff, along with other nephrology and obstetrics/gynaecology topics.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the recommended HPV vaccination schedule for boys aged 9 to 14?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.05916,
+  "tokens_in": 9510,
+  "citations": [
+   {
+    "section": "8jao0i9j9g",
+    "page_start": 172,
+    "page_end": 172
+   },
+   {
+    "section": "8jb32m6g04",
+    "page_start": 199,
+    "page_end": 204
+   },
+   {
+    "section": "ro4u691mmn",
+    "page_start": 144,
+    "page_end": 147
+   },
+   {
+    "section": "ro3qjvc4ln",
+    "page_start": 135,
+    "page_end": 136
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "8jeu9o0toi",
+    "page_start": 291,
+    "page_end": 293
+   },
+   {
+    "section": "ro4v13vchd",
+    "page_start": 140,
+    "page_end": 143
+   },
+   {
+    "section": "8j7aouo8br",
+    "page_start": 123,
+    "page_end": 126
+   }
+  ],
+  "context_chars": 30772,
+  "t_route": 0.26,
+  "t_retrieve": 1.43,
+  "t_first_token": 5.93,
+  "t_total": 6.25,
+  "grade": "correct",
+  "why": "The system correctly stated that the documents do not contain information about HPV vaccination schedules and declined to answer from them."
+ },
+ {
+  "id": "N07",
+  "answer": "The excerpts provided do not contain any information about resetting passwords for the hospital email system. The wiki only covers how patients can contact the nephrology department via email (using addresses like nephro1@cmcvellore.ac.in) and how those communications are handled, but nothing about password reset procedures for staff or any email system administration.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How do I reset my password for the hospital email system?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.053088,
+  "tokens_in": 8473,
+  "citations": [
+   {
+    "section": "8j9o326jim",
+    "page_start": 150,
+    "page_end": 151
+   },
+   {
+    "section": "8jl0hf26gp",
+    "page_start": 394,
+    "page_end": 396
+   },
+   {
+    "section": "8j4h4ljldg",
+    "page_start": 92,
+    "page_end": 97
+   },
+   {
+    "section": "rnv664b6lo",
+    "page_start": 41,
+    "page_end": 42
+   },
+   {
+    "section": "8j5jg88467",
+    "page_start": 112,
+    "page_end": 114
+   },
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8jfp031o41",
+    "page_start": 303,
+    "page_end": 306
+   },
+   {
+    "section": "ro0ubc0ccd",
+    "page_start": 64,
+    "page_end": 67
+   }
+  ],
+  "context_chars": 31751,
+  "t_route": 0.32,
+  "t_retrieve": 1.7,
+  "t_first_token": 3.35,
+  "t_total": 4.4,
+  "grade": "correct",
+  "why": "The system correctly states that the information is not in the documents and does not invent a password reset procedure."
+ },
+ {
+  "id": "N08",
+  "answer": "The excerpts provided do not contain any information about rituximab dosing for pemphigus vulgaris. The only rituximab doses mentioned in the excerpts relate to vasculitis treatment [1] and antibody-mediated rejection post-transplant [8], not pemphigus vulgaris.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the dose of rituximab for pemphigus vulgaris?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.052278,
+  "tokens_in": 8363,
+  "citations": [
+   {
+    "section": "8j8q97k3a8",
+    "page_start": 140,
+    "page_end": 141
+   },
+   {
+    "section": "8j8msv1r7m",
+    "page_start": 138,
+    "page_end": 140
+   },
+   {
+    "section": "ro3qjvc4ln",
+    "page_start": 135,
+    "page_end": 136
+   },
+   {
+    "section": "8je68lg2t3",
+    "page_start": 283,
+    "page_end": 287
+   },
+   {
+    "section": "8jf4m4d3us",
+    "page_start": 309,
+    "page_end": 311
+   },
+   {
+    "section": "8jfl38nbv2",
+    "page_start": 311,
+    "page_end": 316
+   },
+   {
+    "section": "ro197m28nq",
+    "page_start": 89,
+    "page_end": 90
+   },
+   {
+    "section": "8jfpi0nk4d",
+    "page_start": 316,
+    "page_end": 319
+   }
+  ],
+  "context_chars": 23969,
+  "t_route": 0.29,
+  "t_retrieve": 1.4,
+  "t_first_token": 3.8,
+  "t_total": 4.44,
+  "grade": "correct",
+  "why": "The system correctly states that the documents do not provide rituximab dosing information for pemphigus vulgaris and does not invent an answer."
+ },
+ {
+  "id": "N09",
+  "answer": "I couldn't find this in the wiki. Nothing in the indexed documents is close enough to your question for me to answer it without guessing.",
+  "refused": true,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "What is the canteen menu on Fridays?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.0,
+  "tokens_in": null,
+  "citations": [],
+  "context_chars": 0,
+  "t_route": 0.24,
+  "t_retrieve": 1.61,
+  "t_first_token": 1.84,
+  "t_total": 1.84,
+  "grade": "correct",
+  "why": "The system correctly declined to answer and stated the information was not in the documents, matching the unanswerable gold."
+ },
+ {
+  "id": "N10",
+  "answer": "The provided excerpts do not contain any information about the orthopaedics ward or the number of beds it has. The excerpts only cover Obstetrics & Gynaecology and Nephrology department policies and procedures.",
+  "refused": false,
+  "route": {
+   "intent": "hybrid",
+   "section_type": null,
+   "query": "How many beds does the orthopaedics ward have?",
+   "reason": "Routing is unavailable, so I searched both by meaning and by section type."
+  },
+  "cost": 0.042318,
+  "tokens_in": 6793,
+  "citations": [
+   {
+    "section": "rnvs97ipes",
+    "page_start": 45,
+    "page_end": 46
+   },
+   {
+    "section": "8j6205f2s6",
+    "page_start": 116,
+    "page_end": 117
+   },
+   {
+    "section": "8j1gsql2d3",
+    "page_start": 19,
+    "page_end": 24
+   },
+   {
+    "section": "ro0kaq08bk",
+    "page_start": 50,
+    "page_end": 51
+   },
+   {
+    "section": "rnv45gpm6h",
+    "page_start": 44,
+    "page_end": 45
+   },
+   {
+    "section": "8j4letm454",
+    "page_start": 97,
+    "page_end": 98
+   },
+   {
+    "section": "rnvc1jggk8",
+    "page_start": 47,
+    "page_end": 47
+   },
+   {
+    "section": "ro0ubc0ccd",
+    "page_start": 64,
+    "page_end": 67
+   }
+  ],
+  "context_chars": 24723,
+  "t_route": 0.18,
+  "t_retrieve": 1.58,
+  "t_first_token": 3.82,
+  "t_total": 4.35,
+  "grade": "correct",
+  "why": "The system correctly states that the number of beds in the orthopaedics ward is not provided in the documents and declines to answer."
+ }
+]
