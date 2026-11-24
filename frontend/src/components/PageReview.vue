@@ -646,7 +646,7 @@ function fmtDelta(v) {
 											language="markdown"
 											variant="outline"
 											:disabled="true"
-											class="min-h-0 flex-1"
+											class="markdown-wrap min-h-0 flex-1"
 										/>
 									</div>
 								</div>
@@ -728,7 +728,7 @@ function fmtDelta(v) {
 									language="markdown"
 									variant="outline"
 									:disabled="true"
-									class="min-h-0 flex-1"
+									class="markdown-wrap min-h-0 flex-1"
 								/>
 							</div>
 						</div>
