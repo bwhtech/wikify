@@ -211,3 +211,32 @@ class TestRemediatePipeline(FrappeTestCase):
 		self.assertEqual(pages[1].canonical_source, "baseline")
 		self.assertEqual(pages[3].remediation_method, "vlm")
 		self.assertEqual(pages[3].canonical_source, "vlm")
+
+	def test_flagged_run_keeps_versions_adopted_by_an_earlier_run(self):
+		sd, path = self._parse()
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+			patch(
+				"wikify.engine.remediate.clean_markdown",
+				side_effect=lambda md, model=None, project_context="", instruction="": md,
+			),
+			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
+		):
+			remediate_pdf(sd, path, scope="all")
+			adopted = frappe.db.get_value(
+				"Source Page",
+				{"source_document": sd, "page_no": 1},
+				["canonical_source", "canonical_markdown", "canonical_composite"],
+				as_dict=True,
+			)
+			self.assertEqual(adopted.canonical_source, "cleanup")
+			remediate_pdf(sd, path, scope="flagged")
+
+		after = frappe.db.get_value(
+			"Source Page",
+			{"source_document": sd, "page_no": 1},
+			["canonical_source", "canonical_markdown", "canonical_composite"],
+			as_dict=True,
+		)
+		self.assertEqual(after, adopted)

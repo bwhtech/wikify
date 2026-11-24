@@ -109,7 +109,19 @@ def get_pages(source_document: str) -> list[dict]:
 	return frappe.get_all(
 		"Source Page",
 		filters={"source_document": source_document},
-		fields=["name", "page_no", "kind", "baseline_markdown", "verdict", "composite", "image"],
+		fields=[
+			"name",
+			"page_no",
+			"kind",
+			"baseline_markdown",
+			"verdict",
+			"composite",
+			"image",
+			"canonical_markdown",
+			"canonical_composite",
+			"canonical_source",
+			"remediation_notes",
+		],
 		order_by="page_no asc",
 	)
 
