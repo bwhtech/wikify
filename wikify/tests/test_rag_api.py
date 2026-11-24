@@ -460,7 +460,8 @@ class TestReindexHook(FrappeTestCase):
 			patch.object(frappe, "enqueue") as enqueue,
 		):
 			rag_events.queue_reindex(self.section)
-			with patch("wikify.rag.index.rebuild_project"):
+			# The job commits; a real commit would keep this test's rows on the site.
+			with patch("wikify.rag.index.rebuild_project"), patch.object(frappe.db, "commit"):
 				rag_events.rebuild_pending_project(self.project.name)
 			rag_events.queue_reindex(self.section)
 		self.assertEqual(enqueue.call_count, 2)
