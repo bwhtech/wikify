@@ -240,3 +240,55 @@ class TestRemediatePipeline(FrappeTestCase):
 			as_dict=True,
 		)
 		self.assertEqual(after, adopted)
+
+	def test_reparse_without_adopt_keeps_canonical_and_stores_a_preview(self):
+		from wikify.engine.reparse import reparse_page
+
+		sd, path = self._parse()
+		page = frappe.db.get_value("Source Page", {"source_document": sd, "page_no": 3}, "name")
+		before = frappe.db.get_value(
+			"Source Page",
+			page,
+			["canonical_markdown", "canonical_source", "remediation_markdown"],
+			as_dict=True,
+		)
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.engine.llm.chat_completion", side_effect=_fake_chat),
+			patch("wikify.engine.remediate.vlm.parse_page_image", return_value=_MERMAID),
+		):
+			result = reparse_page(sd, path, 3, instruction="Drop the footer", adopt=False)
+
+		after = frappe.db.get_value(
+			"Source Page",
+			page,
+			[
+				"canonical_markdown",
+				"canonical_source",
+				"remediation_markdown",
+				"preview_markdown",
+				"preview_composite",
+				"preview_instruction",
+			],
+			as_dict=True,
+		)
+		self.assertEqual(
+			(after.canonical_markdown, after.canonical_source, after.remediation_markdown),
+			(before.canonical_markdown, before.canonical_source, before.remediation_markdown),
+		)
+		self.assertIn("MERMAID_OK", after.preview_markdown)
+		self.assertEqual(after.preview_composite, result["composite"])
+		self.assertEqual(after.preview_instruction, "Drop the footer")
+
+
+class TestRemediateTargets(FrappeTestCase):
+	def test_failed_scope_picks_only_pages_still_on_a_failed_first_parse(self):
+		from wikify.engine.remediate import is_target
+
+		def page(notes, source):
+			return {"remediation_notes": notes, "canonical_source": source, "verdict": "review"}
+
+		self.assertTrue(is_target(page("vlm failed: 400", "baseline"), "failed"))
+		self.assertFalse(is_target(page("vlm failed: 400", "cleanup"), "failed"))
+		self.assertFalse(is_target(page("low text recall", "baseline"), "failed"))
+		self.assertFalse(is_target(page(None, None), "failed"))

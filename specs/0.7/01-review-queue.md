@@ -55,8 +55,9 @@ A suggestion:
     "recommended": True,
     "safe": False,              # True only for content-preserving fixes with no model call
     "confidence": 0.94,         # the score the fix is expected to reach, or None
-    "preview": {"type": "markdown", "markdown": "..."}  # or None
-    "preview_on_request": False # True: preview needs a model call (section 6.2)
+    "preview": "...",           # the markdown the wiki would get, or None
+    "options": None,            # choices for a fix that needs one, such as section types
+    "on_request": False,        # True: the preview needs a model call (section 6.2)
 }
 ```
 
@@ -149,7 +150,7 @@ calls one existing engine function.
 | Suggestion | Offered when | Preview | Apply calls |
 |---|---|---|---|
 | `use_candidate` | The page has a stored alternative that is not the canonical one: `remediation_markdown` when the canonical is baseline, or `baseline_markdown` when the canonical is a remediation. Recommended when its score beats the canonical score. | The stored markdown. No model call. | `store.set_canonical(page, md, composite, source)`, then `propagate_page` |
-| `reparse` | `llm.has_openrouter()` | On request. See section 6.2. | Writes a candidate (`adopt=False`), then becomes `use_candidate` |
+| `reparse` | `llm.has_openrouter()` | On request. See section 6.2. | Cannot be applied. It stores a preview, which `use_candidate` then offers as "Use the new reading" |
 | `page_image` | The page has an `image` | The canonical markdown plus `![Page N](image)` | The `use_page_image` section mode, moved from the agent tool into `engine/reparse.py` |
 | `exclude` (only for `page_image_only`) | The page has exactly one owner section, and that section covers only this page | "This page is left out of the wiki." | `api.sections.toggle_include(owner, 0)` logic |
 
@@ -248,20 +249,28 @@ Permissions are the same as on `Wikify Import`: System Manager only.
 2. This enqueues `wikify.jobs.review.preview` on the `long` queue, with
    `job_id=f"review-preview:{page_name}"`, so the same page is not queued twice.
 3. The job calls `reparse_page(..., adopt=False)`. This is a new flag. When it is
-   false, the function stores the candidate with `store.set_remediation(...,
-   adopted=False)` and skips `set_canonical`, `_recompute_canonical_mean` and section
-   propagation. The default stays `True`, so the agent tool behaves as before.
-4. The job publishes the `wikify_review_preview` realtime event with
-   `{import, page_no, composite, ok, error}` to the import's room.
-5. The UI reloads the issue. The candidate is now the stored alternative, so the
-   `use_candidate` suggestion shows it with its score. Apply works as in section 5.1.
+   false, the function writes the result to the page's preview fields and skips
+   `set_remediation`, `set_canonical`, `recompute_canonical_mean` and section
+   propagation. The cost is still added to the page. The default stays `True`, so
+   the agent tool behaves as before.
+4. After the job commits, it publishes the `wikify_review_preview` realtime event with
+   `{import, page_no, ok, composite}` or `{import, page_no, ok: false, error}`, the
+   same way as `wikify_import_progress`.
+5. The UI reloads the issue. The preview is now the first alternative, so
+   `use_candidate` offers "Use the new reading" with its score and the instruction.
+   Applying it moves the preview into the remediation fields as an adopted `vlm`
+   version, clears the preview, and stores the instruction on the decision.
 
-A failed preview publishes `ok: false` with the error. The issue shows "Could not
-re-read the page: <error>" and keeps its other suggestions.
+A failed preview publishes `ok: false` with the error. The card shows "Could not
+re-read the page" with the error, and the page does not change. `get_issue` returns
+`reading: true` while the job is queued or running, so a reload keeps the spinner.
 
-No new field is needed: `remediation_markdown` and `remediation_composite` already hold
-"the candidate that is not canonical". A preview replaces the previous candidate.
-This is fine, because the old candidate was not adopted either.
+The preview has its own fields on Source Page (`preview_markdown`,
+`preview_composite`, `preview_notes`, `preview_instruction`). The `remediation_*`
+fields describe the pipeline's version, and the reason text and the vision-failure
+rule read them. Writing a preview there would change an item before anyone applied
+anything: a successful re-read would hide a "vision failed" item, and on an adopted
+page the reason would describe the preview instead of the published text.
 
 ## 7. API and UI
 
@@ -338,11 +347,11 @@ narrow ones, like `PageReview`.
   - History lines, when there are any.
   - The question, then the suggestions as radio cards. The recommended one is
     preselected. The selected card expands to show its preview in `MarkdownPreview`,
-    under the label "How it will look on the wiki". A `preview_on_request` card shows
-    a **Re-read now** button, its cost and its wait time instead of a preview.
-  - **Something else.** For a page issue, it shows a textarea "Tell the model what to
-    change", which runs `preview_reparse` with that instruction. For a section issue,
-    it shows **Ask the agent**.
+    under the label "How it will look on the wiki". An `on_request` card shows an
+    optional instruction box ("Anything the model should do differently?"), a
+    **Re-read now** button and the wait time instead of a preview. The instruction
+    goes to `preview_reparse`.
+  - For a section issue, **Ask the agent** (slice 35).
   - A pinned footer with **Skip for now** (go to the next item), **It is fine as is**
     and **Apply and next** (the primary action). When the selected card has no
     preview yet, the primary action is disabled.
@@ -377,8 +386,11 @@ and **Approve anyway** buttons.
   - `accept` hides the issue until the markdown changes.
 - `test_lint.py`: `close_fences` and `pad_ragged_rows` are idempotent and only add
   text.
-- `reparse_page(adopt=False)` leaves `canonical_markdown` alone. Patch
-  `vlm.parse_page_image`, as `test_remediate_pipeline.py` does.
+- `reparse_page(adopt=False)` leaves `canonical_markdown` alone and fills the preview
+  fields. Patch `vlm.parse_page_image`, as `test_remediate_pipeline.py` does.
+- Applying a preview adopts it as `vlm`, clears it, and keeps the instruction on the
+  decision. `reparse` itself cannot be applied.
+- The preview job publishes `ok: true` with the score, or `ok: false` with the error.
 - API: a user without write permission on the import cannot apply.
 - All fixtures are committed strings, not site data.
 

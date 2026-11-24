@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
+from frappe.utils.background_jobs import is_job_enqueued
 
 from wikify.api.permission import assert_readable
 from wikify.api.sections import assert_not_published
-from wikify.engine import store
+from wikify.engine import llm, store
 from wikify.engine.review import ReviewQueue, actions
+from wikify.jobs._util import import_job_id
+from wikify.jobs.review import PREVIEW_TIMEOUT, preview_job_id
+
+MAX_INSTRUCTION = 2000
 
 
 @frappe.whitelist()
@@ -21,7 +26,10 @@ def get_issue(import_name: str, issue_id: str) -> dict:
 	detail = ReviewQueue(imp.source_document).detail(issue_id)
 	if not detail:
 		frappe.throw(_("This item no longer exists. It may have been fixed."), frappe.DoesNotExistError)
-	return {**detail, "read_only": imp.status == "Completed"}
+	reading = detail["target"]["doctype"] == "Source Page" and is_job_enqueued(
+		preview_job_id(detail["target"]["name"])
+	)
+	return {**detail, "read_only": imp.status == "Completed", "reading": reading}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -38,8 +46,12 @@ def apply(import_name: str, issue_id: str, suggestion: str, value: str = "") -> 
 	queue = ReviewQueue(imp.source_document, import_name)
 	found = _find(queue, issue_id)
 	result = actions.apply(queue, found, suggestion, value)
-	_record_applied(imp.source_document, found, suggestion, result["outcome"])
-	return {"follow_up": result["follow_up"], "follow_up_kind": result.get("follow_up_kind")}
+	_record_applied(imp.source_document, found, suggestion, result["outcome"], result.get("instruction"))
+	return {
+		"outcome": result["outcome"],
+		"follow_up": result["follow_up"],
+		"follow_up_kind": result.get("follow_up_kind"),
+	}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -51,6 +63,32 @@ def apply_safe(import_name: str) -> dict:
 		result = actions.apply(queue, found, suggestion["id"])
 		_record_applied(imp.source_document, found, suggestion["id"], result["outcome"])
 	return {"applied": len(pairs)}
+
+
+@frappe.whitelist(methods=["POST"])
+def preview_reparse(import_name: str, page_no: int, instruction: str = "") -> dict:
+	imp = _get_import(import_name, "write")
+	if not llm.has_openrouter():
+		frappe.throw(_("Re-reading a page needs a model key. Add one in Wikify Settings."))
+	if is_job_enqueued(import_job_id(import_name)):
+		frappe.throw(_("This import is still being processed. Try again once it finishes."))
+	page_name = frappe.db.get_value(
+		"Source Page", {"source_document": imp.source_document, "page_no": int(page_no)}
+	)
+	if not page_name:
+		frappe.throw(_("Page {0} does not exist in this document.").format(page_no))
+	job_id = preview_job_id(page_name)
+	if not is_job_enqueued(job_id):
+		frappe.enqueue(
+			"wikify.jobs.review.preview",
+			queue="long",
+			timeout=PREVIEW_TIMEOUT,
+			job_id=job_id,
+			import_name=import_name,
+			page_no=int(page_no),
+			instruction=(instruction or "").strip()[:MAX_INSTRUCTION],
+		)
+	return {"queued": True}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -71,7 +109,9 @@ def _get_import(import_name: str, ptype: str):
 	return imp
 
 
-def _record_applied(source_document: str, found: dict, suggestion: str, outcome: str) -> None:
+def _record_applied(
+	source_document: str, found: dict, suggestion: str, outcome: str, instruction: str | None = None
+) -> None:
 	"""Keep the fingerprint of the content after the fix, so a fix that leaves the signal in
 	place (a page image does not raise the score) still closes the item. Background jobs
 	have not run yet, so their items stay open until the signal itself goes."""
@@ -83,6 +123,7 @@ def _record_applied(source_document: str, found: dict, suggestion: str, outcome:
 		"applied",
 		suggestion=suggestion,
 		outcome=outcome,
+		instruction=instruction,
 	)
 
 

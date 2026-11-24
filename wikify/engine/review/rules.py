@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from textwrap import shorten
 
 from wikify.engine.remediate import MIN_CANONICAL_CHARS, content_chars
 from wikify.engine.review.text import DEFAULT_TITLES, QUESTIONS, SOURCE_LABELS, match_reasons
@@ -135,7 +136,6 @@ class Detector:
 			],
 			signals=[
 				{"label": "Pages failed", "value": f"{count} of {len(self.pages)}"},
-				{"label": "Error", "value": first_error, "mono": True},
 			],
 			# The pages still render their first parse, so they stay off the page map.
 			pages=[],
@@ -259,5 +259,5 @@ def page_range(section: dict) -> list[int]:
 def first_line(notes: str | None, prefix: str) -> str:
 	for note in (notes or "").split("; "):
 		if note.startswith(prefix):
-			return note.removeprefix(prefix).strip()[:200]
+			return shorten(note.removeprefix(prefix), width=400, placeholder="…")
 	return ""

@@ -76,6 +76,9 @@ function pick() {
 				:disabled="disabled"
 			/>
 		</div>
+		<div v-else-if="selected && suggestion.on_request" class="px-3.5 pb-3.5 sm:pl-10">
+			<slot />
+		</div>
 		<div v-else-if="selected && suggestion.preview" class="px-3.5 pb-3.5 sm:pl-10">
 			<p class="mb-1.5 text-xs text-ink-gray-5">How it will look on the wiki</p>
 			<div

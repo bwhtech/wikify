@@ -22,18 +22,23 @@ def apply(queue, issue: dict, suggestion_id: str, value: str = "") -> dict:
 	offered = {s["id"] for s in suggestions_for(issue, queue.row(issue), queue.taxonomy)}
 	if suggestion_id not in offered:
 		frappe.throw(_("That fix is not offered for this item any more. Reload to see the latest."))
-	action = ACTIONS[suggestion_id]
-	return action(queue, issue, value)
+	if suggestion_id not in ACTIONS:
+		frappe.throw(_("Re-read the page first, then apply the new version."))
+	return ACTIONS[suggestion_id](queue, issue, value)
 
 
 def use_candidate(queue, issue: dict, value: str) -> dict:
 	page = queue.row(issue)
 	candidate = alternative(page)
-	store.set_canonical(page.name, candidate["markdown"], candidate["composite"], candidate["source"])
-	store.set_remediation_adopted(page.name, candidate["source"] != "baseline")
+	if candidate["source"] == "preview":
+		store.adopt_preview(page.name)
+	else:
+		store.set_canonical(page.name, candidate["markdown"], candidate["composite"], candidate["source"])
+		store.set_remediation_adopted(page.name, candidate["source"] != "baseline")
 	recompute_canonical_mean(queue.source_document)
 	outcome = f"{USE_LABELS[candidate['source']]}, score {score_text(page.canonical_composite)} to {score_text(candidate['composite'])}"
-	return {"outcome": outcome, **propagate(queue, page)}
+	instruction = page.preview_instruction if candidate["source"] == "preview" else None
+	return {"outcome": outcome, "instruction": instruction, **propagate(queue, page)}
 
 
 def page_image(queue, issue: dict, value: str) -> dict:

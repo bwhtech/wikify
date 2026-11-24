@@ -29,6 +29,12 @@
   "column_break_rem",
   "remediation_notes",
   "remediation_markdown",
+  "preview_section",
+  "preview_composite",
+  "preview_instruction",
+  "column_break_preview",
+  "preview_notes",
+  "preview_markdown",
   "canonical_section",
   "canonical_source",
   "canonical_composite",
@@ -189,6 +195,42 @@
    "options": "Markdown"
   },
   {
+   "collapsible": 1,
+   "fieldname": "preview_section",
+   "fieldtype": "Section Break",
+   "label": "Review Preview"
+  },
+  {
+   "fieldname": "preview_composite",
+   "fieldtype": "Float",
+   "label": "Preview Composite",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "preview_instruction",
+   "fieldtype": "Small Text",
+   "label": "Preview Instruction",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_preview",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "preview_notes",
+   "fieldtype": "Small Text",
+   "label": "Preview Notes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "preview_markdown",
+   "fieldtype": "Code",
+   "label": "Preview Markdown",
+   "options": "Markdown",
+   "read_only": 1
+  },
+  {
    "fieldname": "canonical_section",
    "fieldtype": "Section Break",
    "label": "Canonical"
@@ -217,7 +259,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-19 00:00:00",
+ "modified": "2026-11-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Wikify",
  "name": "Source Page",

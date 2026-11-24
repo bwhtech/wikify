@@ -11,9 +11,9 @@ it touches and ends in something you can demo.
 
 | # | Slice | Type | Blocked by | Status |
 |---|---|---|---|---|
-| 32 | Read-only queue: `engine/review.py` detect and reasons, the `Wikify Review Decision` DocType, read APIs, `accept` and `reopen`, the Review tab dashboard, and the item screen without apply | HITL | none | ⬜ |
-| 33 | Fixes with no model call: the `apply` API, `use_candidate`, `page_image`, `propagate_page` moved into the engine, section lint fixes, set section type, `apply_safe`, boundary follow-up | HITL | 32 | ⬜ |
-| 34 | Fixes that call a model: `reparse_page(adopt=False)`, the preview job and realtime event, "Something else" instruction, remediation scope `failed`, reclassify | HITL | 33 | ⬜ |
+| 32 | Read-only queue: `engine/review.py` detect and reasons, the `Wikify Review Decision` DocType, read APIs, `accept` and `reopen`, the Review tab dashboard, and the item screen without apply | HITL | none | ✅ |
+| 33 | Fixes with no model call: the `apply` API, `use_candidate`, `page_image`, `propagate_page` moved into the engine, section lint fixes, set section type, `apply_safe`, boundary follow-up | HITL | 32 | ✅ |
+| 34 | Fixes that call a model: `reparse_page(adopt=False)`, the preview job and realtime event, the instruction box, remediation scope `failed`, reclassify | HITL | 33 | ✅ |
 | 35 | Hand-off and polish: Ask the agent with a draft message, the approve-tree confirm (D1), landing on Review (D2), mobile layout | HITL | 33 | ⬜ |
 
 Delivery is in order. 32 is valuable on its own: the user finally sees one list with
@@ -120,8 +120,8 @@ names.
 
 **Demo:** open a low-score page and click **Re-read now**. The card shows a spinner,
 the realtime event arrives, and the card shows the new candidate with its score.
-Apply it. Type "the second column is a footnote, drop it" in **Something else** and
-re-read, and the preview reflects the instruction. On an import whose vision pass
+Apply it. Type "the second column is a footnote, drop it" in the card's instruction
+box and re-read, and the preview reflects the instruction. On an import whose vision pass
 failed, the document item **Retry the vision pass** queues remediation with scope
 `failed`, and progress streams on the import.
 

@@ -3,9 +3,11 @@ engine path; `apply` lives in `review.actions`."""
 
 from __future__ import annotations
 
+from wikify.engine import llm
 from wikify.engine.lint import close_fences, fix_table_separators, lint_markdown, pad_ragged_rows
 
 USE_LABELS = {
+	"preview": "Use the new reading",
 	"vlm": "Use the vision model version",
 	"cleanup": "Use the cleaned-up version",
 	"baseline": "Use the first parse",
@@ -32,6 +34,8 @@ def page_suggestions(issue: dict, page: dict) -> list[dict]:
 	found = []
 	if candidate := alternative(page):
 		found.append(use_candidate(page, candidate))
+	if llm.has_openrouter():
+		found.append(reparse())
 	if page.image and page.image not in (page.canonical_markdown or ""):
 		found.append(page_image(page))
 	return found
@@ -112,6 +116,15 @@ def type_suggestions(taxonomy: list[str]) -> list[dict]:
 	]
 
 
+def reparse() -> dict:
+	return suggestion(
+		"reparse",
+		"Re-read the page with the vision model",
+		"Reads the page image again, about 10 to 30 seconds. You see the result before anything changes.",
+		on_request=True,
+	)
+
+
 def retry_remediation() -> dict:
 	return suggestion(
 		"retry_remediation",
@@ -136,6 +149,8 @@ def use_candidate(page: dict, candidate: dict) -> dict:
 	detail = f"Scores {candidate['composite']:.2f}" if candidate["composite"] is not None else "Not scored"
 	if current is not None:
 		detail += f". The version in use scores {current:.2f}."
+	if candidate["source"] == "preview" and page.preview_instruction:
+		detail += f' You asked: "{page.preview_instruction}".'
 	return suggestion(
 		"use_candidate",
 		USE_LABELS.get(candidate["source"], "Use the other version"),
@@ -156,18 +171,20 @@ def page_image(page: dict) -> dict:
 
 
 def alternative(page: dict) -> dict | None:
-	"""The stored version of the page that is not the one in use, if it has content."""
-	if page.canonical_source in (None, "", "baseline"):
-		markdown, composite, source = (
-			page.remediation_markdown,
-			page.remediation_composite,
-			page.remediation_method,
-		)
-	else:
-		markdown, composite, source = page.baseline_markdown, page.composite, "baseline"
-	if not (markdown or "").strip() or markdown.strip() == (page.canonical_markdown or "").strip():
-		return None
-	return {"markdown": markdown, "composite": composite, "source": source}
+	"""The stored version of the page that is not the one in use, if it has content. A
+	fresh re-read comes first, then whichever pipeline version is not adopted."""
+	candidates = [
+		(page.remediation_markdown, page.remediation_composite, page.remediation_method),
+		(page.baseline_markdown, page.composite, "baseline"),
+	]
+	if page.remediation_adopted:
+		candidates.reverse()
+	candidates.insert(0, (page.preview_markdown, page.preview_composite, "preview"))
+	current = (page.canonical_markdown or "").strip()
+	for markdown, composite, source in candidates:
+		if source and (markdown or "").strip() not in ("", current):
+			return {"markdown": markdown, "composite": composite, "source": source}
+	return None
 
 
 def suggestion(
@@ -180,6 +197,7 @@ def suggestion(
 	confidence: float | None = None,
 	preview: str | None = None,
 	options: list[str] | None = None,
+	on_request: bool = False,
 ) -> dict:
 	return {
 		"id": id,
@@ -190,4 +208,5 @@ def suggestion(
 		"confidence": confidence,
 		"preview": preview,
 		"options": options,
+		"on_request": on_request,
 	}

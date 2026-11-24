@@ -160,6 +160,44 @@ def set_remediation_adopted(page_name: str, adopted: bool) -> None:
 	frappe.db.set_value("Source Page", page_name, "remediation_adopted", 1 if adopted else 0)
 
 
+def set_page_preview(
+	page_name: str, markdown: str, composite: float | None, notes: str | None, instruction: str
+) -> None:
+	frappe.db.set_value(
+		"Source Page",
+		page_name,
+		{
+			"preview_markdown": markdown,
+			"preview_composite": composite,
+			"preview_notes": notes,
+			"preview_instruction": instruction or None,
+		},
+	)
+
+
+def adopt_preview(page_name: str) -> None:
+	"""Publish the review preview. It becomes the page's vision remediation."""
+	page = frappe.db.get_value(
+		"Source Page", page_name, ["preview_markdown", "preview_composite", "preview_notes"], as_dict=True
+	)
+	frappe.db.set_value(
+		"Source Page",
+		page_name,
+		{
+			"remediation_method": "vlm",
+			"remediation_markdown": page.preview_markdown,
+			"remediation_composite": page.preview_composite,
+			"remediation_notes": page.preview_notes,
+			"remediation_adopted": 1,
+			"preview_markdown": None,
+			"preview_composite": 0,
+			"preview_notes": None,
+			"preview_instruction": None,
+		},
+	)
+	set_canonical(page_name, page.preview_markdown, page.preview_composite, "vlm")
+
+
 def set_canonical_mean(source_document: str, mean: float | None) -> None:
 	frappe.db.set_value("Source Document", source_document, "canonical_mean", mean)
 
@@ -458,6 +496,11 @@ REVIEW_PAGE_FIELDS = [
 	"remediation_markdown",
 	"remediation_composite",
 	"remediation_notes",
+	"remediation_adopted",
+	"preview_markdown",
+	"preview_composite",
+	"preview_notes",
+	"preview_instruction",
 ]
 
 

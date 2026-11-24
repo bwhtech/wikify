@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { Alert, Badge, Button, LoadingIndicator, dayjs, dialog, toast, useCall } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
+import RereadPanel from "@/components/review/RereadPanel.vue";
 import SuggestionCard from "@/components/review/SuggestionCard.vue";
 import { CATEGORIES, issueLocation, severityBadge } from "@/components/review/meta";
 import { setPage, setSection } from "@/data/agentContext";
+import { useSocket } from "@/socket";
 
 const props = defineProps({
 	importName: { type: String, required: true },
@@ -27,9 +29,14 @@ const choice = ref(null);
 const value = ref("");
 const showExtracted = ref(false);
 const imageIndex = ref(0);
+const reread = reactive({ running: false, error: "" });
 
 watch(issue, (found) => {
-	choice.value = found?.suggestions.find((s) => s.recommended)?.id ?? null;
+	reread.running = Boolean(found?.reading);
+	choice.value = reread.running
+		? "reparse"
+		: found?.suggestions.find((s) => s.recommended)?.id ?? null;
+	reread.error = "";
 	value.value = "";
 	showExtracted.value = false;
 	imageIndex.value = 0;
@@ -45,20 +52,54 @@ const settledTitle = computed(() => {
 	return `Fixed: ${latest.outcome}`;
 });
 const chosen = computed(() => issue.value?.suggestions.find((s) => s.id === choice.value));
-const canApply = computed(() => chosen.value && (!chosen.value.options || value.value));
+const canApply = computed(
+	() => chosen.value && !chosen.value.on_request && (!chosen.value.options || value.value)
+);
 const image = computed(() => issue.value?.images[imageIndex.value]);
 const imageCount = computed(() => issue.value?.images.length || 0);
 
 const applyCall = reviewCall("apply");
 const acceptCall = reviewCall("accept");
 const reopenCall = reviewCall("reopen");
+const previewCall = reviewCall("preview_reparse");
+
+async function startReread(instruction) {
+	reread.error = "";
+	reread.running = true;
+	await previewCall.submit({
+		import_name: props.importName,
+		page_no: issue.value.target.page_no,
+		instruction,
+	});
+	if (previewCall.error) {
+		reread.running = false;
+		reread.error = previewCall.error.messages?.[0] || "Could not start the re-read";
+	}
+}
+
+function onPreview(payload) {
+	const target = issue.value?.target;
+	if (payload.import !== props.importName || target?.doctype !== "Source Page") return;
+	if (payload.page_no !== target.page_no) return;
+	reread.running = false;
+	if (!payload.ok) {
+		reread.error = payload.error;
+		return;
+	}
+	toast.success(`Page re-read. The new version scores ${payload.composite.toFixed(2)}.`);
+	detail.reload();
+}
+
+const socket = useSocket();
+onMounted(() => socket?.on("wikify_review_preview", onPreview));
+onUnmounted(() => socket?.off("wikify_review_preview", onPreview));
 
 async function apply() {
 	const result = await run(applyCall, { suggestion: choice.value, value: value.value });
 	if (!result) return;
 	emit("changed");
 	if (result.follow_up?.length) showFollowUp(result);
-	else toast.success("Fix applied");
+	else toast.success(result.outcome);
 	goNext();
 }
 
@@ -123,7 +164,8 @@ function attachAgentContext(found) {
 function decisionText(decision) {
 	const what =
 		decision.action === "accepted" ? "Marked as fine" : decision.outcome || "Fix applied";
-	return `${what}, ${dayjs(decision.creation).fromNow()}`;
+	const asked = decision.instruction ? ` (you asked: "${decision.instruction}")` : "";
+	return `${what}${asked}, ${dayjs(decision.creation).fromNow()}`;
 }
 </script>
 
@@ -321,7 +363,14 @@ function decisionText(decision) {
 								:selected="choice === suggestion.id"
 								:disabled="!editable"
 								@select="choice = suggestion.id"
-							/>
+							>
+								<RereadPanel
+									:running="reread.running"
+									:error="reread.error"
+									:disabled="!editable"
+									@start="startReread"
+								/>
+							</SuggestionCard>
 						</div>
 						<p v-if="!issue.suggestions.length" class="text-p-sm text-ink-gray-5">
 							We have no automatic fix for this one. Mark it as fine, or ask the

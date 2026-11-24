@@ -23,7 +23,10 @@ def reparse_page(
 	method: str | None = None,
 	instruction: str = "",
 	project_context: str = "",
+	adopt: bool = True,
 ) -> dict:
+	"""Re-read one page. With `adopt=False` the result is kept apart as a preview, so a
+	person sees it before it replaces the canonical text."""
 	if not llm.has_openrouter():
 		raise RuntimeError("OpenRouter key not set — re-parsing needs cloud models.")
 
@@ -65,9 +68,12 @@ def reparse_page(
 	new_ps = score_page(page_no, new_md, gt, image_data_url=img, use_judge=use_judge, page_kind=kind)
 	notes = "; ".join([*new_ps.notes, *diagram_notes]) or None
 
-	store.set_remediation(page["name"], method, new_md, new_ps, adopted=True, notes=notes)
-	store.set_canonical(page["name"], new_md, new_ps.composite, method)
-	recompute_canonical_mean(source_document)
+	if adopt:
+		store.set_remediation(page["name"], method, new_md, new_ps, adopted=True, notes=notes)
+		store.set_canonical(page["name"], new_md, new_ps.composite, method)
+		recompute_canonical_mean(source_document)
+	else:
+		store.set_page_preview(page["name"], new_md, new_ps.composite, notes, instruction)
 	store.add_document_cost(source_document, store.add_page_cost(page["name"], llm.get_metrics()))
 
 	return {

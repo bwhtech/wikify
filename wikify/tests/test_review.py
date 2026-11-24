@@ -1,6 +1,7 @@
 # Copyright (c) 2026, BWH and contributors
 # For license information, please see license.txt
 import json
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -9,6 +10,8 @@ from wikify.api import review as review_api
 from wikify.engine import store
 from wikify.engine.loader.sectionizer import Section
 from wikify.engine.review import rules
+from wikify.engine.review.suggestions import alternative
+from wikify.jobs import review as review_job
 from wikify.tests.test_ask_history import make_project, make_user
 
 THRESHOLD = 0.70
@@ -124,6 +127,28 @@ class TestReviewRules(FrappeTestCase):
 		low = page(1, canonical_composite=0.5)
 		changed = page(1, canonical_composite=0.5, canonical_markdown="Different text")
 		self.assertNotEqual(detect([low])[0]["fingerprint"], detect([changed])[0]["fingerprint"])
+
+
+class TestCandidates(FrappeTestCase):
+	def test_baseline_page_offers_the_unadopted_remediation(self):
+		row = page(1, remediation_method="cleanup", remediation_markdown="Cleaner text")
+		self.assertEqual(alternative(row)["source"], "cleanup")
+
+	def test_adopted_page_offers_the_first_parse(self):
+		row = page(
+			1,
+			canonical_source="vlm",
+			canonical_markdown="Vision text",
+			remediation_method="vlm",
+			remediation_markdown="Vision text",
+			remediation_adopted=1,
+			baseline_markdown="First parse",
+		)
+		self.assertEqual(alternative(row)["source"], "baseline")
+
+	def test_a_preview_comes_before_the_stored_versions(self):
+		row = page(1, remediation_method="cleanup", remediation_markdown="Cleaner", preview_markdown="New")
+		self.assertEqual(alternative(row)["source"], "preview")
 
 
 class TestReviewApi(FrappeTestCase):
@@ -271,3 +296,88 @@ class TestReviewApi(FrappeTestCase):
 			review_api.get_review(self.imp.name)
 		with self.assertRaises(frappe.PermissionError):
 			review_api.accept(self.imp.name, self.issue_id)
+
+	def test_applying_a_preview_publishes_it_as_the_vision_version(self):
+		frappe.db.set_value(
+			"Source Page",
+			self.low,
+			{
+				"preview_markdown": "The re-read page 2.",
+				"preview_composite": 0.95,
+				"preview_instruction": "Drop the footer",
+			},
+		)
+		detail = review_api.get_issue(self.imp.name, self.issue_id)
+		self.assertEqual(detail["suggestions"][0]["label"], "Use the new reading")
+		self.assertIn("Drop the footer", detail["suggestions"][0]["detail"])
+
+		review_api.apply(self.imp.name, self.issue_id, "use_candidate")
+		page = frappe.db.get_value(
+			"Source Page",
+			self.low,
+			[
+				"canonical_markdown",
+				"canonical_source",
+				"remediation_markdown",
+				"remediation_adopted",
+				"preview_markdown",
+			],
+			as_dict=True,
+		)
+		self.assertEqual(page.canonical_markdown, "The re-read page 2.")
+		self.assertEqual((page.canonical_source, page.remediation_adopted), ("vlm", 1))
+		self.assertEqual(page.remediation_markdown, "The re-read page 2.")
+		self.assertIsNone(page.preview_markdown)
+		self.assertEqual(
+			review_api.get_review(self.imp.name)["reviewed"][0]["instruction"], "Drop the footer"
+		)
+
+	def test_reread_is_offered_with_a_key_but_cannot_be_applied(self):
+		with patch("wikify.engine.llm.has_openrouter", return_value=True):
+			ids = [s["id"] for s in review_api.get_issue(self.imp.name, self.issue_id)["suggestions"]]
+			self.assertIn("reparse", ids)
+			with self.assertRaises(frappe.ValidationError):
+				review_api.apply(self.imp.name, self.issue_id, "reparse")
+
+	def test_preview_reparse_queues_one_job_per_page(self):
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=True),
+			patch("wikify.api.review.is_job_enqueued", return_value=False),
+			patch("frappe.enqueue") as enqueue,
+		):
+			self.assertEqual(review_api.preview_reparse(self.imp.name, 2, "  Drop it  "), {"queued": True})
+		kwargs = enqueue.call_args.kwargs
+		self.assertEqual(kwargs["job_id"], f"review-preview:{self.low}")
+		self.assertEqual((kwargs["page_no"], kwargs["instruction"]), (2, "Drop it"))
+
+	def test_preview_reparse_needs_a_model_key(self):
+		with (
+			patch("wikify.engine.llm.has_openrouter", return_value=False),
+			self.assertRaises(frappe.ValidationError),
+		):
+			review_api.preview_reparse(self.imp.name, 2)
+
+	def test_preview_job_reports_success_and_failure(self):
+		events = []
+		with (
+			patch("wikify.engine.store.get_import_pdf_path", return_value="/tmp/r.pdf"),
+			patch("frappe.publish_realtime", lambda event, payload, **kw: events.append((event, payload))),
+			patch("frappe.log_error"),
+		):
+			with patch.object(review_job, "reparse_page", return_value={"composite": 0.88}):
+				review_job.preview(self.imp.name, 2)
+			with patch.object(review_job, "reparse_page", side_effect=RuntimeError("402 Payment Required")):
+				review_job.preview(self.imp.name, 2)
+		self.assertEqual(
+			events,
+			[
+				(
+					"wikify_review_preview",
+					{"import": self.imp.name, "page_no": 2, "ok": True, "composite": 0.88},
+				),
+				(
+					"wikify_review_preview",
+					{"import": self.imp.name, "page_no": 2, "ok": False, "error": "402 Payment Required"},
+				),
+			],
+		)
