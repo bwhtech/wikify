@@ -27,20 +27,18 @@ def _page_no(args: dict) -> int | None:
 
 
 def _propagate_page(source_document: str, page_no: int) -> str:
-	from wikify.engine.sectionize import rebuild_section_markdown, sections_covering_page
+	from wikify.engine.sectionize import propagate_page
 
-	owners = sections_covering_page(source_document, page_no)
-	if len(owners) == 1:
-		try:
-			res = rebuild_section_markdown(owners[0].name)
-		except ValueError as e:
-			return " " + _("Section propagation failed ({0}) — the wiki preview is still stale.").format(
-				str(e)
-			)
+	try:
+		result = propagate_page(source_document, page_no)
+	except ValueError as e:
+		return " " + _("Section propagation failed ({0}) — the wiki preview is still stale.").format(str(e))
+	owners, rebuilt = result["owners"], result["rebuilt"]
+	if rebuilt:
 		return " " + _(
 			"Propagated into section '{0}' ({1} chars) — the wiki preview now shows it. If this "
 			"document has a generated wiki, finish with sync_wiki_page on `{2}`."
-		).format(res["title"], res["chars"], owners[0].name)
+		).format(rebuilt["title"], rebuilt["chars"], owners[0].name)
 	if not owners:
 		return " " + _(
 			"No section's page range covers this page, so the wiki preview is NOT updated. "

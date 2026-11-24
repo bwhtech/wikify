@@ -134,6 +134,32 @@ def fix_table_separators(markdown: str) -> str:
 	return "\n".join(out)
 
 
+def close_fences(markdown: str) -> str:
+	"""Close a code fence left open at the end. Only adds text; idempotent."""
+	lines = (markdown or "").split("\n")
+	openers = [m.group(1) for m in map(_FENCE_RE.match, lines) if m]
+	if len(openers) % 2 == 0:
+		return markdown
+	return f"{(markdown or '').rstrip()}\n{openers[-1]}"
+
+
+def pad_ragged_rows(markdown: str) -> str:
+	"""Pad table rows that have fewer cells than their header. Longer rows are left alone."""
+	lines = (markdown or "").split("\n")
+	for start, block in _table_blocks(lines):
+		if len(block) < 3 or not _SEPARATOR_RE.match(block[1]):
+			continue
+		header_cells = _cell_count(block[0])
+		for offset, row in enumerate(block[2:], start=2):
+			missing = header_cells - _cell_count(row)
+			if missing > 0 and not _SEPARATOR_RE.match(row):
+				body = row.rstrip()
+				if body.endswith("|") and not body.endswith("\\|"):
+					body = body[:-1]
+				lines[start + offset] = body + "|" + " |" * missing
+	return "\n".join(lines)
+
+
 _BLANK_RUN_RE = re.compile(r"(?<![\\_])_{3,}")
 _RULE_LINE_RE = re.compile(r"^\s*(?:_\s*){3,}$")
 _HTML_LINE_RE = re.compile(r"^\s*</?[a-zA-Z]")

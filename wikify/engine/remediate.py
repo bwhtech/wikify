@@ -64,6 +64,18 @@ def pick_winner(candidates: list[tuple], baseline_composite: float, baseline_mar
 	return cleanup_candidate
 
 
+def is_target(page: dict, scope: str) -> bool:
+	if scope == "all":
+		return True
+	if scope == "failed":
+		return "vlm failed:" in (page["remediation_notes"] or "") and page["canonical_source"] in (
+			None,
+			"",
+			"baseline",
+		)
+	return page["verdict"] != "pass"
+
+
 def remediate_pdf(  # noqa: C901
 	source_document: str,
 	pdf_path: str,
@@ -83,7 +95,7 @@ def remediate_pdf(  # noqa: C901
 	dpi = int(settings.get("render_dpi"))
 
 	pages = store.get_pages(source_document)
-	targets = pages if scope == "all" else [p for p in pages if p["verdict"] != "pass"]
+	targets = [p for p in pages if is_target(p, scope)]
 	total = len(targets)
 
 	# Pages outside the scope keep the version they already publish.

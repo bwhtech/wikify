@@ -67,7 +67,7 @@ def reparse_page(
 
 	store.set_remediation(page["name"], method, new_md, new_ps, adopted=True, notes=notes)
 	store.set_canonical(page["name"], new_md, new_ps.composite, method)
-	_recompute_canonical_mean(source_document)
+	recompute_canonical_mean(source_document)
 	store.add_document_cost(source_document, store.add_page_cost(page["name"], llm.get_metrics()))
 
 	return {
@@ -100,7 +100,7 @@ def embed_page_image(source_document: str, page_no: int, caption: str) -> dict:
 	return {"page_no": page_no, "image_url": image_url}
 
 
-def _recompute_canonical_mean(source_document: str) -> None:
+def recompute_canonical_mean(source_document: str) -> None:
 	rows = store.get_canonical_composites(source_document)
 	comps = [c for c in rows if c is not None]
 	store.set_canonical_mean(source_document, round(sum(comps) / len(comps), 3) if comps else None)

@@ -329,3 +329,23 @@ class TestLintSurfacing(FrappeTestCase):
 		self.assertIn("table missing separator row (line 1)", flagged.block)
 		clean = resolve_attachments([{"type": "section", "name": self._name("2. Beta")}])
 		self.assertNotIn("Markdown lint:", clean.block)
+
+
+class TestLintFixHelpers(FrappeTestCase):
+	def test_close_fences_only_adds_the_closing_fence(self):
+		from wikify.engine.lint import close_fences
+
+		markdown = "Settings:\n```\nP01 = 50 Hz"
+		fixed = close_fences(markdown)
+		self.assertEqual(fixed, "Settings:\n```\nP01 = 50 Hz\n```")
+		self.assertEqual(close_fences(fixed), fixed)
+		self.assertEqual(lint_markdown(fixed), [])
+
+	def test_pad_ragged_rows_pads_short_rows_and_leaves_the_rest(self):
+		from wikify.engine.lint import pad_ragged_rows
+
+		markdown = "| a | b | c |\n|---|---|---|\n| 1 | 2 |\n| 1 | 2 | 3 | 4 |"
+		fixed = pad_ragged_rows(markdown)
+		self.assertEqual(fixed.split("\n")[2], "| 1 | 2 | |")
+		self.assertEqual(fixed.split("\n")[3], "| 1 | 2 | 3 | 4 |")
+		self.assertEqual(pad_ragged_rows(fixed), fixed)

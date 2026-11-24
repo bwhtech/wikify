@@ -23,6 +23,7 @@ import { statusTheme, isActive } from "@/utils/status";
 import { confirmDeleteDocument } from "@/utils/deleteDocument";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
+import ReviewTab from "@/components/review/ReviewTab.vue";
 import { setDocument, setProject } from "@/data/agentContext";
 import { recordRecent } from "@/data/commandPalette";
 
@@ -39,6 +40,7 @@ const imp = useDoc({ doctype: "Wikify Import", name: props.name });
 
 // Keys are route params, so they don't always match the labels.
 const tabs = [
+	{ label: "Review", key: "review" },
 	{ label: "PDF", key: "pdf" },
 	{ label: "Pages", key: "pages" },
 	{ label: "Wiki", key: "tree" },
@@ -156,6 +158,16 @@ watch(
 
 const pageReview = ref(null);
 const sectionTree = ref(null);
+const reviewTab = ref(null);
+const reviewBusy = computed(() => isActive(status.value) || !imp.doc?.source_document);
+
+function openPage(pageNo) {
+	router.push({
+		name: "ImportDetail",
+		params: { name: props.name, tab: "pages" },
+		query: { page: String(pageNo) },
+	});
+}
 
 // Document-level audit score + LLM spend (0.4 slice 23) live on Source Document.
 const sdStats = useList({
@@ -199,6 +211,7 @@ function onProgress(payload) {
 		if (wasRemediating && payload.status === "Review") {
 			pageReview.value?.reload();
 			sectionTree.value?.reload();
+			reviewTab.value?.reload();
 		}
 		// A finished publish assigned each included section its wiki_document — the
 		// mounted tree still holds the pre-publish (empty) values until refetched.
@@ -230,6 +243,7 @@ function onAgentMutation(payload) {
 	if (!imp.doc || !docs.includes(imp.doc.source_document)) return;
 	pageReview.value?.reload();
 	sectionTree.value?.reload();
+	reviewTab.value?.reload();
 	sdStats.reload();
 }
 function onClassifyDone(payload) {
@@ -240,6 +254,7 @@ function onClassifyDone(payload) {
 	}
 	toast.success("Sections reclassified");
 	sectionTree.value?.reload();
+	reviewTab.value?.reload();
 	sdStats.reload();
 }
 onMounted(() => {
@@ -359,8 +374,16 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 
 		<Tabs v-model="activeTab" :tabs="tabs">
 			<template #tab-panel="{ tab }">
+				<ReviewTab
+					v-if="tab.key === 'review'"
+					ref="reviewTab"
+					:import-name="name"
+					:busy="reviewBusy"
+					@open-page="openPage"
+				/>
+
 				<!-- Overview -->
-				<div v-if="tab.key === 'overview'" class="body-container pt-5 pb-40">
+				<div v-else-if="tab.key === 'overview'" class="body-container pt-5 pb-40">
 					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
 						<div>
 							<p class="text-sm text-ink-gray-5">Pages</p>
