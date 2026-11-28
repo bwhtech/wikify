@@ -42,8 +42,8 @@ class Detector:
 
 	def issues(self) -> list[dict]:
 		issues = self._document_issues()
-		issues += [i for i in map(self._page_issue, self.pages) if i]
-		issues += [i for i in map(self._section_issue, self.sections) if i]
+		issues += [issue for page in self.pages if (issue := self._page_issue(page))]
+		issues += [issue for section in self.sections if (issue := self._section_issue(section))]
 		return issues
 
 	def _document_issues(self) -> list[dict]:

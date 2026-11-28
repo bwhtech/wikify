@@ -137,7 +137,7 @@ def fix_table_separators(markdown: str) -> str:
 def close_fences(markdown: str) -> str:
 	"""Close a code fence left open at the end. Only adds text; idempotent."""
 	lines = (markdown or "").split("\n")
-	openers = [m.group(1) for m in map(_FENCE_RE.match, lines) if m]
+	openers = [match.group(1) for line in lines if (match := _FENCE_RE.match(line))]
 	if len(openers) % 2 == 0:
 		return markdown
 	return f"{(markdown or '').rstrip()}\n{openers[-1]}"

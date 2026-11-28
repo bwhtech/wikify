@@ -38,4 +38,4 @@ def preview(import_name: str, page_no: int, instruction: str = "") -> None:
 		frappe.log_error(f"Review preview failed for page {page_no} of {import_name}")
 		payload.update(ok=False, error=str(error) or type(error).__name__)
 	# After commit, so the SPA's reload reads the stored candidate.
-	frappe.publish_realtime("wikify_review_preview", payload, after_commit=True)
+	frappe.publish_realtime("wikify_review_preview", payload, user=frappe.session.user, after_commit=True)
