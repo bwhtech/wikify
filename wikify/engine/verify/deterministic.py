@@ -14,11 +14,12 @@ from collections import Counter
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _MD_TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
+_HTML_TAG = re.compile(r"</?[a-z][a-z0-9]*(?:\s[^<>]*)?/?>")
 
 
 def _tokens(text: str) -> Counter:
-	# Strip common markdown syntax so we compare words, not formatting.
-	cleaned = re.sub(r"[#*_`>\-\|]", " ", text.lower())
+	# Strip HTML tags and common markdown syntax so we compare words, not formatting.
+	cleaned = re.sub(r"[#*_`>\-\|]", " ", _HTML_TAG.sub(" ", text.lower()))
 	return Counter(_WORD_RE.findall(cleaned))
 
 
