@@ -133,7 +133,7 @@ Different jobs use different models, and each one is configurable.
 | Job | Default model |
 |---|---|
 | Judge a page against its image | `anthropic/claude-sonnet-4.6` |
-| Re-read a page from its image | `mistralai/mistral-medium-3.1` |
+| Re-read a page from its image | `google/gemini-3-flash-preview` |
 | Clean up page text | `google/gemini-2.5-flash` |
 | Label a section | `google/gemini-2.5-flash` |
 | The assistant | `anthropic/claude-sonnet-4.6` |
