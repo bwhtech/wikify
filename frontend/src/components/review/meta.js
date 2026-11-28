@@ -44,3 +44,17 @@ export function sortIssues(issues) {
 			(a.target.page_no || 0) - (b.target.page_no || 0)
 	);
 }
+
+const DRAFT_LINT_LINES = 8;
+
+// The section chip tells the agent where; the draft tells it what is wrong.
+export function agentDraft(issue) {
+	const lines = [`Fix this section: ${issue.title}. ${issue.reason}`];
+	const lint = issue.lint || [];
+	if (lint.length) lines.push("", "What the check found:");
+	for (const item of lint.slice(0, DRAFT_LINT_LINES)) {
+		lines.push(item.line ? `- Line ${item.line}: ${item.message}` : `- ${item.message}`);
+	}
+	if (lint.length > DRAFT_LINT_LINES) lines.push(`- ${lint.length - DRAFT_LINT_LINES} more`);
+	return lines.join("\n");
+}

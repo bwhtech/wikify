@@ -367,8 +367,8 @@ returned `follow_up`, it stays on the item and shows the boundary-page alert
 
 ### 7.4 Approve the tree (D1)
 
-`build_graph` stays as it is. In the UI, the action that calls it (`SectionTree.vue`) checks
-`summary.blocks`. When it is greater than 0, it shows a confirm dialog: "5 spots
+`build_graph` stays as it is. In the UI, the action that calls it (`SectionTree.vue`) reloads
+the review and checks `summary.blocks`, so edits made in the tree count. When it is greater than 0, it shows a confirm dialog: "5 spots
 still block publishing. They will render broken on the wiki." with **Review them**
 and **Approve anyway** buttons.
 

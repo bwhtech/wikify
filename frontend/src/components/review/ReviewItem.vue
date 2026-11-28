@@ -4,8 +4,9 @@ import { Alert, Badge, Button, LoadingIndicator, dayjs, dialog, toast, useCall }
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import RereadPanel from "@/components/review/RereadPanel.vue";
 import SuggestionCard from "@/components/review/SuggestionCard.vue";
-import { CATEGORIES, issueLocation, severityBadge } from "@/components/review/meta";
+import { CATEGORIES, agentDraft, issueLocation, severityBadge } from "@/components/review/meta";
 import { setPage, setSection } from "@/data/agentContext";
+import { askAgent } from "@/data/agentPanel";
 import { useSocket } from "@/socket";
 
 const props = defineProps({
@@ -56,6 +57,9 @@ const canApply = computed(
 	() => chosen.value && !chosen.value.on_request && (!chosen.value.options || value.value)
 );
 const image = computed(() => issue.value?.images[imageIndex.value]);
+const canAskAgent = computed(
+	() => editable.value && issue.value.target.doctype === "Source Section"
+);
 const imageCount = computed(() => issue.value?.images.length || 0);
 
 const applyCall = reviewCall("apply");
@@ -129,13 +133,26 @@ async function reopen() {
 	detail.reload();
 }
 
-function goNext() {
+function goNext(queue = props.queue) {
+	const at = queue.findIndex((i) => i.id === props.issueId);
 	const next =
-		props.queue.find((i, index) => index > position.value) ||
+		queue.find((i, index) => index > at && i.id !== props.issueId) ||
 		props.queue.find((i) => i.id !== props.issueId);
 	if (next) emit("open", next.id);
 	else emit("close");
 }
+
+// Applying here moves on before the queue reloads, so a vanished item was fixed elsewhere,
+// such as by the agent.
+watch(
+	() => props.queue,
+	(queue, before) => {
+		const ids = new Set(queue.map((i) => i.id));
+		if (ids.has(props.issueId) || !before?.some((i) => i.id === props.issueId)) return;
+		toast.success("This spot is fixed.");
+		goNext(before.filter((i) => ids.has(i.id) || i.id === props.issueId));
+	}
+);
 
 async function run(call, params = {}) {
 	await call.submit({ import_name: props.importName, issue_id: props.issueId, ...params });
@@ -376,6 +393,20 @@ function decisionText(decision) {
 							We have no automatic fix for this one. Mark it as fine, or ask the
 							agent in the chat panel.
 						</p>
+					</section>
+
+					<section
+						v-if="canAskAgent"
+						class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-outline-gray-1 px-3 py-2.5"
+					>
+						<p class="flex-1 text-p-sm text-ink-gray-6">
+							None of these fit? The agent can edit this section for you.
+						</p>
+						<Button
+							icon-left="lucide-sparkles"
+							label="Ask the agent"
+							@click="askAgent(agentDraft(issue))"
+						/>
 					</section>
 				</div>
 

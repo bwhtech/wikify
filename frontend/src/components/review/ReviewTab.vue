@@ -1,7 +1,7 @@
 <script setup>
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { LoadingIndicator, useCall } from "frappe-ui";
+import { LoadingIndicator } from "frappe-ui";
 import ReviewDashboard from "@/components/review/ReviewDashboard.vue";
 import ReviewItem from "@/components/review/ReviewItem.vue";
 import { sortIssues } from "@/components/review/meta";
@@ -9,24 +9,15 @@ import { sortIssues } from "@/components/review/meta";
 const props = defineProps({
 	importName: { type: String, required: true },
 	busy: { type: Boolean, default: false },
+	// The import page loads the review once and shares it with the tree's approve check.
+	review: { type: Object, required: true },
 });
 const emit = defineEmits(["open-page"]);
 
 const route = useRoute();
 const router = useRouter();
 
-const review = useCall({
-	url: "/api/v2/method/wikify.api.review.get_review",
-	params: () => ({ import_name: props.importName }),
-	immediate: !props.busy,
-});
-
-watch(
-	() => props.busy,
-	(busy) => !busy && review.reload()
-);
-
-const issues = computed(() => sortIssues(review.data?.issues || []));
+const issues = computed(() => sortIssues(props.review.data?.issues || []));
 const itemId = computed(() => route.query.item || null);
 
 function openItem(id) {
@@ -38,8 +29,6 @@ function closeItem() {
 	delete query.item;
 	router.push({ query });
 }
-
-defineExpose({ reload: () => review.reload() });
 </script>
 
 <template>

@@ -47,7 +47,8 @@ const tabs = [
 	{ label: "Logs", key: "overview" },
 ];
 const tabKeys = tabs.map((t) => t.key);
-const activeTab = ref(Math.max(0, tabKeys.indexOf(props.tab)));
+// A link without a tab passes "" rather than undefined, so the prop default never applies.
+const activeTab = ref(Math.max(0, tabKeys.indexOf(props.tab || "pdf")));
 
 // Persist the active tab in the route (path param) so a refresh restores it. Use
 // replace so tab-switching doesn't flood browser history; preserve any query (the
@@ -158,8 +159,29 @@ watch(
 
 const pageReview = ref(null);
 const sectionTree = ref(null);
-const reviewTab = ref(null);
 const reviewBusy = computed(() => isActive(status.value) || !imp.doc?.source_document);
+
+const review = useCall({
+	url: "/api/v2/method/wikify.api.review.get_review",
+	params: () => ({ import_name: props.name }),
+	immediate: false,
+});
+function reloadReview() {
+	if (!reviewBusy.value) review.reload();
+}
+watch(reviewBusy, reloadReview, { immediate: true });
+
+// An import opened without a tab lands on Review while it has open spots.
+watch(
+	() => review.data?.summary.open,
+	(open) => {
+		if (open && !route.params.tab) activeTab.value = tabKeys.indexOf("review");
+	}
+);
+
+function openReview() {
+	router.push({ name: "ImportDetail", params: { name: props.name, tab: "review" } });
+}
 
 function openPage(pageNo) {
 	router.push({
@@ -208,10 +230,10 @@ function onProgress(payload) {
 	if (["Review", "Failed", "Completed", "Graphed", "Stopped"].includes(payload.status)) {
 		imp.reload();
 		// A finished remediation rewrote canonical scores + rebuilt the tree — refetch both.
+		// The review reloads through the reviewBusy watch.
 		if (wasRemediating && payload.status === "Review") {
 			pageReview.value?.reload();
 			sectionTree.value?.reload();
-			reviewTab.value?.reload();
 		}
 		// A finished publish assigned each included section its wiki_document — the
 		// mounted tree still holds the pre-publish (empty) values until refetched.
@@ -243,7 +265,7 @@ function onAgentMutation(payload) {
 	if (!imp.doc || !docs.includes(imp.doc.source_document)) return;
 	pageReview.value?.reload();
 	sectionTree.value?.reload();
-	reviewTab.value?.reload();
+	reloadReview();
 	sdStats.reload();
 }
 function onClassifyDone(payload) {
@@ -254,7 +276,7 @@ function onClassifyDone(payload) {
 	}
 	toast.success("Sections reclassified");
 	sectionTree.value?.reload();
-	reviewTab.value?.reload();
+	reloadReview();
 	sdStats.reload();
 }
 onMounted(() => {
@@ -376,9 +398,9 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 			<template #tab-panel="{ tab }">
 				<ReviewTab
 					v-if="tab.key === 'review'"
-					ref="reviewTab"
 					:import-name="name"
 					:busy="reviewBusy"
+					:review="review"
 					@open-page="openPage"
 				/>
 
@@ -485,7 +507,9 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:status="status"
 						:wiki-space="imp.doc?.wiki_space"
 						:initial-section="route.query.section"
+						:review="review"
 						@graphed="imp.reload()"
+						@review="openReview"
 					/>
 				</div>
 

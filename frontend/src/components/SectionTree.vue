@@ -7,6 +7,7 @@ import WikiPreview from "@/components/WikiPreview.vue";
 import WikiPublish from "@/components/WikiPublish.vue";
 import { useIsNarrow } from "@/composables/useMediaQuery";
 import { setSection } from "@/data/agentContext";
+import { plural } from "@/utils/format";
 import { isPublished } from "@/utils/status";
 
 const props = defineProps({
@@ -17,8 +18,10 @@ const props = defineProps({
 	wikiSpace: { type: String, default: null },
 	// Deep-link target (0.5 graph view click-through): selected + scrolled to on load.
 	initialSection: { type: String, default: null },
+	// The import's review, for the spots that still block publishing.
+	review: { type: Object, default: null },
 });
-const emit = defineEmits(["graphed"]);
+const emit = defineEmits(["graphed", "review"]);
 
 // Flat sections ordered by tree position (`lft`); the nesting is rebuilt client-side.
 const sections = useList({
@@ -278,6 +281,26 @@ const graphLabel = computed(() => {
 	if (isGraphed.value) return "Rebuild graph";
 	return isNarrow.value ? "Build graph" : "Approve & Build Graph";
 });
+// Lint informs and never gates (0.6), so open blockers ask instead of refusing.
+const checking = ref(false);
+async function approve() {
+	checking.value = true;
+	await props.review?.reload();
+	checking.value = false;
+	const blocks = props.review?.data?.summary.blocks;
+	if (!blocks) return buildGraph();
+	const spots = plural(blocks, "spot still blocks", "spots still block");
+	dialog.confirm({
+		title: "Approve with open problems?",
+		message: `${spots} publishing. They will render broken on the wiki.`,
+		theme: "yellow",
+		actions: [
+			{ label: "Review them", variant: "subtle", onClick: () => emit("review") },
+			{ label: "Approve anyway", variant: "solid", onClick: buildGraph },
+		],
+	});
+}
+
 async function buildGraph() {
 	try {
 		await graph.submit({ import_name: props.importName });
@@ -330,8 +353,8 @@ async function buildGraph() {
 						size="sm"
 						variant="solid"
 						:label="graphLabel"
-						:loading="graph.loading"
-						@click="buildGraph"
+						:loading="graph.loading || checking"
+						@click="approve"
 					/>
 					<WikiPublish
 						class="ml-auto"
