@@ -71,11 +71,21 @@ def chat_completion(
 		timeout=timeout,
 	)
 	dt = time.monotonic() - t0
-	resp.raise_for_status()
+	if not resp.ok:
+		raise requests.HTTPError(
+			f"{model} failed with {resp.status_code}: {error_message(resp)}", response=resp
+		)
 	data = resp.json()
 
 	record_metrics(label, model, dt, data.get("usage") or {})
 	return data
+
+
+def error_message(resp) -> str:
+	try:
+		return resp.json()["error"]["message"]
+	except (ValueError, KeyError, TypeError):
+		return resp.reason or "no details"
 
 
 def record_metrics(label: str, model: str, seconds: float, usage: dict) -> None:

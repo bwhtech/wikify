@@ -81,6 +81,11 @@ const routes = [
 				replace: true,
 			},
 	},
+	{
+		path: "/:pathMatch(.*)*",
+		name: "NotFound",
+		component: () => import("@/pages/NotFound.vue"),
+	},
 ];
 
 // __FRONTEND_ROUTE__ is injected by the frappe-ui vite plugin (= '/wikify').

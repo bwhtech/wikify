@@ -21,7 +21,7 @@ import frappe
 
 # Defaults mirror the POC `config.py` (used when a Settings field is blank).
 DEFAULTS = {
-	"vlm_model": "mistralai/mistral-medium-3.1",
+	"vlm_model": "google/gemini-3-flash-preview",
 	"cleanup_model": "google/gemini-2.5-flash",
 	"judge_model": "anthropic/claude-sonnet-4.6",
 	"classifier_model": "google/gemini-2.5-flash",

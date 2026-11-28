@@ -14,10 +14,10 @@ const { resolvedTheme, toggleTheme } = useTheme();
 			<slot name="actions" />
 		</template>
 		<div v-else class="flex w-full items-center gap-3">
-			<div class="flex min-w-0 flex-1 basis-0 items-center">
+			<div class="flex min-w-0 flex-1 items-center">
 				<slot />
 			</div>
-			<div class="flex min-w-max flex-1 basis-0 items-center justify-end gap-2">
+			<div class="flex shrink-0 items-center justify-end gap-2">
 				<slot name="actions" />
 				<Button
 					variant="ghost"

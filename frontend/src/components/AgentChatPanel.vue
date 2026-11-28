@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Button, dialog, Dropdown, Spinner, Textarea } from "frappe-ui";
 import MarkdownPreview from "@/components/MarkdownPreview.vue";
 import { useAgentChat } from "@/composables/useAgentChat";
+import { agentPanel } from "@/data/agentPanel";
 
 const props = defineProps({
 	open: { type: Boolean, default: false },
@@ -37,6 +38,34 @@ onBeforeUnmount(endResize);
 
 const chat = useAgentChat();
 const { messages, prompt, isRunning, errorText, attachments, sessionId, model, models } = chat;
+
+const composer = ref(null);
+const COMPOSER_MAX_HEIGHT = 192;
+
+// Grow with wrapped lines too, so a long draft reads from the top without scrolling.
+function fitComposer() {
+	const el = composer.value?.el;
+	if (!el) return;
+	el.style.height = "auto";
+	const border = el.offsetHeight - el.clientHeight;
+	el.style.height = `${Math.min(el.scrollHeight + border, COMPOSER_MAX_HEIGHT)}px`;
+}
+watch(prompt, () => nextTick(fitComposer));
+
+// A draft starts a new chat scoped to the current chips, unless a turn is still running.
+watch(
+	() => agentPanel.draft,
+	async (draft) => {
+		if (draft == null) return;
+		if (!isRunning.value) chat.newSession();
+		prompt.value = draft;
+		agentPanel.draft = null;
+		await nextTick();
+		composer.value?.el?.focus({ preventScroll: true });
+		fitComposer();
+	},
+	{ immediate: true }
+);
 
 const TOOL_STATUS_LABEL = {
 	running: "running…",
@@ -348,10 +377,11 @@ function onKeydown(e) {
 			</div>
 			<div class="flex items-end gap-2">
 				<Textarea
+					ref="composer"
 					v-model="prompt"
 					:rows="1"
 					placeholder="Ask the assistant…"
-					class="max-h-32 flex-1 resize-none"
+					class="flex-1 resize-none"
 					@keydown="onKeydown"
 				/>
 				<Button

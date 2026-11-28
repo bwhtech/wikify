@@ -64,6 +64,18 @@ def pick_winner(candidates: list[tuple], baseline_composite: float, baseline_mar
 	return cleanup_candidate
 
 
+def is_target(page: dict, scope: str) -> bool:
+	if scope == "all":
+		return True
+	if scope == "failed":
+		return "vlm failed:" in (page["remediation_notes"] or "") and page["canonical_source"] in (
+			None,
+			"",
+			"baseline",
+		)
+	return page["verdict"] != "pass"
+
+
 def remediate_pdf(  # noqa: C901
 	source_document: str,
 	pdf_path: str,
@@ -83,12 +95,16 @@ def remediate_pdf(  # noqa: C901
 	dpi = int(settings.get("render_dpi"))
 
 	pages = store.get_pages(source_document)
-	targets = pages if scope == "all" else [p for p in pages if p["verdict"] != "pass"]
+	targets = [p for p in pages if is_target(p, scope)]
 	total = len(targets)
 
-	canon_md = {p["page_no"]: p["baseline_markdown"] or "" for p in pages}
-	canon_comp = {p["page_no"]: p["composite"] for p in pages}
-	canon_src = {p["page_no"]: "baseline" for p in pages}
+	# Pages outside the scope keep the version they already publish.
+	canon_md = {p["page_no"]: p["canonical_markdown"] or p["baseline_markdown"] or "" for p in pages}
+	canon_comp = {
+		p["page_no"]: p["composite"] if p["canonical_composite"] is None else p["canonical_composite"]
+		for p in pages
+	}
+	canon_src = {p["page_no"]: p["canonical_source"] or "baseline" for p in pages}
 
 	with fitz.open(pdf_path) as doc:
 		furniture = det.find_furniture_lines([doc[p["page_no"] - 1].get_text("text") for p in pages])
@@ -182,6 +198,8 @@ def remediate_pdf(  # noqa: C901
 				canon_src[p["page_no"]] = method
 			else:
 				canon_md[p["page_no"]] = base_md
+				canon_comp[p["page_no"]] = p["composite"]
+				canon_src[p["page_no"]] = "baseline"
 			canon_md[p["page_no"]] = images.place_figures(canon_md[p["page_no"]], figures, p["page_no"])
 			canon_md[p["page_no"]] = repair_broken_image_tags(canon_md[p["page_no"]], page_image)
 			canon_md[p["page_no"]] = with_page_crop(canon_md[p["page_no"]], page_image)

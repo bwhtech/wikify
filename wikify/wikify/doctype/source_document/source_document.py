@@ -24,6 +24,7 @@ class SourceDocument(Document):
 		)
 
 		frappe.db.delete("Section Reference", {"source_document": self.name})
+		frappe.db.delete("Wikify Review Decision", {"source_document": self.name})
 		frappe.db.delete("Source Section", {"source_document": self.name})
 		# Pages go before their images: File refuses to delete a URL still set in Source Page.image.
 		frappe.db.delete("Source Page", {"source_document": self.name})

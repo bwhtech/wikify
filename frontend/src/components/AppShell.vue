@@ -17,6 +17,7 @@ import { useTheme } from "@/utils/useTheme";
 import { useIsMobile } from "@/composables/useMediaQuery";
 import { session } from "@/data/session";
 import AgentChatPanel from "@/components/AgentChatPanel.vue";
+import { agentPanel } from "@/data/agentPanel";
 import AppSettingsDialog from "@/components/AppSettingsDialog.vue";
 import CommandPalette from "@/components/CommandPalette.vue";
 import { PALETTE_SHORTCUT, paletteOpen } from "@/data/commandPalette";
@@ -30,7 +31,6 @@ const isMobile = useIsMobile();
 const BUG_REPORT_URL = "https://github.com/bwhtech/wikify/issues/new";
 
 const mobileMenuOpen = ref(false);
-const agentOpen = ref(false);
 
 const menuItems = computed(() => [
 	{
@@ -124,8 +124,8 @@ onMounted(initializeTheme);
 					<MobileNavItem
 						label="Assistant"
 						icon="lucide-sparkles"
-						:active="agentOpen"
-						@click="agentOpen = true"
+						:active="agentPanel.open"
+						@click="agentPanel.open = true"
 					/>
 					<MobileNavItem
 						label="Menu"
@@ -177,8 +177,8 @@ onMounted(initializeTheme);
 							<SidebarItem
 								label="Assistant"
 								icon="lucide-sparkles"
-								:active="agentOpen"
-								@click="agentOpen = !agentOpen"
+								:active="agentPanel.open"
+								@click="agentPanel.open = !agentPanel.open"
 							/>
 						</nav>
 						<div class="mt-auto">
@@ -186,7 +186,7 @@ onMounted(initializeTheme);
 						</div>
 					</div>
 				</Sidebar>
-				<AgentChatPanel v-model:open="agentOpen" docked />
+				<AgentChatPanel v-model:open="agentPanel.open" docked />
 			</template>
 
 			<router-view :key="pageKey" :route="visibleRoute" />
@@ -197,7 +197,7 @@ onMounted(initializeTheme);
 			v-if="!isMobile"
 			v-model:open="paletteOpen"
 			:menu-items="paletteMenuItems"
-			@open-assistant="agentOpen = true"
+			@open-assistant="agentPanel.open = true"
 		/>
 
 		<!-- Mobile overflow menu (settings / theme / logout). -->
@@ -215,6 +215,6 @@ onMounted(initializeTheme);
 			</div>
 		</BottomSheet>
 
-		<AgentChatPanel v-if="isMobile" v-model:open="agentOpen" />
+		<AgentChatPanel v-if="isMobile" v-model:open="agentPanel.open" />
 	</div>
 </template>

@@ -133,7 +133,15 @@ def overlapping_sections(section_name: str) -> list[dict]:
 	]
 
 
-def rebuild_section_markdown(section_name: str) -> dict:
+def propagate_page(source_document: str, page_no: int) -> dict:
+	"""Carry a page's new canonical markdown into the one section that owns it. A boundary
+	page (several owners) is left alone: whole-page adoption would duplicate text."""
+	owners = sections_covering_page(source_document, page_no)
+	rebuilt = rebuild_section_markdown(owners[0].name) if len(owners) == 1 else None
+	return {"owners": owners, "rebuilt": rebuilt}
+
+
+def rebuild_section_markdown(section_name: str, dry_run: bool = False) -> dict:
 	"""Re-derive ONE section's markdown from its pages' canonical, tree untouched.
 
 	Adopts the whole `page_start`-`page_end` canonical slice (boilerplate-stripped, same
@@ -166,6 +174,8 @@ def rebuild_section_markdown(section_name: str) -> dict:
 	heading = _HEADING_RE.match(first_line)
 	if heading and _clean_title(heading.group(2)) == sec.title:
 		markdown = body.strip()
+	if dry_run:
+		return {"section": section_name, "markdown": markdown}
 	overlaps = overlapping_sections(section_name)
 	store.set_section_markdown(section_name, markdown)
 	return {

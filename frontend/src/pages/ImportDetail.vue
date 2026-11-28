@@ -23,6 +23,7 @@ import { statusTheme, isActive } from "@/utils/status";
 import { confirmDeleteDocument } from "@/utils/deleteDocument";
 import PageReview from "@/components/PageReview.vue";
 import SectionTree from "@/components/SectionTree.vue";
+import ReviewTab from "@/components/review/ReviewTab.vue";
 import { setDocument, setProject } from "@/data/agentContext";
 import { recordRecent } from "@/data/commandPalette";
 
@@ -39,13 +40,15 @@ const imp = useDoc({ doctype: "Wikify Import", name: props.name });
 
 // Keys are route params, so they don't always match the labels.
 const tabs = [
+	{ label: "Review", key: "review" },
 	{ label: "PDF", key: "pdf" },
 	{ label: "Pages", key: "pages" },
 	{ label: "Wiki", key: "tree" },
 	{ label: "Logs", key: "overview" },
 ];
 const tabKeys = tabs.map((t) => t.key);
-const activeTab = ref(Math.max(0, tabKeys.indexOf(props.tab)));
+// A link without a tab passes "" rather than undefined, so the prop default never applies.
+const activeTab = ref(Math.max(0, tabKeys.indexOf(props.tab || "pdf")));
 
 // Persist the active tab in the route (path param) so a refresh restores it. Use
 // replace so tab-switching doesn't flood browser history; preserve any query (the
@@ -156,6 +159,37 @@ watch(
 
 const pageReview = ref(null);
 const sectionTree = ref(null);
+const reviewBusy = computed(() => isActive(status.value) || !imp.doc?.source_document);
+
+const review = useCall({
+	url: "/api/v2/method/wikify.api.review.get_review",
+	params: () => ({ import_name: props.name }),
+	immediate: false,
+});
+function reloadReview() {
+	if (!reviewBusy.value) review.reload();
+}
+watch(reviewBusy, reloadReview, { immediate: true });
+
+// An import opened without a tab lands on Review while it has open spots.
+watch(
+	() => review.data?.summary.open,
+	(open) => {
+		if (open && !route.params.tab) activeTab.value = tabKeys.indexOf("review");
+	}
+);
+
+function openReview() {
+	router.push({ name: "ImportDetail", params: { name: props.name, tab: "review" } });
+}
+
+function openPage(pageNo) {
+	router.push({
+		name: "ImportDetail",
+		params: { name: props.name, tab: "pages" },
+		query: { page: String(pageNo) },
+	});
+}
 
 // Document-level audit score + LLM spend (0.4 slice 23) live on Source Document.
 const sdStats = useList({
@@ -196,6 +230,7 @@ function onProgress(payload) {
 	if (["Review", "Failed", "Completed", "Graphed", "Stopped"].includes(payload.status)) {
 		imp.reload();
 		// A finished remediation rewrote canonical scores + rebuilt the tree — refetch both.
+		// The review reloads through the reviewBusy watch.
 		if (wasRemediating && payload.status === "Review") {
 			pageReview.value?.reload();
 			sectionTree.value?.reload();
@@ -230,6 +265,7 @@ function onAgentMutation(payload) {
 	if (!imp.doc || !docs.includes(imp.doc.source_document)) return;
 	pageReview.value?.reload();
 	sectionTree.value?.reload();
+	reloadReview();
 	sdStats.reload();
 }
 function onClassifyDone(payload) {
@@ -240,6 +276,7 @@ function onClassifyDone(payload) {
 	}
 	toast.success("Sections reclassified");
 	sectionTree.value?.reload();
+	reloadReview();
 	sdStats.reload();
 }
 onMounted(() => {
@@ -359,8 +396,16 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 
 		<Tabs v-model="activeTab" :tabs="tabs">
 			<template #tab-panel="{ tab }">
+				<ReviewTab
+					v-if="tab.key === 'review'"
+					:import-name="name"
+					:busy="reviewBusy"
+					:review="review"
+					@open-page="openPage"
+				/>
+
 				<!-- Overview -->
-				<div v-if="tab.key === 'overview'" class="body-container pt-5 pb-40">
+				<div v-else-if="tab.key === 'overview'" class="body-container pt-5 pb-40">
 					<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
 						<div>
 							<p class="text-sm text-ink-gray-5">Pages</p>
@@ -462,7 +507,9 @@ const levelColor = { info: "text-ink-gray-7", warn: "text-ink-amber-6", error: "
 						:status="status"
 						:wiki-space="imp.doc?.wiki_space"
 						:initial-section="route.query.section"
+						:review="review"
 						@graphed="imp.reload()"
+						@review="openReview"
 					/>
 				</div>
 

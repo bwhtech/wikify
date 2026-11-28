@@ -109,7 +109,19 @@ def get_pages(source_document: str) -> list[dict]:
 	return frappe.get_all(
 		"Source Page",
 		filters={"source_document": source_document},
-		fields=["name", "page_no", "kind", "baseline_markdown", "verdict", "composite", "image"],
+		fields=[
+			"name",
+			"page_no",
+			"kind",
+			"baseline_markdown",
+			"verdict",
+			"composite",
+			"image",
+			"canonical_markdown",
+			"canonical_composite",
+			"canonical_source",
+			"remediation_notes",
+		],
 		order_by="page_no asc",
 	)
 
@@ -142,6 +154,48 @@ def set_canonical(page_name: str, markdown: str, composite: float | None, source
 		values["verdict"] = get_verdict(composite)
 	frappe.db.set_value("Source Page", page_name, values)
 	invalidate_page(page_name)
+
+
+def set_remediation_adopted(page_name: str, adopted: bool) -> None:
+	frappe.db.set_value("Source Page", page_name, "remediation_adopted", 1 if adopted else 0)
+
+
+def set_page_preview(
+	page_name: str, markdown: str, composite: float | None, notes: str | None, instruction: str
+) -> None:
+	frappe.db.set_value(
+		"Source Page",
+		page_name,
+		{
+			"preview_markdown": markdown,
+			"preview_composite": composite,
+			"preview_notes": notes,
+			"preview_instruction": instruction or None,
+		},
+	)
+
+
+def adopt_preview(page_name: str) -> None:
+	"""Publish the review preview. It becomes the page's vision remediation."""
+	page = frappe.db.get_value(
+		"Source Page", page_name, ["preview_markdown", "preview_composite", "preview_notes"], as_dict=True
+	)
+	frappe.db.set_value(
+		"Source Page",
+		page_name,
+		{
+			"remediation_method": "vlm",
+			"remediation_markdown": page.preview_markdown,
+			"remediation_composite": page.preview_composite,
+			"remediation_notes": page.preview_notes,
+			"remediation_adopted": 1,
+			"preview_markdown": None,
+			"preview_composite": 0,
+			"preview_notes": None,
+			"preview_instruction": None,
+		},
+	)
+	set_canonical(page_name, page.preview_markdown, page.preview_composite, "vlm")
 
 
 def set_canonical_mean(source_document: str, mean: float | None) -> None:
@@ -421,3 +475,109 @@ def replace_references(
 		doc = frappe.new_doc("Section Reference")
 		doc.update(row)
 		doc.insert(ignore_permissions=True)
+
+
+REVIEW_PAGE_FIELDS = [
+	"name",
+	"page_no",
+	"kind",
+	"image",
+	"composite",
+	"canonical_composite",
+	"canonical_source",
+	"canonical_markdown",
+	"baseline_markdown",
+	"notes",
+	"text_recall",
+	"extra_ratio",
+	"table_score",
+	"judge_score",
+	"remediation_method",
+	"remediation_markdown",
+	"remediation_composite",
+	"remediation_notes",
+	"remediation_adopted",
+	"preview_markdown",
+	"preview_composite",
+	"preview_notes",
+	"preview_instruction",
+]
+
+
+def get_review_pages(source_document: str) -> list[dict]:
+	return frappe.get_all(
+		"Source Page",
+		filters={"source_document": source_document},
+		fields=REVIEW_PAGE_FIELDS,
+		order_by="page_no asc",
+	)
+
+
+def get_review_sections(source_document: str) -> list[dict]:
+	return frappe.get_all(
+		"Source Section",
+		filters={"source_document": source_document},
+		fields=[
+			"name",
+			"title",
+			"page_start",
+			"page_end",
+			"is_group",
+			"include_in_wiki",
+			"section_type",
+			"lint_issues",
+			"markdown",
+		],
+		order_by="lft asc",
+	)
+
+
+def get_other_section_type() -> str | None:
+	return frappe.db.get_value("Section Type", {"is_other": 1}, "name")
+
+
+def get_review_decisions(source_document: str) -> list[dict]:
+	return frappe.get_all(
+		"Wikify Review Decision",
+		filters={"source_document": source_document},
+		fields=[
+			"name",
+			"issue_id",
+			"issue_code",
+			"issue_title",
+			"target_doctype",
+			"target_name",
+			"fingerprint",
+			"action",
+			"suggestion",
+			"instruction",
+			"outcome",
+			"owner",
+			"creation",
+		],
+		order_by="creation desc",
+	)
+
+
+def add_review_decision(source_document: str, issue: dict, action: str, **values) -> None:
+	frappe.get_doc(
+		{
+			"doctype": "Wikify Review Decision",
+			"source_document": source_document,
+			"issue_id": issue["id"],
+			"issue_code": issue["code"],
+			"issue_title": issue["title"],
+			"target_doctype": issue["target"]["doctype"],
+			"target_name": issue["target"]["name"],
+			"fingerprint": issue["fingerprint"],
+			"action": action,
+			**values,
+		}
+	).insert(ignore_permissions=True)
+
+
+def reopen_decisions(source_document: str, issue_id: str) -> None:
+	"""Drop "fine as is" and unpin applied fixes; the applied ones stay as history."""
+	filters = {"source_document": source_document, "issue_id": issue_id}
+	frappe.db.delete("Wikify Review Decision", {**filters, "action": "accepted"})
+	frappe.db.set_value("Wikify Review Decision", {**filters, "action": "applied"}, "fingerprint", "")

@@ -85,7 +85,8 @@ def parse_pdf(
 			page_no = i + 1
 			png = pdf_utils.render_png(page, dpi=dpi)
 			kind = pdf_utils.classify_page(page, min_chars, min_drawings)
-			markdown = baseline.parse_page(pdf_path, page_no)
+			page_text = page.get_text("text")
+			markdown = baseline.parse_page(pdf_path, page_no, page_text)
 			page_name = store.add_page(sd, page_no, kind, png, markdown)
 			figures = images.page_figures(page, repeated, page_name, page_no)
 			if figures:
@@ -100,7 +101,7 @@ def parse_pdf(
 			score = score_page(
 				page_no,
 				markdown,
-				page.get_text("text"),
+				page_text,
 				image_data_url=image_data_url,
 				use_judge=use_judge,
 				page_kind=kind,

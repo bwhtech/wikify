@@ -64,8 +64,8 @@ def start_imports(files: list[dict] | str, project: str | None = None) -> list[s
 
 @frappe.whitelist(methods=["POST"])
 def trigger_remediation(import_name: str, scope: str = "flagged") -> str:
-	if scope not in ("flagged", "all"):
-		frappe.throw(f"Invalid scope: {scope!r} (expected 'flagged' or 'all').")
+	if scope not in ("flagged", "all", "failed"):
+		frappe.throw(f"Invalid scope: {scope!r} (expected 'flagged', 'all' or 'failed').")
 
 	imp = frappe.get_doc("Wikify Import", import_name)
 	if not imp.source_document:
